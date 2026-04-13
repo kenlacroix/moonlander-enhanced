@@ -2,6 +2,15 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.0.0] - 2026-04-13
+
+### Added
+- Share any terrain with a link: `?seed=1969` in the URL loads that exact map. Address bar updates live when you launch a mission.
+- PWA support: manifest + service worker with network-first caching. Installable on mobile, playable offline after first load.
+- Embed mode: `?embed=1` skips the title screen and auto-restarts on the same seed. Drop an iframe on your portfolio or blog.
+- Retro vector graphics skin: press V to toggle. Green phosphor wireframe lander with scanline overlay. 1979 arcade aesthetic.
+- Ghost sharing: press G after landing to download your ghost run as a `.json` file. Press I on mission select to import a ghost file. Imported ghosts replay on the matching seed.
+
 ## [0.3.0.0] - 2026-04-13
 
 ### Added
