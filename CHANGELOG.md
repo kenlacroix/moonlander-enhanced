@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.1.0] - 2026-04-13
+
+### Added
+- Lunar Archaeology Mode: historical Apollo artifacts (flags, rover tracks, descent stage debris, boot prints, memorial plaques) scattered on ~40% of terrains. Land near one to scan it and learn a real historical fact via LLM, or see a hardcoded fallback offline. 5 artifact types with unique canvas sprites. Amber glow when unscanned, dims to gray after scanning.
+
 ## [0.4.0.0] - 2026-04-13
 
 ### Added
