@@ -17,6 +17,7 @@ export class HUD {
 		windLabel: string | null = null,
 		fuelLeak = false,
 		autopilot = false,
+		adaptiveLabel: string | null = null,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -98,6 +99,15 @@ export class HUD {
 			ctx.font = '20px "Courier New", monospace';
 			ctx.textAlign = "right";
 			ctx.fillText(`SCORE: ${score}`, CANVAS_WIDTH - 20, 20);
+		}
+
+		// Adaptive difficulty label (top right, below score)
+		if (adaptiveLabel && adaptiveLabel !== "NORMAL") {
+			const labelColor = adaptiveLabel === "EASY" ? "#44aaff" : adaptiveLabel === "HARD" ? "#ffaa00" : "#ff4444";
+			ctx.fillStyle = labelColor;
+			ctx.font = '12px "Courier New", monospace';
+			ctx.textAlign = "right";
+			ctx.fillText(`DIFFICULTY: ${adaptiveLabel}`, CANVAS_WIDTH - 20, 44);
 		}
 
 		// Controls hint (bottom center)

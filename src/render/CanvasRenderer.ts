@@ -266,8 +266,8 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
-	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false, autopilot = false): void {
-		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak, autopilot);
+	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false, autopilot = false, adaptiveLabel: string | null = null): void {
+		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak, autopilot, adaptiveLabel);
 	}
 
 	drawTitle(selection: number, completedCount: number, totalCampaign: number): void {

@@ -56,7 +56,7 @@
 - [x] Agent replay viewer (watch best agent run at normal speed)
 - [ ] Claude API — dynamic mission briefings per terrain seed
 - [ ] Claude API — mission control commentary on landing quality
-- [ ] Difficulty adaptation based on player history
+- [x] Difficulty adaptation based on player history
 
 **Exit question:** Can you watch the RL agent improve in real time and understand why?
 

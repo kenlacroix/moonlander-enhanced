@@ -1,4 +1,5 @@
 import { Autopilot } from "../ai/Autopilot";
+import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
 import { CanvasRenderer } from "../render/CanvasRenderer";
@@ -52,6 +53,7 @@ export class Game {
 	private titleSelection = 0; // 0 = free play, 1 = campaign, 2 = AI training
 	private trainingLoop: TrainingLoop | null = null;
 	private latestTrainingStats: TrainingStats | null = null;
+	private adaptiveLabel: string | null = null;
 	private lastTime = 0;
 	private accumulator = 0;
 	private firstFrame = true;
@@ -79,7 +81,15 @@ export class Game {
 	}
 
 	private reset(): void {
-		const diff = this.activeMission?.difficulty;
+		let diff = this.activeMission?.difficulty;
+		// Apply adaptive difficulty for free-play missions
+		if (this.gameMode === "freeplay" && !diff) {
+			const modifiers = getAdaptiveModifiers(this.seed);
+			diff = applyAdaptiveModifiers(undefined, modifiers);
+			this.adaptiveLabel = modifiers.label;
+		} else {
+			this.adaptiveLabel = null;
+		}
 		this.terrain = generateTerrain(this.seed, diff);
 		// Spawn lander above center of the world
 		const spawnX = WORLD_WIDTH / 2;
@@ -434,7 +444,7 @@ export class Game {
 		}
 		this.renderer.drawLander(this.lander, offset);
 		const windLabel = this.wind ? getWindLabel(this.wind) : null;
-		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive, this.autopilot.enabled);
+		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive, this.autopilot.enabled, this.adaptiveLabel);
 
 		// Touch controls overlay
 		if (this.input.isTouchDevice) {
