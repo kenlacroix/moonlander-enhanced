@@ -4,6 +4,7 @@ import type { LanderState } from "../game/Lander";
 import type { Mission } from "../game/Missions";
 import type { Particle } from "../game/Particles";
 import type { LandingPad, TerrainData } from "../game/Terrain";
+import type { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import type { TelemetryFrame } from "../systems/Telemetry";
 import {
 	CANVAS_HEIGHT,
@@ -27,6 +28,7 @@ export class CanvasRenderer {
 	private background: Background;
 	private hud: HUD;
 	private beaconPhase = 0;
+	private retro: RetroVectorSkin | null = null;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
@@ -58,9 +60,15 @@ export class CanvasRenderer {
 		}
 	}
 
+	setRetroSkin(skin: RetroVectorSkin | null): void {
+		this.retro = skin;
+	}
+
 	clear(): void {
 		this.ctx.fillStyle = "#000000";
 		this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		// Apply scanline overlay in retro mode
+		this.retro?.drawScanlines(this.ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 	}
 
 	drawBackground(camera: Camera): void {
@@ -144,6 +152,39 @@ export class CanvasRenderer {
 
 		const hw = LANDER_WIDTH / 2;
 		const hh = LANDER_HEIGHT / 2;
+
+		// Retro mode: green wireframe only
+		if (this.retro) {
+			this.retro.applyStyle(ctx);
+			ctx.strokeStyle = this.retro.getColor();
+			ctx.lineWidth = 1.5;
+			// Body outline
+			ctx.beginPath();
+			ctx.moveTo(-hw * 0.6, -hh);
+			ctx.lineTo(hw * 0.6, -hh);
+			ctx.lineTo(hw, hh * 0.3);
+			ctx.lineTo(hw * 0.8, hh * 0.6);
+			ctx.lineTo(-hw * 0.8, hh * 0.6);
+			ctx.lineTo(-hw, hh * 0.3);
+			ctx.closePath();
+			ctx.stroke();
+			// Legs
+			ctx.beginPath();
+			ctx.moveTo(-hw * 0.6, hh * 0.6); ctx.lineTo(-hw * 1.0, hh);
+			ctx.moveTo(hw * 0.6, hh * 0.6); ctx.lineTo(hw * 1.0, hh);
+			ctx.stroke();
+			// Thrust glow
+			if (lander.thrusting) {
+				ctx.strokeStyle = this.retro.getColor();
+				ctx.beginPath();
+				ctx.moveTo(-hw * 0.3, hh * 0.85);
+				ctx.lineTo(0, hh + 15);
+				ctx.lineTo(hw * 0.3, hh * 0.85);
+				ctx.stroke();
+			}
+			ctx.restore();
+			return;
+		}
 
 		// Lander body — simple geometric shape
 		ctx.fillStyle = COLOR_LANDER;

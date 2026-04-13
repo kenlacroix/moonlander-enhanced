@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MoonLander</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#00ff88" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
@@ -25,5 +29,10 @@
 <body>
   <canvas id="game-canvas"></canvas>
   <script type="module" src="/src/main.ts"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  </script>
 </body>
 </html>

@@ -26,6 +26,7 @@ const NULL_INPUT: InputState = {
 	menuBack: false,
 	toggleAutopilot: false,
 	openSettings: false,
+	toggleRetroSkin: false,
 };
 
 export class Autopilot {
@@ -134,6 +135,7 @@ export class Autopilot {
 			menuBack: false,
 			toggleAutopilot: false,
 			openSettings: false,
+			toggleRetroSkin: false,
 		};
 	}
 

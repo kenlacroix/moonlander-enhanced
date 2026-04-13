@@ -23,6 +23,7 @@ function unpackInput(frame: InputFrame): InputState {
 		menuBack: false,
 		toggleAutopilot: false,
 		openSettings: false,
+		toggleRetroSkin: false,
 	};
 }
 

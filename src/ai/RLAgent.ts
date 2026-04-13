@@ -145,6 +145,7 @@ export class RLAgent {
 			menuBack: false,
 			toggleAutopilot: false,
 			openSettings: false,
+			toggleRetroSkin: false,
 		};
 	}
 

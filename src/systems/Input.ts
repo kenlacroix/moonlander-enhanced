@@ -9,6 +9,7 @@ export interface InputState {
 	menuBack: boolean;
 	toggleAutopilot: boolean;
 	openSettings: boolean;
+	toggleRetroSkin: boolean;
 }
 
 /** Touch zone identifiers */
@@ -23,6 +24,7 @@ export class Input {
 	private _menuBackPressed = false;
 	private _autopilotToggled = false;
 	private _settingsPressed = false;
+	private _retroToggled = false;
 
 	// Touch state
 	private touchActive = new Map<number, TouchZone>();
@@ -55,6 +57,9 @@ export class Input {
 			}
 			if (e.code === "KeyS" && !this.keys.has("ArrowDown")) {
 				this._settingsPressed = true;
+			}
+			if (e.code === "KeyV") {
+				this._retroToggled = true;
 			}
 			// Prevent scrolling with arrow keys / space
 			if (
@@ -141,6 +146,7 @@ export class Input {
 			menuBack: this._menuBackPressed,
 			toggleAutopilot: this._autopilotToggled,
 			openSettings: this._settingsPressed,
+			toggleRetroSkin: this._retroToggled,
 		};
 		this._restartPressed = false;
 		this._menuUpPressed = false;
@@ -149,6 +155,7 @@ export class Input {
 		this._menuBackPressed = false;
 		this._autopilotToggled = false;
 		this._settingsPressed = false;
+		this._retroToggled = false;
 		this._touchRestart = false;
 		this._touchMenuSelect = false;
 		return state;

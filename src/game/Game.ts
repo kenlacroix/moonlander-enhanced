@@ -1,4 +1,5 @@
 import { type AlienState, applyAlienEffect, createAlien, getAlienEffectLabel, shouldSpawnAlien, updateAlien } from "./Alien";
+import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
 import type { TrainingStats } from "../ai/RLAgent";
@@ -78,17 +79,29 @@ export class Game {
 	private fuelLeakActive = false;
 	private fuelLeakTriggered = false;
 	private alien: AlienState | null = null;
+	private retroSkin = new RetroVectorSkin();
 
-	constructor(canvas: HTMLCanvasElement) {
+	private embedMode: boolean;
+
+	constructor(canvas: HTMLCanvasElement, urlSeed?: number, embedMode = false) {
+		this.embedMode = embedMode;
 		this.renderer = new CanvasRenderer(canvas);
 		this.audio = new Audio();
 		this.input = new Input();
 		this.camera = new Camera();
 		this.particles = new ParticleSystem();
-		this.seed = MISSIONS[0].seed;
+		this.seed = urlSeed ?? MISSIONS[0].seed;
 		this.llmConfig = loadLLMConfig();
 		this.reset();
-		this.status = "title"; // start on title screen
+
+		if (urlSeed && !Number.isNaN(urlSeed)) {
+			// URL seed provided — jump straight into the mission
+			this.gameMode = "freeplay";
+			this.activeMission = { id: 0, name: `SEED ${urlSeed}`, seed: urlSeed, description: "Shared mission" };
+			this.status = "playing";
+		} else {
+			this.status = "title";
+		}
 	}
 
 	private reset(): void {
@@ -274,6 +287,7 @@ export class Game {
 					this.seed = mission.seed;
 					this.reset();
 					this.fetchBriefing(mission);
+					this.updateURL(mission.seed);
 				}
 			}
 			if (inputState.menuBack) {
@@ -284,8 +298,14 @@ export class Game {
 			return;
 		}
 
-		// Handle restart — go back to menu
+		// Handle restart
 		if (inputState.restart && this.status !== "playing") {
+			// Embed mode: restart same seed, never show menu
+			if (this.embedMode) {
+				this.reset();
+				requestAnimationFrame((t) => this.loop(t));
+				return;
+			}
 			// In campaign, advance to next mission on success
 			if (this.gameMode === "campaign" && this.status === "landed" && this.activeMission) {
 				const nextIdx = this.selectedMission + 1;
@@ -315,6 +335,12 @@ export class Game {
 		// Autopilot toggle
 		if (inputState.toggleAutopilot && this.status === "playing") {
 			this.autopilot.toggle();
+		}
+
+		// Retro skin toggle
+		if (inputState.toggleRetroSkin) {
+			this.retroSkin.toggle();
+			this.renderer.setRetroSkin(this.retroSkin.active ? this.retroSkin : null);
 		}
 
 		// If autopilot is active, use its computed input instead of player input
@@ -641,5 +667,15 @@ export class Game {
 		}).finally(() => {
 			this.llmLoading = false;
 		});
+	}
+
+	private updateURL(seed: number | null): void {
+		const url = new URL(window.location.href);
+		if (seed !== null) {
+			url.searchParams.set("seed", String(seed));
+		} else {
+			url.searchParams.delete("seed");
+		}
+		window.history.replaceState(null, "", url.toString());
 	}
 }

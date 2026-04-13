@@ -66,12 +66,12 @@
 
 **Theme:** Send someone a link. They get it in 10 seconds.
 
-- [ ] URL-encoded terrain seeds (share exact map with friends)
+- [x] URL-encoded terrain seeds (share exact map with friends)
 - [ ] Async ghost sharing (export/import ghost run as JSON)
-- [ ] Retro vector graphics skin (unlockable)
+- [x] Retro vector graphics skin (unlockable)
 - [ ] 3D mode exploration (Three.js spike — actual lunar surface)
-- [ ] PWA support (installable, offline play)
-- [ ] Embed mode (plays in an iframe for portfolio/blog)
+- [x] PWA support (installable, offline play)
+- [x] Embed mode (plays in an iframe for portfolio/blog)
 
 **Exit question:** Would a stranger share this with a friend?
 
