@@ -91,6 +91,93 @@
 
 ---
 
+## Phase 6 — Competitive Layer
+
+**Theme:** You vs the world.
+
+- [ ] Global leaderboard via serverless API (Cloudflare Workers or Vercel Edge). Score + seed + ghost hash. No accounts, just a player name.
+- [ ] Daily challenge: one shared seed, everyone gets the same terrain, 24-hour leaderboard reset at midnight UTC.
+- [ ] Ghost download from the leaderboard. Watch the #1 player's run before you try.
+- [ ] Seed-of-the-week community picks. Curated by LLM based on terrain interestingness (roughness variance, pad difficulty score).
+- [ ] Achievement badges (localStorage): "First Landing", "No Thrust Landing", "Full Campaign", "Beat the AI", "Survive the Aliens".
+
+**Exit question:** Do strangers compete against each other on your game?
+
+---
+
+## Phase 7 — Visual Upgrade (WebGL)
+
+**Theme:** It looks like a real game now.
+
+- [ ] PixiJS WebGL renderer (swap-in, game logic untouched per IRenderer pattern).
+- [ ] Bloom shader on thruster plume and landing pad beacons.
+- [ ] Heat distortion shader behind engine bell.
+- [ ] Normal mapping on terrain surface for 3D feel on 2D geometry.
+- [ ] Dynamic sun lighting per mission (angle changes, casts lander shadow).
+- [ ] Lander spotlight illuminating terrain on final approach.
+- [ ] Particle count 10x via WebGL particle containers.
+- [ ] Screen shake with camera trauma system.
+
+**Exit question:** Does someone watching over your shoulder say "that looks cool"?
+
+---
+
+## Phase 8 — Audio Evolution
+
+**Theme:** The sound design becomes the game.
+
+- [ ] Procedural ambient radio chatter (seeded beeps, static bursts, garbled transmissions).
+- [ ] Heartbeat audio layer synced with descent rate. Faster heartbeat = faster descent.
+- [ ] Doppler effect on thruster hum when camera moves relative to lander.
+- [ ] Per-mission musical key. Each seed generates a different tritone root so every mission sounds different.
+- [ ] Spatial audio (Web Audio panning) for aliens, wind, terrain proximity warnings.
+- [ ] Sound design for the terrain editor (drawing sounds, pad placement click).
+
+**Exit question:** Can you close your eyes and still feel the tension?
+
+---
+
+## Phase 9 — Multiplayer
+
+**Theme:** Land together or crash trying.
+
+- [ ] Split-screen local multiplayer (2 players, same terrain, side by side).
+- [ ] Async multiplayer via WebSocket: see other players' landers in real time as ghosts.
+- [ ] Race mode: same seed, first to land wins. Visible timer.
+- [ ] Sabotage mode: each player has one interference power (wind gust, gravity spike) using the alien effect system.
+
+**Exit question:** Do you text someone "try to beat this" and they actually do?
+
+---
+
+## Phase 10 — Education Mode
+
+**Theme:** The game teaches you real physics.
+
+- [ ] Physics sandbox: adjustable gravity slider (Moon, Mars, Earth, Jupiter, zero-g).
+- [ ] Orbital mechanics intro: start from orbit, deorbit burn, then descent. Two-phase landing.
+- [ ] Real Apollo mission replays: recreate Apollo 11's descent as a playable mission with actual altitude/speed data overlay.
+- [ ] Annotated autopilot: when active, show WHY it makes each decision (force vectors, target indicators).
+- [ ] RL agent explainer: visualize neural network weights during training, show which inputs matter most, animate reward signal.
+
+**Exit question:** Can you watch the RL agent improve and understand why?
+
+---
+
+## Phase 11 — Platform
+
+**Theme:** It's not a game anymore. It's a thing people build on.
+
+- [ ] Mission SDK: JSON schema for user-created missions with custom terrain, events, win conditions, narrative.
+- [ ] Plugin system for custom lander types, skins, and effects.
+- [ ] Classroom mode: teacher creates mission sets, students compete, teacher sees score/telemetry dashboard.
+- [ ] Headless simulation API: run N landings with given inputs, return scores. For benchmarking RL agents.
+- [ ] Open source community contributions: mission packs, skins, sound packs.
+
+**Exit question:** Are people building things you didn't plan?
+
+---
+
 ## Verification
 
 - Run `npm run dev` and open http://localhost:5173
