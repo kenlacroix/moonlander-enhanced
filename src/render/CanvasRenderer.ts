@@ -285,13 +285,14 @@ export class CanvasRenderer {
 		ctx.fillText("A LUNAR DESCENT SIMULATOR", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 80);
 
 		// Mode options
-		const options = ["FREE PLAY", "CAMPAIGN"];
+		const options = ["FREE PLAY", "CAMPAIGN", "AI TRAINING"];
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
+			"Watch an AI learn to land from scratch.",
 		];
 
-		for (let i = 0; i < 2; i++) {
+		for (let i = 0; i < 3; i++) {
 			const y = CANVAS_HEIGHT / 2 + i * 60;
 			const isSelected = i === selection;
 
@@ -405,6 +406,135 @@ export class CanvasRenderer {
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
 		ctx.fillText("[UP/DOWN] Select    [ENTER] Launch    [ESC] Back to menu", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+
+		ctx.restore();
+	}
+
+	/** Training mode UI with reward graph */
+	drawTrainingUI(
+		episode: number,
+		epsilon: number,
+		lastLanded: boolean,
+		lastReward: number,
+		rewardHistory: number[],
+	): void {
+		const ctx = this.ctx;
+		ctx.save();
+
+		// Title
+		ctx.fillStyle = "#ffaa00";
+		ctx.font = 'bold 28px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText("AI TRAINING MODE", CANVAS_WIDTH / 2, 50);
+
+		// Stats
+		ctx.font = '16px "Courier New", monospace';
+		ctx.textAlign = "left";
+		const sx = 60;
+		let sy = 100;
+		const lh = 26;
+
+		ctx.fillStyle = "#00ff88";
+		ctx.fillText(`Episode:     ${episode}`, sx, sy); sy += lh;
+		ctx.fillText(`Exploration: ${(epsilon * 100).toFixed(1)}%`, sx, sy); sy += lh;
+
+		ctx.fillStyle = lastLanded ? "#00ff88" : "#ff4444";
+		ctx.fillText(`Last result: ${lastLanded ? "LANDED" : "CRASHED"}`, sx, sy); sy += lh;
+
+		ctx.fillStyle = "#ffffff";
+		ctx.fillText(`Last reward: ${lastReward.toFixed(1)}`, sx, sy); sy += lh;
+
+		// Moving average
+		if (rewardHistory.length > 0) {
+			const window = Math.min(20, rewardHistory.length);
+			const recent = rewardHistory.slice(-window);
+			const avg = recent.reduce((a, b) => a + b, 0) / window;
+			ctx.fillStyle = avg > 0 ? "#00ff88" : "#ff4444";
+			ctx.fillText(`Avg reward (${window}): ${avg.toFixed(1)}`, sx, sy);
+		}
+
+		// Reward graph
+		if (rewardHistory.length > 1) {
+			const graphX = 60;
+			const graphY = 280;
+			const graphW = CANVAS_WIDTH - 120;
+			const graphH = 300;
+
+			// Background
+			ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+			ctx.fillRect(graphX, graphY, graphW, graphH);
+
+			// Zero line
+			const minR = Math.min(...rewardHistory, -10);
+			const maxR = Math.max(...rewardHistory, 10);
+			const range = maxR - minR || 1;
+			const zeroY = graphY + graphH - ((0 - minR) / range) * graphH;
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+			ctx.lineWidth = 1;
+			ctx.setLineDash([4, 4]);
+			ctx.beginPath();
+			ctx.moveTo(graphX, zeroY);
+			ctx.lineTo(graphX + graphW, zeroY);
+			ctx.stroke();
+			ctx.setLineDash([]);
+
+			// Reward line
+			ctx.strokeStyle = "#00ff88";
+			ctx.lineWidth = 1.5;
+			ctx.beginPath();
+			const maxPoints = Math.min(rewardHistory.length, 500);
+			const step = rewardHistory.length > maxPoints ? rewardHistory.length / maxPoints : 1;
+			for (let i = 0; i < maxPoints; i++) {
+				const idx = Math.floor(i * step);
+				const rx = graphX + (i / maxPoints) * graphW;
+				const ry = graphY + graphH - ((rewardHistory[idx] - minR) / range) * graphH;
+				if (i === 0) ctx.moveTo(rx, ry);
+				else ctx.lineTo(rx, ry);
+			}
+			ctx.stroke();
+
+			// Moving average line (smoothed)
+			if (rewardHistory.length > 20) {
+				ctx.strokeStyle = "#ffaa00";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				const avgWindow = 20;
+				for (let i = avgWindow; i < maxPoints; i++) {
+					const idx = Math.floor(i * step);
+					const startIdx = Math.max(0, idx - avgWindow);
+					let sum = 0;
+					for (let j = startIdx; j <= idx; j++) sum += rewardHistory[j];
+					const avg = sum / (idx - startIdx + 1);
+					const rx = graphX + (i / maxPoints) * graphW;
+					const ry = graphY + graphH - ((avg - minR) / range) * graphH;
+					if (i === avgWindow) ctx.moveTo(rx, ry);
+					else ctx.lineTo(rx, ry);
+				}
+				ctx.stroke();
+			}
+
+			// Axis labels
+			ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+			ctx.font = '10px "Courier New", monospace';
+			ctx.textAlign = "right";
+			ctx.fillText(`${maxR.toFixed(0)}`, graphX - 5, graphY + 12);
+			ctx.fillText(`${minR.toFixed(0)}`, graphX - 5, graphY + graphH);
+			ctx.textAlign = "center";
+			ctx.fillText("Episodes", graphX + graphW / 2, graphY + graphH + 16);
+
+			// Legend
+			ctx.textAlign = "right";
+			ctx.fillStyle = "#00ff88";
+			ctx.fillText("raw", graphX + graphW, graphY - 8);
+			ctx.fillStyle = "#ffaa00";
+			ctx.fillText("avg ", graphX + graphW - 40, graphY - 8);
+		}
+
+		// Controls
+		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText("[ENTER] Watch agent play    [ESC] Back to menu", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
 
 		ctx.restore();
 	}

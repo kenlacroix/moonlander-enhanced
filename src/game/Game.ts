@@ -1,4 +1,6 @@
 import { Autopilot } from "../ai/Autopilot";
+import type { TrainingStats } from "../ai/RLAgent";
+import { TrainingLoop } from "../ai/TrainingLoop";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { Audio } from "../systems/Audio";
 import { GhostPlayer, GhostRecorder, loadGhostForSeed } from "../systems/GhostReplay";
@@ -28,7 +30,7 @@ import { type WindState, createWind, getWindLabel, updateWind } from "./Wind";
 import { checkCollision, getTerrainHeightAt, normAngle } from "./Physics";
 import { generateTerrain, type TerrainData } from "./Terrain";
 
-export type GameStatus = "title" | "menu" | "playing" | "landed" | "crashed";
+export type GameStatus = "title" | "menu" | "playing" | "landed" | "crashed" | "training" | "agent-replay";
 type GameMode = "freeplay" | "campaign";
 
 export class Game {
@@ -47,7 +49,9 @@ export class Game {
 	private gameMode: GameMode = "freeplay";
 	private activeMission: Mission | null = null;
 	private campaignCompleted = loadCampaignProgress();
-	private titleSelection = 0; // 0 = free play, 1 = campaign
+	private titleSelection = 0; // 0 = free play, 1 = campaign, 2 = AI training
+	private trainingLoop: TrainingLoop | null = null;
+	private latestTrainingStats: TrainingStats | null = null;
 	private lastTime = 0;
 	private accumulator = 0;
 	private firstFrame = true;
@@ -131,17 +135,93 @@ export class Game {
 			this.audioInitialized = true;
 		}
 
-		// Title screen (Free Play vs Campaign)
+		// Title screen (Free Play vs Campaign vs AI Training)
 		if (this.status === "title") {
-			if (inputState.menuUp || inputState.menuDown) {
-				this.titleSelection = this.titleSelection === 0 ? 1 : 0;
+			if (inputState.menuUp) {
+				this.titleSelection = (this.titleSelection - 1 + 3) % 3;
+			}
+			if (inputState.menuDown) {
+				this.titleSelection = (this.titleSelection + 1) % 3;
 			}
 			if (inputState.menuSelect) {
-				this.gameMode = this.titleSelection === 0 ? "freeplay" : "campaign";
-				this.selectedMission = 0;
-				this.status = "menu";
+				if (this.titleSelection === 2) {
+					this.startTraining();
+				} else {
+					this.gameMode = this.titleSelection === 0 ? "freeplay" : "campaign";
+					this.selectedMission = 0;
+					this.status = "menu";
+				}
 			}
 			this.renderTitle();
+			requestAnimationFrame((t) => this.loop(t));
+			return;
+		}
+
+		// Training mode
+		if (this.status === "training") {
+			if (inputState.menuBack) {
+				this.stopTraining();
+				this.status = "title";
+			}
+			if (inputState.menuSelect && this.trainingLoop && this.trainingLoop.agent.episodeCount > 0) {
+				// Launch agent replay
+				this.stopTraining();
+				this.startAgentReplay();
+			}
+			this.renderTraining();
+			requestAnimationFrame((t) => this.loop(t));
+			return;
+		}
+
+		// Agent replay mode — watch the trained agent play at normal speed
+		if (this.status === "agent-replay") {
+			if (inputState.menuBack) {
+				this.status = "title";
+				requestAnimationFrame((t) => this.loop(t));
+				return;
+			}
+			if (inputState.restart && this.lander.status !== "flying") {
+				this.startAgentReplay();
+				requestAnimationFrame((t) => this.loop(t));
+				return;
+			}
+			// Run physics with agent's chosen action
+			this.accumulator += dt;
+			while (this.accumulator >= FIXED_TIMESTEP) {
+				if (this.lander.status === "flying" && this.trainingLoop) {
+					const state = this.trainingLoop.agent.getState(this.lander, this.terrain);
+					const action = this.trainingLoop.agent.chooseAction(state);
+					const agentInput = this.trainingLoop.agent.actionToInput(action);
+					updateLander(this.lander, agentInput, FIXED_TIMESTEP);
+					const result = checkCollision(this.lander, this.terrain);
+					if (result.collided) {
+						if (result.safeLanding && result.onPad) {
+							this.lander.status = "landed";
+							this.lander.vy = 0;
+							this.lander.vx = 0;
+							this.lander.y = result.onPad.y - LANDER_HEIGHT / 2;
+							this.audio.playSuccess();
+						} else {
+							this.lander.status = "crashed";
+							this.particles.emitExplosion(this.lander.x, this.lander.y);
+							this.camera.shake(15);
+							this.audio.playCrash();
+						}
+					}
+				}
+				this.accumulator -= FIXED_TIMESTEP;
+			}
+			this.particles.update(dt);
+			if (this.lander.thrusting) {
+				const rad = (this.lander.angle + 90) * (Math.PI / 180);
+				this.particles.emitExhaust(
+					this.lander.x + Math.cos(rad) * 18,
+					this.lander.y + Math.sin(rad) * 18,
+					this.lander.angle,
+				);
+			}
+			this.camera.follow(this.lander.x, this.lander.y, dt);
+			this.renderAgentReplay();
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
@@ -403,5 +483,75 @@ export class Game {
 			bestScores,
 			this.gameMode === "campaign" ? this.campaignCompleted : undefined,
 		);
+	}
+
+	private async startTraining(): Promise<void> {
+		this.status = "training";
+		if (!this.trainingLoop) {
+			this.trainingLoop = new TrainingLoop();
+		}
+		// Save epsilon so we can resume
+		const savedEpsilon = this.trainingLoop.agent.epsilon;
+		if (!this.trainingLoop.agent.ready) {
+			await this.trainingLoop.init();
+		}
+		this.trainingLoop.agent.epsilon = savedEpsilon;
+		this.trainingLoop.start((stats) => {
+			this.latestTrainingStats = stats;
+		});
+	}
+
+	private stopTraining(): void {
+		this.trainingLoop?.pause();
+	}
+
+	private startAgentReplay(): void {
+		if (!this.trainingLoop) return;
+		// Set up a game with training terrain
+		this.seed = 1969;
+		this.activeMission = null;
+		this.terrain = generateTerrain(this.seed);
+		const landerType = getLanderType();
+		this.lander = createLander(WORLD_WIDTH / 2, 80, landerType);
+		this.particles.clear();
+		this.camera = new Camera();
+		this.accumulator = 0;
+		this.firstFrame = true;
+		// Force epsilon to 0 so agent uses learned policy, no exploration
+		this.trainingLoop.agent.epsilon = 0;
+		this.status = "agent-replay";
+	}
+
+	private renderTraining(): void {
+		this.renderer.clear();
+		const history = this.trainingLoop?.agent.getRewardHistory() ?? [];
+		const stats = this.latestTrainingStats;
+		this.renderer.drawTrainingUI(
+			stats?.episode ?? 0,
+			stats?.epsilon ?? 1,
+			stats?.landed ?? false,
+			stats?.totalReward ?? 0,
+			history,
+		);
+	}
+
+	private renderAgentReplay(): void {
+		const offset = this.camera.getOffset();
+		this.renderer.clear();
+		this.renderer.drawBackground(this.camera);
+		this.renderer.drawTerrain(this.terrain, offset);
+		this.renderer.drawParticles(this.particles.particles, offset);
+		this.renderer.drawLander(this.lander, offset);
+		this.renderer.drawHUD(this.lander, 0, null, false, false);
+
+		// Status overlay
+		if (this.lander.status === "landed") {
+			this.renderer.drawMessage("AGENT LANDED!", "Press R to replay  |  ESC for menu");
+		} else if (this.lander.status === "crashed") {
+			this.renderer.drawMessage("AGENT CRASHED", "Press R to replay  |  ESC for menu");
+		} else {
+			// Show "AI PLAYING" indicator
+			this.renderer.drawMessage("", "AI AGENT PLAYING  |  ESC for menu");
+		}
 	}
 }
