@@ -2,6 +2,27 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.2.0.0] - 2026-04-13
+
+### Added
+- Title screen with Free Play and Campaign mode selection
+- 10 free-play missions with named lunar locations and fixed terrain seeds
+- 5-mission campaign with escalating difficulty (terrain roughness, pad sizes, fuel limits, wind)
+- Mission select screen with best scores per mission and campaign lock/unlock progression
+- Sound design: procedural thruster hum, crash explosion, success jingle, low fuel warning beep (Web Audio API, no audio files)
+- Ghost replay system: records inputs, saves best run per seed to localStorage, replays as translucent blue wireframe lander
+- Touch/mobile controls: three-zone layout (left rotate, center thrust, right rotate) with visual overlay, tap-to-navigate menus
+- Wind system: oscillating horizontal force with gust envelope, strength varies per mission, shown on HUD
+- Three lander types (Eagle/Atlas/Sparrow) with different thrust, fuel, mass, and rotation characteristics
+- Persistent leaderboard: top 5 scores per seed with dates, shows rank on landing ("NEW BEST!", "#2", etc.)
+- Session telemetry: records altitude, speed, and fuel 4x/second, displays altitude-over-time chart on post-flight screen
+- Fuel leak random event: 10% chance per mission (deterministic), drains fuel at 30% burn rate, "LEAK!" warning on HUD
+
+### Fixed
+- Wind no longer applies by default on free-play missions (was silently adding strength-20 wind)
+- Ghost replay no longer advances during post-flight screen (was exhausting frame buffer before restart)
+- Input state consumed once per frame instead of per physics step (fixes dropped restart/menu inputs)
+
 ## [0.1.0.0] - 2026-04-13
 
 ### Added
