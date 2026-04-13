@@ -1,3 +1,4 @@
+import { type AlienState, applyAlienEffect, createAlien, getAlienEffectLabel, shouldSpawnAlien, updateAlien } from "./Alien";
 import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
 import type { TrainingStats } from "../ai/RLAgent";
@@ -76,6 +77,7 @@ export class Game {
 	private flightElapsed = 0;
 	private fuelLeakActive = false;
 	private fuelLeakTriggered = false;
+	private alien: AlienState | null = null;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.renderer = new CanvasRenderer(canvas);
@@ -123,6 +125,8 @@ export class Game {
 		this.fuelLeakTriggered = false;
 		const windStrength = diff?.windStrength ?? 0;
 		this.wind = windStrength > 0 ? createWind(this.seed, windStrength) : null;
+		this.alien = shouldSpawnAlien(this.seed, diff) ? createAlien(this.seed) : null;
+		this.audio.soundtrack.start();
 		const ghostRun = loadGhostForSeed(this.seed);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
 	}
@@ -302,6 +306,7 @@ export class Game {
 		// Return to menu mid-flight
 		if (inputState.menuBack && this.status === "playing") {
 			this.audio.setThruster(false);
+			this.audio.soundtrack.stop();
 			this.status = "menu";
 			requestAnimationFrame((t) => this.loop(t));
 			return;
@@ -324,11 +329,14 @@ export class Game {
 			this.accumulator -= FIXED_TIMESTEP;
 		}
 
-		// Record telemetry
+		// Record telemetry and update soundtrack tension
 		if (this.status === "playing") {
 			const terrainY = getTerrainHeightAt(this.lander.x, this.terrain.points);
 			const altitude = terrainY - (this.lander.y + LANDER_HEIGHT / 2);
 			this.telemetry.update(dt, altitude, this.lander.vy, this.lander.vx, this.lander.fuel);
+			// Soundtrack tension: 0 at spawn altitude, 1 at ground
+			const tension = Math.max(0, Math.min(1, 1 - altitude / 500));
+			this.audio.updateSoundtrack(tension);
 		}
 
 		// Update particles with real dt for smooth visuals
@@ -373,11 +381,21 @@ export class Game {
 		// Step ghost replay alongside player physics
 		this.ghostPlayer?.step();
 
-		this.ghostRecorder.record(inputState);
-		updateLander(this.lander, inputState, dt);
+		// Apply alien effects to input before physics
+		this.flightElapsed += dt;
+		let resolvedInput = inputState;
+		if (this.alien) {
+			updateAlien(this.alien, this.lander.x, this.lander.y, dt, this.flightElapsed);
+			resolvedInput = applyAlienEffect(this.alien, this.lander, inputState, dt);
+			if (this.alien.effectJustStarted) {
+				this.audio.playAlienWarning();
+			}
+		}
+
+		this.ghostRecorder.record(inputState); // record raw input, not alien-modified
+		updateLander(this.lander, resolvedInput, dt);
 
 		// Apply wind
-		this.flightElapsed += dt;
 		if (this.wind) {
 			updateWind(this.wind, this.flightElapsed);
 			this.lander.vx += this.wind.speed * dt;
@@ -411,6 +429,7 @@ export class Game {
 				);
 				this.audio.setThruster(false);
 				this.audio.playSuccess();
+				this.audio.soundtrack.onLanded();
 				this.ghostRecorder.save(this.score);
 				this.lastRank = addScore(this.seed, this.score);
 				this.fetchCommentary(true);
@@ -426,6 +445,7 @@ export class Game {
 				this.camera.shake(15);
 				this.audio.setThruster(false);
 				this.audio.playCrash();
+				this.audio.soundtrack.onCrashed();
 				this.fetchCommentary(false);
 			}
 		}
@@ -460,9 +480,13 @@ export class Game {
 		if (this.ghostPlayer?.isActive()) {
 			this.renderer.drawGhost(this.ghostPlayer.lander, offset);
 		}
+		if (this.alien) {
+			this.renderer.drawAlien(this.alien, this.lander.x, this.lander.y, offset);
+		}
 		this.renderer.drawLander(this.lander, offset);
 		const windLabel = this.wind ? getWindLabel(this.wind) : null;
-		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive, this.autopilot.enabled, this.adaptiveLabel);
+		const alienLabel = this.alien ? getAlienEffectLabel(this.alien) : null;
+		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive, this.autopilot.enabled, this.adaptiveLabel, alienLabel);
 
 		// Touch controls overlay
 		if (this.input.isTouchDevice) {

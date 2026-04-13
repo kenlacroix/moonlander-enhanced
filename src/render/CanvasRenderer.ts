@@ -1,3 +1,4 @@
+import type { AlienState } from "../game/Alien";
 import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
 import type { Mission } from "../game/Missions";
@@ -266,8 +267,8 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
-	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false, autopilot = false, adaptiveLabel: string | null = null): void {
-		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak, autopilot, adaptiveLabel);
+	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false, autopilot = false, adaptiveLabel: string | null = null, alienEffect: string | null = null): void {
+		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak, autopilot, adaptiveLabel, alienEffect);
 	}
 
 	drawTitle(selection: number, completedCount: number, totalCampaign: number): void {
@@ -609,6 +610,50 @@ export class CanvasRenderer {
 		ctx.fillText(`${maxTime.toFixed(1)}s`, chartX + chartW / 2, chartY + chartH + 14);
 
 		ctx.restore();
+	}
+
+	/** Draw alien UFO sprite */
+	drawAlien(alien: AlienState, landerX: number, landerY: number, offset: { x: number; y: number }): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.translate(offset.x + alien.x, offset.y + alien.y);
+
+		// UFO body (oval)
+		ctx.fillStyle = "#88ffaa";
+		ctx.shadowColor = "#88ffaa";
+		ctx.shadowBlur = 8;
+		ctx.beginPath();
+		ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI * 2);
+		ctx.fill();
+
+		// Dome
+		ctx.fillStyle = "#aaffcc";
+		ctx.shadowBlur = 4;
+		ctx.beginPath();
+		ctx.ellipse(0, -4, 6, 5, 0, Math.PI, Math.PI * 2);
+		ctx.fill();
+
+		ctx.shadowBlur = 0;
+		ctx.restore();
+
+		// Tractor beam when effect is active
+		if (alien.activeEffect) {
+			ctx.save();
+			const ax = offset.x + alien.x;
+			const ay = offset.y + alien.y;
+			const lx = offset.x + landerX;
+			const ly = offset.y + landerY;
+			const pulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.4;
+			ctx.strokeStyle = `rgba(68, 255, 136, ${pulse})`;
+			ctx.lineWidth = 2;
+			ctx.setLineDash([4, 6]);
+			ctx.beginPath();
+			ctx.moveTo(ax, ay);
+			ctx.lineTo(lx, ly);
+			ctx.stroke();
+			ctx.setLineDash([]);
+			ctx.restore();
+		}
 	}
 
 	/** Draw mission briefing text (shown during first seconds of flight) */

@@ -4,18 +4,24 @@
  * Initialized on first user interaction (browser autoplay policy).
  */
 
+import { Soundtrack } from "./Soundtrack";
+
 export class Audio {
 	private ctx: AudioContext | null = null;
 	private thrusterOsc: OscillatorNode | null = null;
 	private thrusterGain: GainNode | null = null;
 	private isThrusterPlaying = false;
 	private initialized = false;
+	readonly soundtrack = new Soundtrack();
 
 	/** Call on first keydown/click to unlock audio context */
 	init(): void {
 		if (this.initialized) return;
 		this.ctx = new AudioContext();
 		this.initialized = true;
+
+		// Initialize soundtrack with shared context
+		this.soundtrack.init(this.ctx);
 
 		// Pre-create thruster nodes (reused across on/off cycles)
 		this.thrusterOsc = this.ctx.createOscillator();
@@ -124,5 +130,31 @@ export class Audio {
 		gain.connect(this.ctx.destination);
 		osc.start(now);
 		osc.stop(now + 0.1);
+	}
+
+	/** Alien mischief warning — two-tone triangle warble */
+	playAlienWarning(): void {
+		if (!this.ctx) return;
+
+		const now = this.ctx.currentTime;
+		for (let i = 0; i < 2; i++) {
+			const osc = this.ctx.createOscillator();
+			const gain = this.ctx.createGain();
+			osc.type = "triangle";
+			osc.frequency.value = i === 0 ? 440 : 660;
+			const start = now + i * 0.15;
+			gain.gain.setValueAtTime(0, start);
+			gain.gain.linearRampToValueAtTime(0.06, start + 0.02);
+			gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
+			osc.connect(gain);
+			gain.connect(this.ctx.destination);
+			osc.start(start);
+			osc.stop(start + 0.15);
+		}
+	}
+
+	/** Update soundtrack tension level */
+	updateSoundtrack(tension: number): void {
+		this.soundtrack.update(tension);
 	}
 }

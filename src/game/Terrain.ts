@@ -33,6 +33,7 @@ export interface DifficultyConfig {
 	spawnY?: number;           // starting altitude (lower = harder)
 	windStrength?: number;     // wind force (0 = none, 50+ = strong)
 	landerType?: string;       // lander variant name
+	aliensEnabled?: boolean;   // force alien spawn (campaign)
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */

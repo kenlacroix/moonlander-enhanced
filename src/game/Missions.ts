@@ -51,14 +51,14 @@ export const CAMPAIGN: Mission[] = [
 		name: "NEEDLE THREADING",
 		seed: 4004,
 		description: "Jagged terrain, tiny pads. Precision landing.",
-		difficulty: { roughness: 0.8, padMinWidth: 40, padMaxWidth: 70, padCount: 2, startingFuel: 900, windStrength: 30 },
+		difficulty: { roughness: 0.8, padMinWidth: 40, padMaxWidth: 70, padCount: 2, startingFuel: 900, windStrength: 30, aliensEnabled: true },
 	},
 	{
 		id: 5,
 		name: "THE IMPOSSIBLE",
 		seed: 5005,
 		description: "Extreme terrain, one small pad, minimal fuel. Good luck.",
-		difficulty: { roughness: 0.9, padMinWidth: 35, padMaxWidth: 50, padCount: 1, startingFuel: 600, windStrength: 40 },
+		difficulty: { roughness: 0.9, padMinWidth: 35, padMaxWidth: 50, padCount: 1, startingFuel: 600, windStrength: 40, aliensEnabled: true },
 	},
 ];
 

@@ -63,3 +63,5 @@ export const COLOR_HUD = "#00ff88";
 export const COLOR_HUD_WARNING = "#ff4444";
 export const COLOR_EXPLOSION = "#ff4400";
 export const COLOR_EARTH = "#4488cc";
+export const COLOR_ALIEN = "#88ffaa";
+export const COLOR_TRACTOR_BEAM = "#44ff88";

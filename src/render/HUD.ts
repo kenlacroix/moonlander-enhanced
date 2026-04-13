@@ -18,6 +18,7 @@ export class HUD {
 		fuelLeak = false,
 		autopilot = false,
 		adaptiveLabel: string | null = null,
+		alienEffect: string | null = null,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -91,6 +92,15 @@ export class HUD {
 			ctx.fillText("AUTO", x, y);
 			ctx.fillStyle = "#ffaa00";
 			ctx.fillText("ENGAGED  [P] off", x + 60, y);
+		}
+
+		// Alien effect warning
+		if (alienEffect) {
+			y += lineHeight;
+			this.drawLabel(ctx, x, y, "ALIEN", alienEffect, true);
+			// Override color to alien green
+			ctx.fillStyle = "#88ffaa";
+			ctx.fillText(alienEffect, x + 60, y);
 		}
 
 		// Score (top right)
