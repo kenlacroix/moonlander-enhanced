@@ -23,9 +23,23 @@ export interface TerrainData {
 	seed: number;
 }
 
+/** Difficulty overrides for campaign mode */
+export interface DifficultyConfig {
+	roughness?: number;        // 0-1, higher = rougher terrain
+	padMinWidth?: number;      // minimum pad width in px
+	padMaxWidth?: number;      // maximum pad width in px
+	padCount?: number;         // number of landing pads
+	startingFuel?: number;     // fuel override
+	spawnY?: number;           // starting altitude (lower = harder)
+	windStrength?: number;     // wind force (0 = none, 50+ = strong)
+	landerType?: string;       // lander variant name
+}
+
 /** Generate terrain using midpoint displacement, seeded for determinism */
-export function generateTerrain(seed: number): TerrainData {
+export function generateTerrain(seed: number, difficulty?: DifficultyConfig): TerrainData {
 	const rng = createRng(seed);
+
+	const roughness = difficulty?.roughness ?? TERRAIN_ROUGHNESS;
 
 	// Start with two endpoints
 	const baseY =
@@ -36,7 +50,7 @@ export function generateTerrain(seed: number): TerrainData {
 	const iterations = 8;
 	for (let iter = 0; iter < iterations; iter++) {
 		const newHeights: number[] = [];
-		const scale = TERRAIN_ROUGHNESS * 0.5 ** iter * 150;
+		const scale = roughness * 0.5 ** iter * 150;
 		for (let i = 0; i < heights.length - 1; i++) {
 			newHeights.push(heights[i]);
 			const mid = (heights[i] + heights[i + 1]) / 2 + (rng() - 0.5) * scale;
@@ -56,23 +70,26 @@ export function generateTerrain(seed: number): TerrainData {
 	const points: Vec2[] = heights.map((h, i) => vec2(i * step, h));
 
 	// Place landing pads
-	const pads = placeLandingPads(points, rng);
+	const pads = placeLandingPads(points, rng, difficulty);
 
 	return { points, pads, seed };
 }
 
-function placeLandingPads(points: Vec2[], rng: () => number): LandingPad[] {
+function placeLandingPads(points: Vec2[], rng: () => number, difficulty?: DifficultyConfig): LandingPad[] {
 	const pads: LandingPad[] = [];
-	const segmentWidth = WORLD_WIDTH / (PAD_COUNT + 1);
+	const padCount = difficulty?.padCount ?? PAD_COUNT;
+	const padMin = difficulty?.padMinWidth ?? PAD_MIN_WIDTH;
+	const padMax = difficulty?.padMaxWidth ?? PAD_MAX_WIDTH;
+	const segmentWidth = WORLD_WIDTH / (padCount + 1);
 
-	for (let i = 0; i < PAD_COUNT; i++) {
+	for (let i = 0; i < padCount; i++) {
 		// Pick a zone for this pad
 		const zoneStart = segmentWidth * (i + 0.5);
 		const zoneEnd = segmentWidth * (i + 1.5);
 		const padCenterX = zoneStart + rng() * (zoneEnd - zoneStart);
 
 		// Width: random between min and max — narrower = more points
-		const padWidth = PAD_MIN_WIDTH + rng() * (PAD_MAX_WIDTH - PAD_MIN_WIDTH);
+		const padWidth = padMin + rng() * (padMax - padMin);
 
 		// Find terrain height at pad center and flatten the pad area
 		const padX = padCenterX - padWidth / 2;
@@ -99,7 +116,7 @@ function placeLandingPads(points: Vec2[], rng: () => number): LandingPad[] {
 
 		// Score inversely proportional to width
 		const widthRatio =
-			1 - (padWidth - PAD_MIN_WIDTH) / (PAD_MAX_WIDTH - PAD_MIN_WIDTH);
+			1 - (padWidth - padMin) / (padMax - padMin);
 		const scoreMultiplier = 1 + Math.floor(widthRatio * 3); // 1x to 4x
 
 		pads.push({
