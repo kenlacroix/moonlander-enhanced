@@ -2,6 +2,20 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.3.0.0] - 2026-04-13
+
+### Added
+- Rule-based autopilot: press P to toggle mid-flight. PID-style guidance finds nearest pad, manages descent rate across four altitude zones.
+- DQN reinforcement learning agent: trains in-browser via TensorFlow.js. 8-dimensional state space, 4 discrete actions, experience replay with target network.
+- AI Training mode: accessible from title screen. Live reward graph (raw + moving average), episode counter, exploration rate display. Press Enter to watch the trained agent play.
+- Agent replay viewer: watch the trained AI attempt a landing at normal speed with full rendering.
+- Multi-provider LLM integration: supports Anthropic (Claude), OpenAI (GPT), and any OpenAI-compatible API. Settings screen accessible with S key on title. API key stored in localStorage only.
+- AI mission briefings: NASA radio-style narrative streams word-by-word during first 5 seconds of flight. Cached per seed.
+- Mission control commentary: post-landing/crash reactions based on speed, angle, and fuel. Streaming text.
+- Adaptive difficulty: free-play missions adjust based on leaderboard history. First play gets EASY (extra fuel, wider pads). Consistent high scores trigger HARD/EXPERT.
+- Procedural soundtrack: three-layer adaptive music. Tritone drone (B1+F2), tension sweep with lowpass filter, shimmer with LFO tremolo. Builds as altitude drops. Resolves to consonance on landing, dissonance on crash.
+- Alien mischief system: deterministic UFO entities orbit the lander and periodically interfere. Four effects: fuel siphon, controls reversed, thrust reduced, drag. Tractor beam visual, HUD warning, audio cue. ~30% of free-play missions, guaranteed on campaign 4-5.
+
 ## [0.2.0.0] - 2026-04-13
 
 ### Added
