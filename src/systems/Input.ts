@@ -7,6 +7,7 @@ export interface InputState {
 	menuDown: boolean;
 	menuSelect: boolean;
 	menuBack: boolean;
+	toggleAutopilot: boolean;
 }
 
 /** Touch zone identifiers */
@@ -19,6 +20,7 @@ export class Input {
 	private _menuDownPressed = false;
 	private _menuSelectPressed = false;
 	private _menuBackPressed = false;
+	private _autopilotToggled = false;
 
 	// Touch state
 	private touchActive = new Map<number, TouchZone>();
@@ -45,6 +47,9 @@ export class Input {
 			}
 			if (e.code === "Escape" || e.code === "KeyM") {
 				this._menuBackPressed = true;
+			}
+			if (e.code === "KeyP") {
+				this._autopilotToggled = true;
 			}
 			// Prevent scrolling with arrow keys / space
 			if (
@@ -129,12 +134,14 @@ export class Input {
 			menuDown: this._menuDownPressed,
 			menuSelect: this._menuSelectPressed || this._touchMenuSelect,
 			menuBack: this._menuBackPressed,
+			toggleAutopilot: this._autopilotToggled,
 		};
 		this._restartPressed = false;
 		this._menuUpPressed = false;
 		this._menuDownPressed = false;
 		this._menuSelectPressed = false;
 		this._menuBackPressed = false;
+		this._autopilotToggled = false;
 		this._touchRestart = false;
 		this._touchMenuSelect = false;
 		return state;

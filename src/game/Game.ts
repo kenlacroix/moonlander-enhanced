@@ -1,3 +1,4 @@
+import { Autopilot } from "../ai/Autopilot";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { Audio } from "../systems/Audio";
 import { GhostPlayer, GhostRecorder, loadGhostForSeed } from "../systems/GhostReplay";
@@ -56,6 +57,7 @@ export class Game {
 	private ghostRecorder = new GhostRecorder();
 	private ghostPlayer: GhostPlayer | null = null;
 	private telemetry = new TelemetryRecorder();
+	private autopilot = new Autopilot();
 	private wind: WindState | null = null;
 	private flightElapsed = 0;
 	private fuelLeakActive = false;
@@ -92,6 +94,7 @@ export class Game {
 		this.fuelWarningCooldown = 0;
 		this.ghostRecorder.start(this.seed);
 		this.telemetry.reset();
+		this.autopilot.enabled = false;
 		this.flightElapsed = 0;
 		this.fuelLeakActive = false;
 		this.fuelLeakTriggered = false;
@@ -198,10 +201,20 @@ export class Game {
 			return;
 		}
 
-		// Fixed timestep physics — pass the already-read input state
+		// Autopilot toggle
+		if (inputState.toggleAutopilot && this.status === "playing") {
+			this.autopilot.toggle();
+		}
+
+		// If autopilot is active, use its computed input instead of player input
+		const physicsInput = this.autopilot.enabled
+			? this.autopilot.computeInput(this.lander, this.terrain)
+			: inputState;
+
+		// Fixed timestep physics — pass the resolved input state
 		this.accumulator += dt;
 		while (this.accumulator >= FIXED_TIMESTEP) {
-			this.fixedUpdate(FIXED_TIMESTEP, inputState);
+			this.fixedUpdate(FIXED_TIMESTEP, physicsInput);
 			this.accumulator -= FIXED_TIMESTEP;
 		}
 
@@ -341,7 +354,7 @@ export class Game {
 		}
 		this.renderer.drawLander(this.lander, offset);
 		const windLabel = this.wind ? getWindLabel(this.wind) : null;
-		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive);
+		this.renderer.drawHUD(this.lander, this.score, windLabel, this.fuelLeakActive, this.autopilot.enabled);
 
 		// Touch controls overlay
 		if (this.input.isTouchDevice) {

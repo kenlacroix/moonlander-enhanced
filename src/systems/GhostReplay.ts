@@ -21,6 +21,7 @@ function unpackInput(frame: InputFrame): InputState {
 		menuDown: false,
 		menuSelect: false,
 		menuBack: false,
+		toggleAutopilot: false,
 	};
 }
 

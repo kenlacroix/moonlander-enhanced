@@ -16,6 +16,7 @@ export class HUD {
 		score: number,
 		windLabel: string | null = null,
 		fuelLeak = false,
+		autopilot = false,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -81,6 +82,16 @@ export class HUD {
 			this.drawLabel(ctx, x, y, "WIND", windLabel);
 		}
 
+		// Autopilot indicator
+		if (autopilot) {
+			y += lineHeight;
+			ctx.fillStyle = "#ffaa00";
+			ctx.textAlign = "left";
+			ctx.fillText("AUTO", x, y);
+			ctx.fillStyle = "#ffaa00";
+			ctx.fillText("ENGAGED  [P] off", x + 60, y);
+		}
+
 		// Score (top right)
 		if (score > 0) {
 			ctx.fillStyle = COLOR_HUD;
@@ -94,7 +105,7 @@ export class HUD {
 		ctx.font = '12px "Courier New", monospace';
 		ctx.textAlign = "center";
 		ctx.fillText(
-			"↑ THRUST   ← → ROTATE   R RESTART",
+			"↑ THRUST   ← → ROTATE   P AUTOPILOT   R RESTART",
 			CANVAS_WIDTH / 2,
 			CANVAS_HEIGHT - 20,
 		);

@@ -50,7 +50,7 @@
 
 **Theme:** The game teaches you how AI thinks.
 
-- [ ] Rule-based autopilot (toggle on/off mid-flight, watch it solve)
+- [x] Rule-based autopilot (toggle on/off mid-flight, watch it solve)
 - [ ] TensorFlow.js RL agent — trains in browser, visible reward curve
 - [ ] Training mode UI (episode count, reward graph, speed multiplier)
 - [ ] Agent replay viewer (watch best agent run at normal speed)
