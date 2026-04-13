@@ -67,7 +67,7 @@
 **Theme:** Send someone a link. They get it in 10 seconds.
 
 - [x] URL-encoded terrain seeds (share exact map with friends)
-- [ ] Async ghost sharing (export/import ghost run as JSON)
+- [x] Async ghost sharing (export/import ghost run as JSON)
 - [x] Retro vector graphics skin (unlockable)
 - [ ] 3D mode exploration (Three.js spike — actual lunar surface)
 - [x] PWA support (installable, offline play)

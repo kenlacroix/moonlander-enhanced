@@ -10,7 +10,7 @@ import { getMissionBriefing } from "../api/MissionBriefing";
 import { getMissionControlCommentary } from "../api/MissionControl";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { Audio } from "../systems/Audio";
-import { GhostPlayer, GhostRecorder, loadGhostForSeed } from "../systems/GhostReplay";
+import { GhostPlayer, GhostRecorder, downloadGhost, loadGhostForSeed, uploadGhost } from "../systems/GhostReplay";
 import { type InputState, Input } from "../systems/Input";
 import { addScore, getBestScore } from "../systems/Leaderboard";
 import { TelemetryRecorder } from "../systems/Telemetry";
@@ -290,12 +290,26 @@ export class Game {
 					this.updateURL(mission.seed);
 				}
 			}
+			if (inputState.importGhost) {
+				uploadGhost().then((run) => {
+					if (run) {
+						const missions = this.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
+						const idx = missions.findIndex((m) => m.seed === run.seed);
+						if (idx >= 0) this.selectedMission = idx;
+					}
+				});
+			}
 			if (inputState.menuBack) {
 				this.status = "title";
 			}
 			this.renderMenu();
 			requestAnimationFrame((t) => this.loop(t));
 			return;
+		}
+
+		// Ghost export (G key on post-flight screen)
+		if (inputState.exportGhost && this.status === "landed") {
+			downloadGhost(this.seed);
 		}
 
 		// Handle restart
@@ -529,12 +543,13 @@ export class Game {
 			const isTouch = this.input.isTouchDevice;
 			const isCampaignNext = this.gameMode === "campaign" && this.selectedMission < CAMPAIGN.length - 1;
 			const nextHint = isCampaignNext ? "next mission" : "mission select";
-			const hint = isTouch ? "Tap top to continue" : `Press R for ${nextHint}`;
+			const ghostHint = isTouch ? "" : "  |  G share ghost";
+			const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
 			const title = this.gameMode === "campaign" ? "MISSION COMPLETE" : "LANDING SUCCESSFUL";
 			const rankText = this.lastRank === 1 ? "  NEW BEST!" : this.lastRank ? `  #${this.lastRank}` : "";
 			this.renderer.drawMessage(
 				title,
-				`Score: ${this.score}${rankText}  |  ${hint}`,
+				`Score: ${this.score}${rankText}  |  ${hint}${ghostHint}`,
 			);
 		} else if (this.status === "crashed") {
 			const hint = this.input.isTouchDevice ? "Tap top to continue" : "Press R for mission select";

@@ -146,6 +146,8 @@ export class RLAgent {
 			toggleAutopilot: false,
 			openSettings: false,
 			toggleRetroSkin: false,
+			exportGhost: false,
+			importGhost: false,
 		};
 	}
 

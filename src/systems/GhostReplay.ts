@@ -24,6 +24,8 @@ function unpackInput(frame: InputFrame): InputState {
 		toggleAutopilot: false,
 		openSettings: false,
 		toggleRetroSkin: false,
+		exportGhost: false,
+		importGhost: false,
 	};
 }
 
@@ -128,4 +130,73 @@ function loadGhosts(): GhostRun[] {
 export function loadGhostForSeed(seed: number): GhostRun | null {
 	const ghosts = loadGhosts();
 	return ghosts.find((g) => g.seed === seed) ?? null;
+}
+
+/** Export a ghost run as a JSON string for sharing */
+export function exportGhost(seed: number): string | null {
+	const ghost = loadGhostForSeed(seed);
+	if (!ghost) return null;
+	return JSON.stringify(ghost);
+}
+
+/** Import a ghost run from JSON string. Returns the imported run or null on error. */
+export function importGhost(json: string): GhostRun | null {
+	try {
+		const run = JSON.parse(json) as GhostRun;
+		if (typeof run.seed !== "number" || typeof run.score !== "number" || !Array.isArray(run.frames)) {
+			return null;
+		}
+		// Save it to localStorage
+		const ghosts = loadGhosts();
+		const existing = ghosts.find((g) => g.seed === run.seed);
+		if (existing) {
+			if (run.score > existing.score) {
+				existing.score = run.score;
+				existing.frames = run.frames;
+			}
+		} else {
+			ghosts.push(run);
+			if (ghosts.length > MAX_STORED_GHOSTS) {
+				ghosts.shift();
+			}
+		}
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(ghosts));
+		return run;
+	} catch {
+		return null;
+	}
+}
+
+/** Download a ghost as a .json file */
+export function downloadGhost(seed: number): void {
+	const json = exportGhost(seed);
+	if (!json) return;
+	const blob = new Blob([json], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `moonlander-ghost-${seed}.json`;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
+/** Prompt user to pick a .json file and import it. Returns a promise with the result. */
+export function uploadGhost(): Promise<GhostRun | null> {
+	return new Promise((resolve) => {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = ".json";
+		input.addEventListener("change", () => {
+			const file = input.files?.[0];
+			if (!file) { resolve(null); return; }
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = importGhost(reader.result as string);
+				resolve(result);
+			};
+			reader.onerror = () => resolve(null);
+			reader.readAsText(file);
+		});
+		input.click();
+	});
 }

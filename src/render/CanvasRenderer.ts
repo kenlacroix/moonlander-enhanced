@@ -447,7 +447,7 @@ export class CanvasRenderer {
 		ctx.textAlign = "center";
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("[UP/DOWN] Select    [ENTER] Launch    [ESC] Back to menu", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+		ctx.fillText("[UP/DOWN] Select    [ENTER] Launch    [I] Import ghost    [ESC] Back", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
 
 		ctx.restore();
 	}
