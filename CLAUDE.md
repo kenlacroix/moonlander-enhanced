@@ -1,0 +1,433 @@
+# MoonLander — Claude Code Context
+
+## Project Identity
+- **Repo name:** `moonlander-enhanced`
+- **Tagline:** A browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game
+- **Owner:** Solo developer / vibe coding project
+- **Primary goal:** Learn game dev, physics simulation, and AI/ML concepts by building
+- **Secondary goal:** Shareable, no-install experience — runs entirely in the browser
+
+---
+
+## Tech Stack
+- **Runtime:** Browser only — no backend required for core game
+- **Language:** TypeScript
+- **Renderer Phase 1:** HTML5 Canvas (2D) — fast to build, 60fps, sufficient for MVP
+- **Renderer Phase 2+:** PixiJS (WebGL) — GPU-accelerated, drop-in upgrade path from Canvas
+- **Renderer Phase 4 (optional):** Three.js — full 3D lunar surface mode
+- **Shaders:** GLSL fragment/vertex shaders via PixiJS filters (bloom, heat distortion, normal maps)
+- **Game loop:** Custom requestAnimationFrame loop (no heavy framework)
+- **Physics:** Custom — real lunar gravity (1.62 m/s²), rotational dynamics
+- **AI gameplay:** TensorFlow.js — in-browser RL agent training (Phase 3)
+- **AI visuals:** TensorFlow.js — neural style transfer for unlockable skins (Phase 3)
+- **AI generative:** Claude API — mission briefings, mission control commentary (Phase 3)
+- **AI textures:** Image generation API — unique terrain textures per mission seed (Phase 4)
+- **Build tool:** Vite
+- **Package manager:** npm
+- **Styling:** CSS modules or plain CSS — minimal, game-focused UI
+- **No game framework** (Phaser, etc.) unless complexity demands it — keep it lean
+
+---
+
+## Repo Structure
+```
+moonlander-enhanced/
+├── CLAUDE.md                  ← you are here
+├── README.md
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+├── src/
+│   ├── main.ts                ← entry point, bootstraps game
+│   ├── game/
+│   │   ├── Game.ts            ← main game loop, state machine
+│   │   ├── Lander.ts          ← lander physics, controls, state
+│   │   ├── Terrain.ts         ← procedural terrain generation
+│   │   ├── Physics.ts         ← gravity, thrust, collision math
+│   │   ├── Particles.ts       ← thruster exhaust, dust, explosions
+│   │   └── Camera.ts          ← viewport, zoom, parallax
+│   ├── render/
+│   │   ├── Renderer.ts        ← render backend switcher (Canvas → WebGL)
+│   │   ├── CanvasRenderer.ts  ← Phase 1: pure Canvas 2D implementation
+│   │   ├── WebGLRenderer.ts   ← Phase 2: PixiJS WebGL implementation
+│   │   ├── HUD.ts             ← telemetry overlay (speed, fuel, altitude)
+│   │   └── Background.ts      ← starfield, Earth rise, parallax layers
+│   ├── graphics/
+│   │   ├── shaders/
+│   │   │   ├── bloom.glsl     ← bloom/glow for thruster and pad lights
+│   │   │   ├── heatwave.glsl  ← heat distortion behind engine plume
+│   │   │   ├── normalmap.glsl ← terrain surface normal mapping (3D feel)
+│   │   │   └── scanline.glsl  ← retro CRT scanline effect (skin)
+│   │   ├── LightingSystem.ts  ← sun angle, shadow casting, lander spotlight
+│   │   ├── TerrainRenderer.ts ← terrain texture tiling, procedural rock detail
+│   │   ├── LanderSprite.ts    ← lander draw: vector base + WebGL glow layers
+│   │   ├── PlumeRenderer.ts   ← thruster plume: particles + shader distortion
+│   │   ├── SkinManager.ts     ← manages active visual skin, skin unlock state
+│   │   └── skins/
+│   │       ├── RetroVector.ts ← 1979 arcade vector graphics skin
+│   │       ├── Painterly.ts   ← TF.js neural style transfer skin
+│   │       └── NeonFuture.ts  ← synthwave neon aesthetic skin
+│   ├── ai/
+│   │   ├── Autopilot.ts       ← rule-based autopilot (Phase 2)
+│   │   ├── RLAgent.ts         ← TensorFlow.js RL agent (Phase 3)
+│   │   ├── StyleTransfer.ts   ← TF.js neural style transfer for skins (Phase 3)
+│   │   └── TextureGen.ts      ← image API calls for AI terrain textures (Phase 4)
+│   ├── api/
+│   │   ├── MissionControl.ts  ← Claude API: live commentary on landing
+│   │   └── MissionBriefing.ts ← Claude API: per-seed mission narrative + art prompt
+│   ├── systems/
+│   │   ├── Input.ts           ← keyboard, touch, gamepad input
+│   │   ├── Audio.ts           ← Web Audio API, thruster hum, crash, jingle
+│   │   ├── Telemetry.ts       ← session recording, ghost replay data
+│   │   └── SaveState.ts       ← localStorage: scores, settings, ghosts, skins
+│   └── utils/
+│       ├── noise.ts           ← Perlin/simplex noise for terrain + texture variation
+│       ├── math.ts            ← vectors, interpolation, clamp helpers
+│       └── constants.ts       ← physics constants, game tuning, graphics config
+├── public/
+│   └── assets/
+│       ├── textures/          ← base terrain textures, lander sprite sheets
+│       ├── audio/             ← thruster, crash, success, ambient sounds
+│       └── styles/            ← reference images for neural style transfer skins
+└── tests/
+    ├── physics.test.ts        ← unit tests for physics math
+    └── terrain.test.ts        ← terrain generation determinism tests
+```
+
+---
+
+## Game Concepts
+
+### Core Loop
+1. Lander spawns above procedurally generated lunar terrain
+2. Player controls thrust (up) and rotation (left/right)
+3. Goal: land on a designated flat pad at safe velocity and angle
+4. Fuel is finite — waste it and you fall
+5. Score based on: landing precision, fuel remaining, descent time, angle on touchdown
+
+### Physics Model
+- Gravity: 1.62 m/s² downward (real lunar surface gravity)
+- Thrust: applies force in lander's current facing direction
+- Rotation: angular velocity with damping (no atmosphere but thruster-based RCS)
+- Collision: terrain polygon vs lander bounding box; safe landing = vertical speed < 2 m/s, angle < 10°
+- No atmosphere = no drag (except optional "solar wind" challenge mode)
+
+### Lander State Machine
+```
+IDLE → FLYING → LANDING_SUCCESS
+                → CRASH
+                → OUT_OF_FUEL → FREEFALL → CRASH
+```
+
+### Terrain Generation
+- Midpoint displacement algorithm seeded by mission number
+- Same seed = same terrain (enables ghost racing and leaderboards)
+- Landing pads: 1-3 per map, width inversely proportional to point value
+- Difficulty scales: pad width, terrain roughness, initial altitude, fuel allowance
+
+---
+
+## Roadmap
+
+### Phase 1 — Playable Core (MVP)
+**Theme:** It works. It feels good. You can lose.
+- [ ] Vite + TypeScript project scaffold
+- [ ] Canvas renderer with game loop
+- [ ] Lander with thrust + rotation + real lunar gravity
+- [ ] Procedural terrain (midpoint displacement)
+- [ ] Landing pad placement and detection
+- [ ] Crash vs safe landing detection
+- [ ] Telemetry HUD (altitude, vertical speed, horizontal speed, fuel, angle)
+- [ ] Thruster particle system (exhaust plume)
+- [ ] Landing dust particle burst
+- [ ] Explosion on crash
+- [ ] Parallax starfield background
+- [ ] Keyboard input (arrow keys + space)
+- [ ] Basic scoring
+- [ ] "Try again" restart flow
+
+**Exit question:** Is the physics fun to fight against? Does landing feel rewarding?
+
+---
+
+### Phase 2 — Depth and Replayability
+**Theme:** Every run is different. You want one more go.
+- [ ] Multiple terrain seeds / mission select
+- [ ] Wind system (direction + strength shown on HUD)
+- [ ] Multiple lander types (different thrust/weight/fuel ratios)
+- [ ] Ghost replay system (record inputs, play back best run)
+- [ ] Persistent leaderboard per terrain seed (localStorage)
+- [ ] Session telemetry log (altitude curve, speed over time)
+- [ ] Touch/mobile input support
+- [ ] Sound design (Web Audio API — thruster hum, crash, success jingle)
+- [ ] Earth rise parallax layer
+- [ ] Fuel leak random event
+- [ ] Campaign mode (5 missions, escalating difficulty)
+
+**Exit question:** Do you come back to beat your own ghost? Is the campaign satisfying?
+
+---
+
+### Phase 3 — AI and Learning Layer
+**Theme:** The game teaches you how AI thinks.
+- [ ] Rule-based autopilot (toggle on/off mid-flight, watch it solve)
+- [ ] TensorFlow.js RL agent — trains in browser, visible reward curve
+- [ ] Training mode UI (episode count, reward graph, speed multiplier)
+- [ ] Agent replay viewer (watch best agent run at normal speed)
+- [ ] Claude API — dynamic mission briefings per terrain seed
+- [ ] Claude API — mission control commentary on landing quality
+- [ ] Difficulty adaptation based on player history
+
+**Exit question:** Can you watch the RL agent improve in real time and understand why?
+
+---
+
+### Phase 4 — Polish and Shareability
+**Theme:** Send someone a link. They get it in 10 seconds.
+- [ ] URL-encoded terrain seeds (share exact map with friends)
+- [ ] Async ghost sharing (export/import ghost run as JSON)
+- [ ] Retro vector graphics skin (unlockable)
+- [ ] 3D mode exploration (Three.js spike — actual lunar surface)
+- [ ] PWA support (installable, offline play)
+- [ ] Embed mode (plays in an iframe for portfolio/blog)
+
+**Exit question:** Would a stranger share this with a friend?
+
+---
+
+## Graphics Roadmap
+
+### Graphics Phase 1 — Canvas 2D (ships with game Phase 1)
+**Theme:** Looks intentional, not unfinished.
+- Vector lander shape with dynamic rotation
+- Filled terrain polygon with flat color + edge highlight
+- Radial gradient glow on thruster (Canvas compositing)
+- Particle system: exhaust plume, dust burst, explosion fragments
+- Parallax starfield (3 depth layers, different scroll speeds)
+- Earth rise on horizon (semi-circle, subtle glow)
+- Landing pad with blinking beacon lights
+- HUD in clean monospace font — altitude, v-speed, h-speed, fuel, angle
+
+**What you learn:** Canvas API, 2D transforms, compositing modes, particle systems
+
+---
+
+### Graphics Phase 2 — WebGL via PixiJS (ships with game Phase 2)
+**Theme:** It looks like a real game now.
+- Swap `CanvasRenderer.ts` for `WebGLRenderer.ts` — game logic untouched
+- Bloom/glow shader on thruster plume and landing pad lights (`bloom.glsl`)
+- Heat distortion shader behind engine bell (`heatwave.glsl`)
+- Normal mapping on terrain surface — flat polygon looks 3D (`normalmap.glsl`)
+- Dynamic sun lighting — angle changes per mission, casts lander shadow on ground
+- Lander spotlight — illuminates terrain directly below on final approach
+- Procedural rock detail on terrain surface (noise-driven micro-geometry)
+- Smoother particle rendering via PixiJS particle container (10x more particles)
+- Screen shake on crash (camera trauma system)
+
+**What you learn:** WebGL pipeline, GLSL shader basics, PixiJS API, GPU compositing
+
+---
+
+### Graphics Phase 3 — AI Visual Layer (ships with game Phase 3)
+**Theme:** The visuals are generative. Every run looks unique.
+
+**Neural Style Transfer Skins (TensorFlow.js, runs in browser)**
+- `StyleTransfer.ts` captures canvas frame, runs TF.js style model, outputs styled frame
+- Style images live in `public/assets/styles/` — one per skin
+- Skins available: Painterly (impressionist), Retro Vector (1979 arcade), Neon Future (synthwave)
+- Performance note: style transfer runs at ~10fps — used as a "replay mode" filter, not real-time
+- Unlocked by: completing campaign missions
+
+**Retro Vector Skin (pure code, no ML)**
+- `RetroVector.ts` overrides all draw calls with green vector lines on black
+- Phosphor glow effect via Canvas shadow blur
+- Mimics original 1979 Atari vector display
+- Unlocked by: landing perfectly (zero horizontal speed, perfect angle)
+
+**AI Terrain Textures (image generation API)**
+- `TextureGen.ts` builds a prompt from mission seed: terrain type, lighting, mineral content
+- Calls image generation API (e.g. fal.ai, Replicate, or similar)
+- Returns a tileable 512x512 texture applied to terrain polygon surface
+- Cached to localStorage by seed — only generates once per mission
+- Graceful fallback: flat color if API unavailable or offline
+
+**What you learn:** TensorFlow.js model inference, image generation APIs, texture mapping, browser performance constraints
+
+---
+
+### Graphics Phase 4 — 3D Mode (optional spike, game Phase 4)
+**Theme:** Same physics, completely different dimension.
+- Three.js replaces PixiJS for this mode only — separate entry point
+- Actual lunar surface mesh generated from same terrain seed
+- Lander is a 3D model (low-poly NASA-inspired descent stage)
+- Earth visible in skybox, slowly rotating
+- Volumetric thruster plume via Three.js particle system
+- Camera follows lander with cinematic lag and tilt
+- Same physics engine underneath — only the renderer changes
+
+**What you learn:** Three.js scene graph, 3D camera systems, mesh generation from 2D data, skyboxes
+
+---
+
+### Graphics Constants and Config
+```typescript
+// src/utils/constants.ts — graphics section
+export const GRAPHICS = {
+  // Renderer backend — swap to 'webgl' for Phase 2
+  BACKEND: 'canvas' as 'canvas' | 'webgl' | 'three',
+
+  // Particle counts (Canvas vs WebGL limits differ)
+  MAX_THRUSTER_PARTICLES: 80,
+  MAX_EXPLOSION_PARTICLES: 200,
+  MAX_DUST_PARTICLES: 60,
+
+  // Lighting
+  SUN_ANGLE_MIN: 15,       // degrees above horizon
+  SUN_ANGLE_MAX: 45,
+  SHADOW_OPACITY: 0.6,
+  SPOTLIGHT_RADIUS: 120,   // px — lander ground spotlight
+
+  // Bloom shader
+  BLOOM_STRENGTH: 1.4,
+  BLOOM_THRESHOLD: 0.6,
+  THRUSTER_GLOW_COLOR: 0xff6600,
+  PAD_BEACON_COLOR: 0x00ff88,
+
+  // Style transfer
+  STYLE_TRANSFER_SIZE: 256,  // resize canvas to this before inference
+  STYLE_TRANSFER_FPS: 10,    // target fps in styled replay mode
+
+  // Parallax layers (scroll multipliers)
+  STAR_LAYER_1_SPEED: 0.01,
+  STAR_LAYER_2_SPEED: 0.03,
+  STAR_LAYER_3_SPEED: 0.06,
+  EARTH_PARALLAX_SPEED: 0.008,
+};
+```
+
+---
+
+### Renderer Architecture — How the Swap Works
+`Renderer.ts` is a thin interface that both `CanvasRenderer` and `WebGLRenderer` implement:
+```typescript
+interface IRenderer {
+  drawTerrain(points: Vec2[], pads: LandingPad[]): void;
+  drawLander(state: LanderState): void;
+  drawParticles(particles: Particle[]): void;
+  drawBackground(camera: Camera): void;
+  drawHUD(state: GameState): void;
+  clear(): void;
+}
+```
+Game logic calls `renderer.drawLander()` — it never knows or cares whether Canvas or WebGL is underneath. This means upgrading from Phase 1 to Phase 2 graphics is a config change, not a rewrite.
+
+---
+
+## Development Principles
+- **Vibe first, refactor later** — get it running, then clean it up
+- **One file per system** — keep concerns separated from the start
+- **Constants file is king** — all physics tuning in `constants.ts`, never magic numbers in logic
+- **Test physics math** — the rest can be eyeballed, but vector math deserves unit tests
+- **No premature optimization** — Canvas 2D is fast enough for this at 60fps
+- **Comment the physics** — future you will not remember why you picked 1.62
+
+---
+
+## Key Constants (starting values, tune freely)
+```typescript
+// src/utils/constants.ts
+export const GRAVITY = 1.62;           // m/s² lunar surface gravity
+export const THRUST_FORCE = 5.0;       // m/s² thrust acceleration
+export const ROTATION_SPEED = 3.0;     // degrees/frame
+export const MAX_LANDING_SPEED = 2.0;  // m/s vertical — above this = crash
+export const MAX_LANDING_ANGLE = 10;   // degrees from vertical — above = crash
+export const STARTING_FUEL = 1000;     // arbitrary fuel units
+export const FUEL_BURN_RATE = 0.5;     // units/frame while thrusting
+export const CANVAS_WIDTH = 1280;
+export const CANVAS_HEIGHT = 720;
+export const TARGET_FPS = 60;
+```
+
+---
+
+## Known Gotchas
+
+### requestAnimationFrame & Timing
+- **Background tab throttling** — browsers throttle `requestAnimationFrame` to ~1fps when the tab is hidden. If your game loop uses frame deltas naively, physics will explode when the tab comes back into focus after a long pause. Always clamp your delta time: `const dt = Math.min(delta, 50)` (50ms = 20fps floor) before passing it to physics.
+- **Frame delta accumulation** — don't use `delta` directly as a physics step. Use a fixed timestep accumulator pattern: accumulate real time, step physics in fixed 16.67ms chunks, interpolate rendering. Prevents physics from being framerate-dependent.
+- **First frame spike** — the very first `requestAnimationFrame` callback often has a huge delta (300-500ms) because of JS engine warmup. Ignore the first frame entirely.
+
+### PixiJS Versioning
+- **v7 vs v8 are breaking** — PixiJS v8 (released 2024) has a completely different API from v7. Most tutorials online are v7. Pick one and pin it in `package.json`. This project uses **PixiJS v8** — do not follow v7 examples.
+- **WebGL context loss** — browsers can revoke the WebGL context (e.g. too many tabs, GPU driver reset). PixiJS has a `contextlost` / `contextrestored` event — handle it or the game will silently freeze.
+- **Canvas fallback** — PixiJS auto-falls back to Canvas if WebGL isn't available. This is usually fine but means shader effects silently disappear. Add a console warning when fallback is detected.
+
+### TensorFlow.js
+- **Model loading is async and slow** — TF.js models can be 5-50MB. Never block the game start on model loading. Load models in the background after the game is playable, show a non-blocking "AI loading..." indicator.
+- **First inference is always slow** — TF.js JIT-compiles on the first `model.predict()` call. Run one dummy inference on load to warm up the GPU before the player triggers it.
+- **Memory leaks** — TF.js tensors must be manually disposed with `tensor.dispose()` or `tf.tidy()`. Forgetting this in a game loop causes memory to grow until the tab crashes. Wrap all inference in `tf.tidy(() => { ... })`.
+- **Mobile GPU limits** — style transfer at 512px is too heavy for most mobile GPUs. Downscale to 256px for mobile, detect via `navigator.hardwareConcurrency < 4`.
+
+### Claude API
+- **CORS in browser** — the Anthropic API supports browser-side calls but requires your API key to be exposed in client-side JS. For a personal/portfolio project this is acceptable. For anything public-facing, proxy through a serverless function (Vercel, Cloudflare Workers) to keep the key server-side.
+- **Streaming responses** — use streaming (`stream: true`) for mission control commentary so text appears word-by-word rather than all at once after a 2-3 second wait. Much better UX.
+- **Rate limits** — the API has per-minute token limits. Mission briefings are fine. Don't call the API on every frame or every landing — debounce to once per mission start/end.
+
+### localStorage
+- **5MB browser limit** — ghost replays and AI textures can add up fast. Implement a cache eviction strategy: keep only the last 10 ghosts and last 20 textures, evict oldest first.
+- **Serialization cost** — `JSON.stringify` on large ghost replay arrays (thousands of input frames) can cause frame drops. Serialize asynchronously using `setTimeout` or a Web Worker.
+- **Private/incognito mode** — localStorage throws in some private browsing modes. Always wrap in try/catch and degrade gracefully.
+
+### Vite + GLSL
+- **Import GLSL as raw string** — add this to `vite.config.ts`:
+  ```typescript
+  assetsInclude: ['**/*.glsl']
+  ```
+  Then import shaders as: `import bloomShader from './shaders/bloom.glsl?raw'`
+- **Hot module replacement breaks WebGL** — Vite's HMR can cause WebGL context issues during development. If the canvas goes blank after a hot reload, a full page refresh fixes it. This is a dev-only issue.
+
+### General Browser
+- **Audio autoplay policy** — browsers block audio until the user interacts with the page. Initialize Web Audio API only inside an input event handler (click, keydown). First thruster sound on first keypress is fine; background music on page load will be silently blocked.
+- **Canvas resolution vs CSS size** — always set `canvas.width` and `canvas.height` to physical pixels (multiply by `window.devicePixelRatio`) and CSS size separately. Failing to do this makes everything blurry on retina/HiDPI displays.
+
+---
+
+## Git Conventions
+
+### Branch Strategy
+```
+main          ← always playable, never broken
+dev           ← active development, merges into main when stable
+phase-1       ← Phase 1 feature work, merges into dev
+phase-2       ← Phase 2 feature work (start after Phase 1 ships)
+graphics-webgl ← WebGL upgrade spike (can run parallel to game phases)
+ai-rl-agent   ← RL agent work (isolated, heavy experimentation)
+```
+
+## Health Stack
+
+- typecheck: tsc --noEmit
+- lint: npx biome check .
+- test: npx vitest run
+- deadcode: npx knip
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
+- Save progress, checkpoint, resume → invoke checkpoint
+- Code quality, health check → invoke health
