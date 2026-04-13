@@ -1,4 +1,5 @@
 import { type AlienState, applyAlienEffect, createAlien, getAlienEffectLabel, shouldSpawnAlien, updateAlien } from "./Alien";
+import { type Artifact, checkArtifactScan, getArtifactPrompt, placeArtifacts } from "./Artifacts";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
@@ -80,6 +81,7 @@ export class Game {
 	private fuelLeakActive = false;
 	private fuelLeakTriggered = false;
 	private alien: AlienState | null = null;
+	private artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
 
 	private embedMode: boolean;
@@ -140,6 +142,7 @@ export class Game {
 		const windStrength = diff?.windStrength ?? 0;
 		this.wind = windStrength > 0 ? createWind(this.seed, windStrength) : null;
 		this.alien = shouldSpawnAlien(this.seed, diff) ? createAlien(this.seed) : null;
+		this.artifacts = placeArtifacts(this.seed, this.terrain.points);
 		this.audio.soundtrack.start();
 		const ghostRun = loadGhostForSeed(this.seed);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
@@ -486,6 +489,7 @@ export class Game {
 				this.audio.soundtrack.onLanded();
 				this.ghostRecorder.save(this.score);
 				this.lastRank = addScore(this.seed, this.score);
+				this.scanNearbyArtifact();
 				this.fetchCommentary(true);
 				if (this.gameMode === "campaign" && this.activeMission) {
 					this.campaignCompleted.add(this.activeMission.id);
@@ -533,6 +537,9 @@ export class Game {
 		this.renderer.drawParticles(this.particles.particles, offset);
 		if (this.ghostPlayer?.isActive()) {
 			this.renderer.drawGhost(this.ghostPlayer.lander, offset);
+		}
+		if (this.artifacts.length > 0) {
+			this.renderer.drawArtifacts(this.artifacts, offset);
 		}
 		if (this.alien) {
 			this.renderer.drawAlien(this.alien, this.lander.x, this.lander.y, offset);
@@ -696,6 +703,52 @@ export class Game {
 		}).finally(() => {
 			this.llmLoading = false;
 		});
+	}
+
+	private scanNearbyArtifact(): void {
+		const scanned = checkArtifactScan(this.artifacts, this.lander.x);
+		if (!scanned) return;
+
+		scanned.scanned = true;
+
+		if (this.llmConfig) {
+			// Fetch a historical fact via LLM
+			const prompt = getArtifactPrompt(scanned);
+			this.llmText = "";
+			this.llmLoading = true;
+			import("../api/LLMProvider").then(({ streamCompletion }) => {
+				streamCompletion(
+					this.llmConfig!,
+					[
+						{ role: "system", content: "You are a lunar historian. Give one fascinating, specific historical fact in 1-2 sentences. No markdown. Plain text only." },
+						{ role: "user", content: prompt },
+					],
+					(chunk) => { this.llmText += chunk; },
+				).then((full) => {
+					scanned.fact = full;
+				}).catch(() => {
+					scanned.fact = this.getOfflineFact(scanned.type);
+					this.llmText = scanned.fact;
+				}).finally(() => {
+					this.llmLoading = false;
+				});
+			});
+		} else {
+			// Offline fallback — hardcoded facts
+			scanned.fact = this.getOfflineFact(scanned.type);
+			this.llmText = scanned.fact;
+		}
+	}
+
+	private getOfflineFact(type: string): string {
+		switch (type) {
+			case "flag": return "Five of the six Apollo flags are likely still standing. Apollo 11's flag was knocked over by the ascent engine exhaust.";
+			case "rover-tracks": return "The Lunar Roving Vehicle had a top speed of 11.2 mph. It cost $38 million in 1971 and was left on the Moon after each mission.";
+			case "debris": return "Six Apollo descent stages sit on the Moon today. They served as launch pads for the ascent stage and were never designed to return.";
+			case "footprints": return "With no wind or water, the Apollo bootprints will remain undisturbed for millions of years, slowly eroded only by micrometeorites.";
+			case "plaque": return "A small aluminum figurine called 'Fallen Astronaut' was placed on the Moon by Apollo 15 in 1971, memorializing 14 astronauts and cosmonauts who died.";
+			default: return "The Apollo program left over 800 pounds of equipment on the lunar surface across six landing sites.";
+		}
 	}
 
 	private updateURL(seed: number | null): void {

@@ -1,4 +1,5 @@
 import type { AlienState } from "../game/Alien";
+import type { Artifact } from "../game/Artifacts";
 import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
 import type { Mission } from "../game/Missions";
@@ -247,6 +248,100 @@ export class CanvasRenderer {
 	}
 
 	/** Draw a ghost lander (translucent replay of best run) */
+	/** Draw artifacts on terrain */
+	drawArtifacts(artifacts: Artifact[], offset: { x: number; y: number }): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.translate(offset.x, offset.y);
+
+		for (const art of artifacts) {
+			const x = art.x;
+			const y = art.y;
+
+			if (art.scanned) {
+				// Scanned: show a dim marker
+				ctx.fillStyle = "rgba(0, 255, 136, 0.3)";
+				ctx.font = '10px "Courier New", monospace';
+				ctx.textAlign = "center";
+				ctx.fillText("[SCANNED]", x, y - 20);
+			} else {
+				// Unscanned: glowing marker
+				ctx.shadowColor = "#ffaa00";
+				ctx.shadowBlur = 8;
+			}
+
+			// Draw artifact icon based on type
+			ctx.fillStyle = art.scanned ? "#444444" : "#ffaa00";
+			ctx.strokeStyle = art.scanned ? "#444444" : "#ffaa00";
+			ctx.lineWidth = 1.5;
+
+			switch (art.type) {
+				case "flag":
+					// Flag pole + rectangle
+					ctx.beginPath();
+					ctx.moveTo(x, y);
+					ctx.lineTo(x, y - 18);
+					ctx.stroke();
+					ctx.fillRect(x, y - 18, 10, 7);
+					break;
+				case "rover-tracks":
+					// Two parallel dashed lines
+					ctx.setLineDash([3, 2]);
+					ctx.beginPath();
+					ctx.moveTo(x - 12, y - 2);
+					ctx.lineTo(x + 12, y - 2);
+					ctx.moveTo(x - 12, y - 5);
+					ctx.lineTo(x + 12, y - 5);
+					ctx.stroke();
+					ctx.setLineDash([]);
+					break;
+				case "debris":
+					// Angular debris shape
+					ctx.beginPath();
+					ctx.moveTo(x - 8, y);
+					ctx.lineTo(x - 3, y - 10);
+					ctx.lineTo(x + 5, y - 8);
+					ctx.lineTo(x + 8, y - 2);
+					ctx.lineTo(x + 2, y);
+					ctx.closePath();
+					ctx.stroke();
+					break;
+				case "footprints":
+					// Two small ovals
+					ctx.beginPath();
+					ctx.ellipse(x - 4, y - 3, 3, 5, -0.2, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.beginPath();
+					ctx.ellipse(x + 5, y - 5, 3, 5, 0.2, 0, Math.PI * 2);
+					ctx.fill();
+					break;
+				case "plaque":
+					// Small rectangle with cross
+					ctx.strokeRect(x - 6, y - 10, 12, 8);
+					ctx.beginPath();
+					ctx.moveTo(x, y - 10);
+					ctx.lineTo(x, y - 2);
+					ctx.moveTo(x - 6, y - 6);
+					ctx.lineTo(x + 6, y - 6);
+					ctx.stroke();
+					break;
+			}
+
+			// Label below
+			if (!art.scanned) {
+				ctx.shadowBlur = 0;
+				ctx.fillStyle = "rgba(255, 170, 0, 0.6)";
+				ctx.font = '9px "Courier New", monospace';
+				ctx.textAlign = "center";
+				ctx.fillText(art.label, x, y + 14);
+			}
+
+			ctx.shadowBlur = 0;
+		}
+
+		ctx.restore();
+	}
+
 	drawGhost(lander: LanderState, offset: { x: number; y: number }): void {
 		const ctx = this.ctx;
 		ctx.save();
