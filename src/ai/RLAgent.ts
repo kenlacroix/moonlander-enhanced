@@ -144,6 +144,7 @@ export class RLAgent {
 			menuSelect: false,
 			menuBack: false,
 			toggleAutopilot: false,
+			openSettings: false,
 		};
 	}
 

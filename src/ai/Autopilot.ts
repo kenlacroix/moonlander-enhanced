@@ -25,6 +25,7 @@ const NULL_INPUT: InputState = {
 	menuSelect: false,
 	menuBack: false,
 	toggleAutopilot: false,
+	openSettings: false,
 };
 
 export class Autopilot {
@@ -132,6 +133,7 @@ export class Autopilot {
 			menuSelect: false,
 			menuBack: false,
 			toggleAutopilot: false,
+			openSettings: false,
 		};
 	}
 

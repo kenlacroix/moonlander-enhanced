@@ -2,6 +2,10 @@ import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
+import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
+import { SettingsOverlay } from "../ui/SettingsOverlay";
+import { getMissionBriefing } from "../api/MissionBriefing";
+import { getMissionControlCommentary } from "../api/MissionControl";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { Audio } from "../systems/Audio";
 import { GhostPlayer, GhostRecorder, loadGhostForSeed } from "../systems/GhostReplay";
@@ -31,7 +35,7 @@ import { type WindState, createWind, getWindLabel, updateWind } from "./Wind";
 import { checkCollision, getTerrainHeightAt, normAngle } from "./Physics";
 import { generateTerrain, type TerrainData } from "./Terrain";
 
-export type GameStatus = "title" | "menu" | "playing" | "landed" | "crashed" | "training" | "agent-replay";
+export type GameStatus = "title" | "menu" | "playing" | "landed" | "crashed" | "training" | "agent-replay" | "settings";
 type GameMode = "freeplay" | "campaign";
 
 export class Game {
@@ -54,6 +58,10 @@ export class Game {
 	private trainingLoop: TrainingLoop | null = null;
 	private latestTrainingStats: TrainingStats | null = null;
 	private adaptiveLabel: string | null = null;
+	private llmConfig: LLMConfig | null = null;
+	private llmText = "";
+	private llmLoading = false;
+	private settingsOverlay = new SettingsOverlay();
 	private lastTime = 0;
 	private accumulator = 0;
 	private firstFrame = true;
@@ -76,6 +84,7 @@ export class Game {
 		this.camera = new Camera();
 		this.particles = new ParticleSystem();
 		this.seed = MISSIONS[0].seed;
+		this.llmConfig = loadLLMConfig();
 		this.reset();
 		this.status = "title"; // start on title screen
 	}
@@ -161,6 +170,12 @@ export class Game {
 					this.selectedMission = 0;
 					this.status = "menu";
 				}
+			}
+			// Open settings with S key
+			if (inputState.openSettings) {
+				this.settingsOverlay.show((config) => {
+					this.llmConfig = config;
+				});
 			}
 			this.renderTitle();
 			requestAnimationFrame((t) => this.loop(t));
@@ -254,6 +269,7 @@ export class Game {
 					this.activeMission = mission;
 					this.seed = mission.seed;
 					this.reset();
+					this.fetchBriefing(mission);
 				}
 			}
 			if (inputState.menuBack) {
@@ -397,6 +413,7 @@ export class Game {
 				this.audio.playSuccess();
 				this.ghostRecorder.save(this.score);
 				this.lastRank = addScore(this.seed, this.score);
+				this.fetchCommentary(true);
 				if (this.gameMode === "campaign" && this.activeMission) {
 					this.campaignCompleted.add(this.activeMission.id);
 					saveCampaignProgress(this.campaignCompleted);
@@ -409,6 +426,7 @@ export class Game {
 				this.camera.shake(15);
 				this.audio.setThruster(false);
 				this.audio.playCrash();
+				this.fetchCommentary(false);
 			}
 		}
 	}
@@ -471,6 +489,16 @@ export class Game {
 		} else if (this.status === "crashed") {
 			const hint = this.input.isTouchDevice ? "Tap top to continue" : "Press R for mission select";
 			this.renderer.drawMessage("CRASH", hint);
+		}
+
+		// LLM commentary (streams in word by word)
+		if (this.llmText && this.status !== "playing") {
+			this.renderer.drawCommentary(this.llmText);
+		}
+
+		// Mission briefing (shown during first seconds of flight)
+		if (this.llmText && this.status === "playing" && this.flightElapsed < 5) {
+			this.renderer.drawBriefing(this.llmText);
 		}
 	}
 
@@ -563,5 +591,31 @@ export class Game {
 			// Show "AI PLAYING" indicator
 			this.renderer.drawMessage("", "AI AGENT PLAYING  |  ESC for menu");
 		}
+	}
+
+	private fetchBriefing(mission: Mission): void {
+		if (!this.llmConfig) { this.llmText = ""; return; }
+		this.llmText = "";
+		this.llmLoading = true;
+		getMissionBriefing(this.llmConfig, mission, (chunk) => {
+			this.llmText += chunk;
+		}).catch(() => {
+			// API error — silent, game is playable without it
+		}).finally(() => {
+			this.llmLoading = false;
+		});
+	}
+
+	private fetchCommentary(landed: boolean): void {
+		if (!this.llmConfig) { this.llmText = ""; return; }
+		this.llmText = "";
+		this.llmLoading = true;
+		getMissionControlCommentary(this.llmConfig, this.lander, this.score, landed, (chunk) => {
+			this.llmText += chunk;
+		}).catch(() => {
+			// API error — silent
+		}).finally(() => {
+			this.llmLoading = false;
+		});
 	}
 }

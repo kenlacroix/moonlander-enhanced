@@ -317,7 +317,7 @@ export class CanvasRenderer {
 		// Controls
 		ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("[UP/DOWN] Select    [ENTER] Start", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+		ctx.fillText("[UP/DOWN] Select    [ENTER] Start    [S] AI Settings", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
 
 		ctx.restore();
 	}
@@ -608,6 +608,64 @@ export class CanvasRenderer {
 		ctx.textAlign = "center";
 		ctx.fillText(`${maxTime.toFixed(1)}s`, chartX + chartW / 2, chartY + chartH + 14);
 
+		ctx.restore();
+	}
+
+	/** Draw mission briefing text (shown during first seconds of flight) */
+	drawBriefing(text: string): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.globalAlpha = 0.8;
+		ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+		ctx.fillRect(CANVAS_WIDTH / 2 - 300, 10, 600, 60);
+		ctx.globalAlpha = 1;
+		ctx.fillStyle = "#44aaff";
+		ctx.font = '12px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText("MISSION CONTROL:", CANVAS_WIDTH / 2, 30);
+		ctx.fillStyle = "#ffffff";
+		ctx.font = '13px "Courier New", monospace';
+		// Wrap text to fit
+		const words = text.split(" ");
+		let line = "";
+		let y = 48;
+		for (const word of words) {
+			const test = line ? `${line} ${word}` : word;
+			if (ctx.measureText(test).width > 560) {
+				ctx.fillText(line, CANVAS_WIDTH / 2, y);
+				line = word;
+				y += 16;
+				if (y > 62) break; // max 2 lines
+			} else {
+				line = test;
+			}
+		}
+		if (line) ctx.fillText(line, CANVAS_WIDTH / 2, y);
+		ctx.restore();
+	}
+
+	/** Draw post-landing/crash commentary from mission control */
+	drawCommentary(text: string): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.fillStyle = "rgba(68, 170, 255, 0.7)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.textAlign = "center";
+		// Wrap text
+		const words = text.split(" ");
+		let line = "";
+		let y = CANVAS_HEIGHT / 2 + 60;
+		for (const word of words) {
+			const test = line ? `${line} ${word}` : word;
+			if (ctx.measureText(test).width > 600) {
+				ctx.fillText(line, CANVAS_WIDTH / 2, y);
+				line = word;
+				y += 18;
+			} else {
+				line = test;
+			}
+		}
+		if (line) ctx.fillText(line, CANVAS_WIDTH / 2, y);
 		ctx.restore();
 	}
 
