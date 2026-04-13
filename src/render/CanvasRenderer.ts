@@ -1,7 +1,9 @@
 import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
+import type { Mission } from "../game/Missions";
 import type { Particle } from "../game/Particles";
 import type { LandingPad, TerrainData } from "../game/Terrain";
+import type { TelemetryFrame } from "../systems/Telemetry";
 import {
 	CANVAS_HEIGHT,
 	CANVAS_WIDTH,
@@ -155,8 +157,8 @@ export class CanvasRenderer {
 		ctx.closePath();
 		ctx.fill();
 
-		// Accent stripe
-		ctx.fillStyle = COLOR_LANDER_ACCENT;
+		// Accent stripe — uses lander type color
+		ctx.fillStyle = lander.landerType?.color ?? COLOR_LANDER_ACCENT;
 		ctx.fillRect(-hw * 0.5, -hh * 0.3, hw, 3);
 
 		// Legs
@@ -202,6 +204,41 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw a ghost lander (translucent replay of best run) */
+	drawGhost(lander: LanderState, offset: { x: number; y: number }): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.globalAlpha = 0.25;
+		ctx.translate(offset.x + lander.x, offset.y + lander.y);
+		ctx.rotate(degToRad(lander.angle));
+
+		const hw = LANDER_WIDTH / 2;
+		const hh = LANDER_HEIGHT / 2;
+
+		// Ghost body — simple outline
+		ctx.strokeStyle = "#44aaff";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.moveTo(-hw * 0.6, -hh);
+		ctx.lineTo(hw * 0.6, -hh);
+		ctx.lineTo(hw, hh * 0.3);
+		ctx.lineTo(hw * 0.8, hh * 0.6);
+		ctx.lineTo(-hw * 0.8, hh * 0.6);
+		ctx.lineTo(-hw, hh * 0.3);
+		ctx.closePath();
+		ctx.stroke();
+
+		// Ghost legs
+		ctx.beginPath();
+		ctx.moveTo(-hw * 0.6, hh * 0.6);
+		ctx.lineTo(-hw * 1.0, hh);
+		ctx.moveTo(hw * 0.6, hh * 0.6);
+		ctx.lineTo(hw * 1.0, hh);
+		ctx.stroke();
+
+		ctx.restore();
+	}
+
 	drawParticles(particles: Particle[], offset: { x: number; y: number }): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -229,8 +266,147 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
-	drawHUD(lander: LanderState, score: number): void {
-		this.hud.draw(this.ctx, lander, score);
+	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false): void {
+		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak);
+	}
+
+	drawTitle(selection: number, completedCount: number, totalCampaign: number): void {
+		const ctx = this.ctx;
+		ctx.save();
+
+		// Title
+		ctx.fillStyle = "#00ff88";
+		ctx.font = 'bold 48px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 120);
+
+		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText("A LUNAR DESCENT SIMULATOR", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 80);
+
+		// Mode options
+		const options = ["FREE PLAY", "CAMPAIGN"];
+		const descriptions = [
+			"10 missions. Pick any. Beat your ghost.",
+			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
+		];
+
+		for (let i = 0; i < 2; i++) {
+			const y = CANVAS_HEIGHT / 2 + i * 60;
+			const isSelected = i === selection;
+
+			if (isSelected) {
+				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
+				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 18, 400, 50);
+				ctx.strokeStyle = "#00ff88";
+				ctx.lineWidth = 1;
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 18, 400, 50);
+			}
+
+			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
+			ctx.font = `bold 22px "Courier New", monospace`;
+			ctx.textAlign = "center";
+			ctx.fillText(options[i], CANVAS_WIDTH / 2, y + 8);
+
+			ctx.fillStyle = isSelected ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)";
+			ctx.font = '13px "Courier New", monospace';
+			ctx.fillText(descriptions[i], CANVAS_WIDTH / 2, y + 26);
+		}
+
+		// Controls
+		ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText("[UP/DOWN] Select    [ENTER] Start", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+
+		ctx.restore();
+	}
+
+	drawMissionSelect(missions: Mission[], selectedIndex: number, bestScores: Map<number, number>, campaignProgress?: Set<number>): void {
+		const ctx = this.ctx;
+		ctx.save();
+
+		// Title
+		ctx.fillStyle = "#00ff88";
+		ctx.font = 'bold 32px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, 60);
+
+		ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText("SELECT MISSION", CANVAS_WIDTH / 2, 90);
+
+		// Mission list
+		const startY = 130;
+		const lineHeight = 48;
+		const visibleCount = Math.min(missions.length, 10);
+
+		for (let i = 0; i < visibleCount; i++) {
+			const m = missions[i];
+			const y = startY + i * lineHeight;
+			const isSelected = i === selectedIndex;
+
+			// Campaign: check locked/completed
+			const isLocked = campaignProgress !== undefined && m.id > 1 && !campaignProgress.has(m.id - 1);
+			const isCompleted = campaignProgress?.has(m.id) ?? false;
+
+			// Selection highlight
+			if (isSelected && !isLocked) {
+				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
+				ctx.fillRect(CANVAS_WIDTH / 2 - 320, y - 14, 640, 40);
+
+				ctx.strokeStyle = "#00ff88";
+				ctx.lineWidth = 1;
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 320, y - 14, 640, 40);
+			}
+
+			// Status indicator for campaign
+			ctx.textAlign = "left";
+			if (campaignProgress !== undefined) {
+				ctx.font = '14px "Courier New", monospace';
+				if (isCompleted) {
+					ctx.fillStyle = "#00ff88";
+					ctx.fillText("[DONE]", CANVAS_WIDTH / 2 - 300, y + 6);
+				} else if (isLocked) {
+					ctx.fillStyle = "#444444";
+					ctx.fillText("[LOCKED]", CANVAS_WIDTH / 2 - 300, y + 6);
+				} else {
+					ctx.fillStyle = "#ffaa00";
+					ctx.fillText("[  >>  ]", CANVAS_WIDTH / 2 - 300, y + 6);
+				}
+			} else {
+				ctx.fillStyle = isSelected ? "#00ff88" : "#888888";
+				ctx.font = 'bold 16px "Courier New", monospace';
+				ctx.fillText(`${String(m.id).padStart(2, "0")}`, CANVAS_WIDTH / 2 - 300, y + 6);
+			}
+
+			// Mission name
+			const dimmed = isLocked;
+			ctx.fillStyle = dimmed ? "#444444" : isSelected ? "#ffffff" : "#aaaaaa";
+			ctx.font = `${isSelected && !isLocked ? "bold " : ""}16px "Courier New", monospace`;
+			ctx.fillText(m.name, CANVAS_WIDTH / 2 - 220, y + 6);
+
+			// Description
+			ctx.fillStyle = dimmed ? "rgba(255, 255, 255, 0.15)" : isSelected ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)";
+			ctx.font = '12px "Courier New", monospace';
+			ctx.fillText(isLocked ? "Complete previous mission to unlock" : m.description, CANVAS_WIDTH / 2 - 220, y + 22);
+
+			// Best score
+			const best = bestScores.get(m.seed);
+			if (best !== undefined) {
+				ctx.textAlign = "right";
+				ctx.fillStyle = "#00ff88";
+				ctx.font = '14px "Courier New", monospace';
+				ctx.fillText(`BEST: ${best}`, CANVAS_WIDTH / 2 + 300, y + 6);
+			}
+		}
+
+		// Controls hint
+		ctx.textAlign = "center";
+		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText("[UP/DOWN] Select    [ENTER] Launch    [ESC] Back to menu", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+
+		ctx.restore();
 	}
 
 	drawMessage(text: string, subtitle?: string): void {
@@ -250,6 +426,98 @@ export class CanvasRenderer {
 			ctx.font = '18px "Courier New", monospace';
 			ctx.fillText(subtitle, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 25);
 		}
+
+		ctx.restore();
+	}
+
+	/** Draw a mini telemetry chart (altitude over time) on the post-flight screen */
+	drawTelemetry(frames: TelemetryFrame[]): void {
+		if (frames.length < 2) return;
+
+		const ctx = this.ctx;
+		ctx.save();
+
+		const chartX = CANVAS_WIDTH / 2 - 250;
+		const chartY = CANVAS_HEIGHT / 2 + 60;
+		const chartW = 500;
+		const chartH = 100;
+
+		// Background
+		ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+		ctx.fillRect(chartX - 5, chartY - 5, chartW + 10, chartH + 25);
+
+		// Find max altitude for scaling
+		let maxAlt = 0;
+		for (const f of frames) {
+			if (f.altitude > maxAlt) maxAlt = f.altitude;
+		}
+		if (maxAlt < 10) maxAlt = 10;
+
+		const maxTime = frames[frames.length - 1].time;
+		if (maxTime <= 0) { ctx.restore(); return; }
+
+		// Altitude line
+		ctx.strokeStyle = "#00ff88";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		for (let i = 0; i < frames.length; i++) {
+			const fx = chartX + (frames[i].time / maxTime) * chartW;
+			const fy = chartY + chartH - (frames[i].altitude / maxAlt) * chartH;
+			if (i === 0) ctx.moveTo(fx, fy);
+			else ctx.lineTo(fx, fy);
+		}
+		ctx.stroke();
+
+		// Labels
+		ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+		ctx.font = '10px "Courier New", monospace';
+		ctx.textAlign = "left";
+		ctx.fillText("ALT", chartX + 2, chartY + 12);
+		ctx.textAlign = "right";
+		ctx.fillText(`${Math.round(maxAlt)}`, chartX + chartW, chartY + 12);
+		ctx.textAlign = "center";
+		ctx.fillText(`${maxTime.toFixed(1)}s`, chartX + chartW / 2, chartY + chartH + 14);
+
+		ctx.restore();
+	}
+
+	/** Draw semi-transparent touch control zones for mobile */
+	drawTouchControls(): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.globalAlpha = 0.15;
+
+		const zoneH = CANVAS_HEIGHT * 0.35;
+		const zoneY = CANVAS_HEIGHT - zoneH;
+		const sideW = CANVAS_WIDTH * 0.3;
+		const centerX = sideW;
+		const centerW = CANVAS_WIDTH - sideW * 2;
+
+		// Left rotate zone
+		ctx.fillStyle = "#4488ff";
+		ctx.fillRect(0, zoneY, sideW, zoneH);
+
+		// Right rotate zone
+		ctx.fillRect(CANVAS_WIDTH - sideW, zoneY, sideW, zoneH);
+
+		// Thrust zone (center)
+		ctx.fillStyle = "#ff6600";
+		ctx.fillRect(centerX, zoneY, centerW, zoneH);
+
+		// Labels
+		ctx.globalAlpha = 0.4;
+		ctx.fillStyle = "#ffffff";
+		ctx.font = 'bold 18px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText("< ROTATE", sideW / 2, zoneY + zoneH / 2);
+		ctx.fillText("ROTATE >", CANVAS_WIDTH - sideW / 2, zoneY + zoneH / 2);
+		ctx.fillText("THRUST", CANVAS_WIDTH / 2, zoneY + zoneH / 2);
+
+		// Tap hint at top
+		ctx.globalAlpha = 0.3;
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText("TAP HERE TO RESTART", CANVAS_WIDTH / 2, 20);
 
 		ctx.restore();
 	}

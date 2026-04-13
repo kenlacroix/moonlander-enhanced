@@ -14,6 +14,8 @@ export class HUD {
 		ctx: CanvasRenderingContext2D,
 		lander: LanderState,
 		score: number,
+		windLabel: string | null = null,
+		fuelLeak = false,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -58,7 +60,8 @@ export class HUD {
 		// Fuel — warn if low
 		const fuelPct = ((lander.fuel / STARTING_FUEL) * 100).toFixed(0);
 		const fuelWarn = lander.fuel < STARTING_FUEL * 0.2;
-		this.drawLabel(ctx, x, y, "FUEL", `${fuelPct}%`, fuelWarn);
+		const fuelText = fuelLeak ? `${fuelPct}% LEAK!` : `${fuelPct}%`;
+		this.drawLabel(ctx, x, y, "FUEL", fuelText, fuelWarn || fuelLeak);
 		y += lineHeight;
 
 		// Fuel bar
@@ -71,6 +74,12 @@ export class HUD {
 		const fillWidth = (lander.fuel / STARTING_FUEL) * barWidth;
 		ctx.fillStyle = fuelWarn ? COLOR_HUD_WARNING : COLOR_HUD;
 		ctx.fillRect(barX, y, fillWidth, barHeight);
+
+		// Wind indicator
+		if (windLabel) {
+			y += lineHeight;
+			this.drawLabel(ctx, x, y, "WIND", windLabel);
+		}
 
 		// Score (top right)
 		if (score > 0) {

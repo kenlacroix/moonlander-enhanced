@@ -4,6 +4,7 @@ import {
 	ROTATION_SPEED,
 	STARTING_FUEL,
 } from "../utils/constants";
+import type { LanderType } from "./LanderTypes";
 import { applyGravity, thrustVector } from "./Physics";
 
 export type LanderStatus = "idle" | "flying" | "landed" | "crashed";
@@ -18,9 +19,10 @@ export interface LanderState {
 	fuel: number;
 	thrusting: boolean;
 	status: LanderStatus;
+	landerType: LanderType;
 }
 
-export function createLander(x: number, y: number): LanderState {
+export function createLander(x: number, y: number, landerType: LanderType): LanderState {
 	return {
 		x,
 		y,
@@ -28,9 +30,10 @@ export function createLander(x: number, y: number): LanderState {
 		vy: 0,
 		angle: 0,
 		angularVel: 0,
-		fuel: STARTING_FUEL,
+		fuel: STARTING_FUEL * landerType.fuelMultiplier,
 		thrusting: false,
 		status: "flying",
+		landerType,
 	};
 }
 
@@ -42,25 +45,27 @@ export function updateLander(
 ): void {
 	if (lander.status !== "flying") return;
 
+	const lt = lander.landerType;
+
 	// Rotation
 	if (input.rotateLeft) {
-		lander.angle -= ROTATION_SPEED * dt;
+		lander.angle -= ROTATION_SPEED * lt.rotationMultiplier * dt;
 	}
 	if (input.rotateRight) {
-		lander.angle += ROTATION_SPEED * dt;
+		lander.angle += ROTATION_SPEED * lt.rotationMultiplier * dt;
 	}
 
 	// Thrust
 	lander.thrusting = input.thrustUp && lander.fuel > 0;
 	if (lander.thrusting) {
 		const thrust = thrustVector(lander.angle);
-		lander.vx += thrust.x * dt;
-		lander.vy += thrust.y * dt;
+		lander.vx += thrust.x * lt.thrustMultiplier * dt;
+		lander.vy += thrust.y * lt.thrustMultiplier * dt;
 		lander.fuel = Math.max(0, lander.fuel - FUEL_BURN_RATE * dt);
 	}
 
-	// Gravity (always applies)
-	lander.vy = applyGravity(lander.vy, dt);
+	// Gravity — mass multiplier makes heavier landers harder to slow down
+	lander.vy = applyGravity(lander.vy, dt * lt.massMultiplier);
 
 	// Integrate position
 	lander.x += lander.vx * dt;

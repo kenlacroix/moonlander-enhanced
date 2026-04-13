@@ -1,7 +1,6 @@
 import {
 	GRAVITY,
 	LANDER_HEIGHT,
-	LANDER_WIDTH,
 	MAX_LANDING_ANGLE,
 	MAX_LANDING_SPEED,
 	THRUST_FORCE,
@@ -34,8 +33,6 @@ export function checkCollision(
 	terrain: TerrainData,
 ): CollisionResult {
 	const landerBottom = lander.y + LANDER_HEIGHT / 2;
-	const landerLeft = lander.x - LANDER_WIDTH / 2;
-	const landerRight = lander.x + LANDER_WIDTH / 2;
 
 	// Check if lander overlaps a landing pad (center must be over pad)
 	for (const pad of terrain.pads) {
