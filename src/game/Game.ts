@@ -5,6 +5,7 @@ import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAd
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
+import { generateFlightReport } from "../systems/FlightRecorder";
 import { SettingsOverlay } from "../ui/SettingsOverlay";
 import { getMissionBriefing } from "../api/MissionBriefing";
 import { getMissionControlCommentary } from "../api/MissionControl";
@@ -312,6 +313,19 @@ export class Game {
 			downloadGhost(this.seed);
 		}
 
+		// Flight report card (F key on post-flight screen)
+		if (inputState.flightReport && (this.status === "landed" || this.status === "crashed")) {
+			generateFlightReport(
+				this.lander,
+				this.terrain,
+				this.telemetry.frames,
+				this.activeMission?.name ?? `SEED ${this.seed}`,
+				this.seed,
+				this.score,
+				this.status === "landed",
+			);
+		}
+
 		// Handle restart
 		if (inputState.restart && this.status !== "playing") {
 			// Embed mode: restart same seed, never show menu
@@ -543,7 +557,7 @@ export class Game {
 			const isTouch = this.input.isTouchDevice;
 			const isCampaignNext = this.gameMode === "campaign" && this.selectedMission < CAMPAIGN.length - 1;
 			const nextHint = isCampaignNext ? "next mission" : "mission select";
-			const ghostHint = isTouch ? "" : "  |  G share ghost";
+			const ghostHint = isTouch ? "" : "  |  G ghost  |  F report";
 			const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
 			const title = this.gameMode === "campaign" ? "MISSION COMPLETE" : "LANDING SUCCESSFUL";
 			const rankText = this.lastRank === 1 ? "  NEW BEST!" : this.lastRank ? `  #${this.lastRank}` : "";
@@ -552,8 +566,8 @@ export class Game {
 				`Score: ${this.score}${rankText}  |  ${hint}${ghostHint}`,
 			);
 		} else if (this.status === "crashed") {
-			const hint = this.input.isTouchDevice ? "Tap top to continue" : "Press R for mission select";
-			this.renderer.drawMessage("CRASH", hint);
+			const crashHint = this.input.isTouchDevice ? "Tap top to continue" : "R mission select  |  F report";
+			this.renderer.drawMessage("CRASH", crashHint);
 		}
 
 		// LLM commentary (streams in word by word)

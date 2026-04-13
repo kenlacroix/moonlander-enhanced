@@ -148,6 +148,7 @@ export class RLAgent {
 			toggleRetroSkin: false,
 			exportGhost: false,
 			importGhost: false,
+			flightReport: false,
 		};
 	}
 

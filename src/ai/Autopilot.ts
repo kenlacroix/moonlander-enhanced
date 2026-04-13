@@ -29,6 +29,7 @@ const NULL_INPUT: InputState = {
 	toggleRetroSkin: false,
 	exportGhost: false,
 	importGhost: false,
+	flightReport: false,
 };
 
 export class Autopilot {
@@ -140,6 +141,7 @@ export class Autopilot {
 			toggleRetroSkin: false,
 			exportGhost: false,
 			importGhost: false,
+			flightReport: false,
 		};
 	}
 

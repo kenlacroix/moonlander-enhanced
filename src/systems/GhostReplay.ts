@@ -26,6 +26,7 @@ function unpackInput(frame: InputFrame): InputState {
 		toggleRetroSkin: false,
 		exportGhost: false,
 		importGhost: false,
+		flightReport: false,
 	};
 }
 
