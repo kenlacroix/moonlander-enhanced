@@ -35,6 +35,7 @@ const NULL_INPUT: InputState = {
 	exportGhost: false,
 	importGhost: false,
 	flightReport: false,
+	toggleRelay: false,
 };
 
 export class Autopilot {
@@ -147,6 +148,7 @@ export class Autopilot {
 			exportGhost: false,
 			importGhost: false,
 			flightReport: false,
+			toggleRelay: false,
 		};
 	}
 

@@ -957,6 +957,21 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw relay mode indicator on mission select */
+	drawRelayIndicator(active: boolean): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.font = '14px "Courier New", monospace';
+		ctx.textAlign = "right";
+		ctx.fillStyle = active ? "#ffaa00" : "rgba(0, 255, 136, 0.4)";
+		ctx.fillText(
+			active ? "RELAY MODE: ON  [L] off" : "[L] Relay Mode",
+			CANVAS_WIDTH - 20,
+			CANVAS_HEIGHT - 20,
+		);
+		ctx.restore();
+	}
+
 	/** Draw semi-transparent touch control zones for mobile */
 	drawTouchControls(): void {
 		const ctx = this.ctx;

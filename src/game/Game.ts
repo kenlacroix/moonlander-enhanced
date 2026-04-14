@@ -46,9 +46,9 @@ import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
 import {
-	type GravityStormState,
 	applyGravityStormEffect,
 	createGravityStorm,
+	type GravityStormState,
 	shouldSpawnGravityStorm,
 	updateGravityStorm,
 } from "./GravityStorm";
@@ -65,6 +65,13 @@ import {
 } from "./Missions";
 import { ParticleSystem } from "./Particles";
 import { checkCollision, getTerrainHeightAt, normAngle } from "./Physics";
+import {
+	advanceRelayLander,
+	createRelayState,
+	isRelayComplete,
+	type RelayState,
+	recordRelayLander,
+} from "./RelayMode";
 import type { DifficultyConfig } from "./Terrain";
 import { generateTerrain, type TerrainData } from "./Terrain";
 import { createWind, updateWind, type WindState } from "./Wind";
@@ -114,6 +121,7 @@ export class Game {
 	private fuelLeakTriggered = false;
 	alien: AlienState | null = null;
 	gravityStorm: GravityStormState | null = null;
+	relay: RelayState | null = null;
 	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
 	private embedMode: boolean;
@@ -356,6 +364,10 @@ export class Game {
 					this.updateURL(mission.seed);
 				}
 			}
+			// Toggle relay mode (L key) — only in free-play
+			if (inputState.toggleRelay && this.gameMode === "freeplay") {
+				this.relay = this.relay ? null : createRelayState();
+			}
 			if (inputState.importGhost) {
 				uploadGhost().then((run) => {
 					if (run) {
@@ -592,7 +604,49 @@ export class Game {
 				this.audio.soundtrack.onCrashed();
 				this.llm.fetchCommentary(this, this.lander, this.score, false);
 			}
+
+			// Relay mode: record lander result and auto-advance
+			if (
+				this.relay &&
+				(this.status === "landed" || this.status === "crashed")
+			) {
+				const hasMore = recordRelayLander(
+					this.relay,
+					this.lander.x,
+					this.lander.y,
+					this.status,
+					this.score,
+				);
+				if (hasMore) {
+					// Auto-spawn next lander after brief delay
+					setTimeout(() => {
+						if (!this.relay || isRelayComplete(this.relay)) return;
+						const spawn = advanceRelayLander(this.relay);
+						this.spawnRelayLander(spawn.spawnX, spawn.spawnY);
+					}, 1500);
+				} else {
+					// Relay complete — show combined score
+					this.score = this.relay.totalScore;
+				}
+			}
 		}
+	}
+
+	private spawnRelayLander(spawnX: number, spawnY: number): void {
+		const diff = this.activeMission?.difficulty;
+		const landerType = getLanderType(diff?.landerType);
+		this.lander = createLander(spawnX, spawnY, landerType);
+		if (diff?.startingFuel !== undefined) {
+			this.lander.fuel = diff.startingFuel;
+		}
+		this.status = "playing";
+		this.particles_.clear();
+		this.firstFrame = true;
+		this.fuelWarningCooldown = 0;
+		this.flightElapsed = 0;
+		this.fuelLeakActive = false;
+		this.fuelLeakTriggered = false;
+		this.audio.soundtrack.start();
 	}
 
 	private calculateScore(pad: { points: number }): number {
