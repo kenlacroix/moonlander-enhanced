@@ -30,16 +30,21 @@ describe("placeArtifacts", () => {
 	});
 
 	it("places artifacts on the terrain surface", () => {
-		const terrain = generateTerrain(1969);
-		const arts = placeArtifacts(1969, terrain.points);
-		if (arts.length === 0) return; // seed might not spawn artifacts
+		// Use a seed known to spawn artifacts
+		let spawnSeed = -1;
+		for (let s = 0; s < 100; s++) {
+			if (shouldSpawnArtifacts(s)) { spawnSeed = s; break; }
+		}
+		expect(spawnSeed).toBeGreaterThanOrEqual(0);
+		const terrain = generateTerrain(spawnSeed);
+		const arts = placeArtifacts(spawnSeed, terrain.points);
+		expect(arts.length).toBeGreaterThan(0);
 		for (const art of arts) {
 			expect(art.y).toBeGreaterThan(0);
 		}
 	});
 
 	it("returns empty for seeds where shouldSpawnArtifacts is false", () => {
-		// Find a seed that doesn't spawn
 		for (let seed = 0; seed < 100; seed++) {
 			if (!shouldSpawnArtifacts(seed)) {
 				const terrain = generateTerrain(seed);
@@ -47,6 +52,16 @@ describe("placeArtifacts", () => {
 				return;
 			}
 		}
+	});
+
+	it("can place 2 artifacts for some seeds", () => {
+		let foundTwo = false;
+		for (let seed = 0; seed < 200 && !foundTwo; seed++) {
+			if (!shouldSpawnArtifacts(seed)) continue;
+			const terrain = generateTerrain(seed);
+			if (placeArtifacts(seed, terrain.points).length === 2) foundTwo = true;
+		}
+		expect(foundTwo).toBe(true);
 	});
 });
 
@@ -68,15 +83,28 @@ describe("checkArtifactScan", () => {
 		expect(result).toBeNull();
 	});
 
-	it("skips already-scanned artifacts", () => {
+	it("returns null at exact scan boundary (exclusive)", () => {
 		const terrain = generateTerrain(1969);
 		const arts = placeArtifacts(1969, terrain.points);
 		if (arts.length === 0) return;
-		arts[0].scanned = true;
-		const result = checkArtifactScan(arts, arts[0].x);
-		// If there's only one artifact, result should be null
-		if (arts.length === 1) {
-			expect(result).toBeNull();
-		}
+		// SCAN_RADIUS = 80, condition is strict < so exactly 80 should be null
+		expect(checkArtifactScan(arts, arts[0].x + 80)).toBeNull();
+		// 79 should hit
+		expect(checkArtifactScan(arts, arts[0].x + 79)).not.toBeNull();
+	});
+
+	it("returns null for empty artifacts array", () => {
+		expect(checkArtifactScan([], 500)).toBeNull();
+	});
+
+	it("skips already-scanned artifacts", () => {
+		// Use hand-crafted artifacts to avoid seed dependency
+		const arts = [
+			{ x: 100, y: 50, type: "flag" as const, scanned: true, label: "FLAG", fact: null },
+			{ x: 5000, y: 50, type: "plaque" as const, scanned: false, label: "PLAQUE", fact: null },
+		];
+		// Only the scanned artifact is nearby — should return null
+		const result = checkArtifactScan(arts, 100);
+		expect(result).toBeNull();
 	});
 });
