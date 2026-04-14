@@ -286,106 +286,131 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-## Long-Term Roadmap
+## Long-Term Roadmap — AI Theater First
 
-### Phase 5 — Visual Upgrade (WebGL + Shaders)
-**Theme:** Same game, dramatically better looking.
-**Priority:** HIGH — unlocks all subsequent graphics work.
+**Vision:** MoonLander Enhanced becomes the "TensorFlow Playground of reinforcement learning" except it's a game you actually want to play. One URL where someone plays, watches an AI learn to beat them, compares RL algorithms, forks any AI decision, then races a friend on the same terrain. Real physics, real AI, all in the browser.
 
-- [ ] PixiJS v8 WebGLRenderer implementing existing IRenderer interface
+**Approach:** AI Theater First (validated by CEO review + cross-model consensus). Lead with the unique differentiator (visible AI learning), then add content depth, then visual upgrade, then multiplayer and 3D.
+
+### Sprint 1 — Foundation (Game.ts Decomposition) — S (~1hr CC)
+- [ ] Split Game.ts (~900 lines) into GameLoop, GameState, Game orchestrator (GameRenderer.ts already extracted)
+- [ ] Generalize existing TrainingLoop.ts into reusable HeadlessGame class
+- [ ] Target: Game.ts under 350 lines, all tests pass, game plays identically
+
+**Exit question:** Is Game.ts maintainable now? Can you add a feature without touching 5 concerns?
+
+---
+
+### Sprint 2 — AI Theater MVP — M (~3hr CC)
+- [ ] Split-screen layout: player (left) + AI training (right, same seed, 50x real-time)
+- [ ] Live reward curve below AI panel (canvas line chart)
+- [ ] Episode counter, best score, current score updating in real time
+- [ ] "Watch AI's best run" button using existing ghost replay
+- [ ] Comparison card on landing: player vs AI scores
+- [ ] Human vs AI shareable scorecard (extends FlightRecorder.ts pattern)
+- [ ] AI narration of decisions via LLM reading autopilot decision state
+
+**Exit question:** Does watching the AI learn make you understand RL better than reading about it?
+
+---
+
+### Sprint 2.5 — RL Algorithm Comparison — M (~2hr CC)
+- [ ] Implement simple policy gradient agent (~50 lines) alongside existing DQN
+- [ ] Run DQN vs policy gradient vs random agent side-by-side in AI Theater
+- [ ] Three learning curves on the same chart
+- [ ] Educational labels explaining why algorithms differ
+
+**Exit question:** Can a non-ML person understand why DQN wins by watching the curves?
+
+---
+
+### Sprint 3 — Mission Replay Archaeology — M (~2hr CC)
+- [ ] Timeline scrubber on AI reward curve from AI Theater
+- [ ] Click any point to restore game state (keyframe every 60 frames + input replay between)
+- [ ] Take over controls from the AI's exact position
+- [ ] AI ghost trajectory stays visible during player's divergent path
+- [ ] Score comparison from fork point
+
+**Exit question:** Is "can I beat the AI from here?" a compelling loop?
+
+---
+
+### Sprint 4 — Multi-World Transfer Learning — M (~3hr CC)
+- [ ] Extend GravityPresets.ts with Europa (1.315), Titan (1.352), asteroid belt (0.1-0.5)
+- [ ] Per-world terrain generation parameters (roughness, color palette, pad style)
+- [ ] Train AI on Moon, drop it on Mars/Jupiter, watch it adapt (or fail)
+- [ ] Transfer learning visualization: overlay Moon-trained vs fresh policy curves
+- [ ] Zero-G as opt-in toggle ("watch the AI break when assumptions fail")
+- [ ] Procedural audio per world (Mars hiss, Europa ice creak, Jupiter radio noise)
+
+**Exit question:** Does watching the AI panic on Jupiter teach you about distribution shift?
+
+---
+
+### Sprint 5 — Apollo Recreations — L (~3-4hr CC)
+- [ ] 3 iconic missions first (Apollo 11, 15, 17), remaining 3 as follow-up
+- [ ] Approximate terrain profiles from mission descriptions
+- [ ] Real mission constraints (fuel, thrust-to-weight, descent trajectory)
+- [ ] LLM-powered historical briefings per mission
+
+**Exit question:** Would a space nerd share this with every space nerd they know?
+
+---
+
+### Sprint 6 — WebGL Visual Upgrade — L (~3-4hr CC)
+- [ ] Extract formal IRenderer interface from CanvasRenderer.ts
+- [ ] PixiJS v8 WebGLRenderer implementing IRenderer (keep 2D-focused, ThreeJSAdapter later)
 - [ ] Bloom/glow shader on thruster plume and landing pad beacons
 - [ ] Heat distortion shader behind engine bell
-- [ ] Normal mapping on terrain — flat polygon looks 3D
-- [ ] Dynamic sun lighting per mission — lander shadow on ground
-- [ ] Lander spotlight on final approach (illuminates terrain below)
-- [ ] Procedural rock detail on terrain (noise-driven micro-geometry)
-- [ ] GPU particle rendering via PixiJS particle container (10x particle budget)
-- [ ] Screen shake on crash (camera trauma system)
-- [ ] Seamless Canvas fallback when WebGL unavailable
+- [ ] Normal mapping on terrain surface
+- [ ] Dynamic sun lighting per mission
+- [ ] Screen shake on crash
+- [ ] Canvas fallback when WebGL unavailable
 
 **Exit question:** Does the WebGL version make you go "whoa" compared to Canvas?
 
 ---
 
-### Phase 6 — Multiplayer and Competition
-**Theme:** You're not alone up there.
-**Priority:** HIGH — biggest engagement multiplier.
+### Sprint 7 — Peer-to-Peer Multiplayer — M (~2hr CC)
+- [ ] Audit physics code for determinism (no Math.random outside seeded PRNG)
+- [ ] WebRTC DataChannel, zero server (copy-paste offer/answer or PeerJS relay)
+- [ ] Same seed = same terrain, sync input frames only (~20 bytes/sec)
+- [ ] Opponent renders as translucent ghost lander
+- [ ] Daily challenge seed (client-side, UTC day as seed)
 
-- [ ] Real-time ghost racing — race against another player's ghost in split-screen or overlay
-- [ ] WebSocket lobby — see other players' landers in real-time (spectate or co-land)
-- [ ] Daily challenge seed — one terrain per day, global leaderboard
-- [ ] Ranked seasons — ELO-style rating based on daily challenge placement
-- [ ] Async challenge mode — send a friend a URL, they try to beat your score on your terrain
-- [ ] Replay theater — watch top-ranked runs with commentary overlay
-- [ ] Clan/team support — aggregate scores for groups
-
-**Exit question:** Does competing against real humans change how the game feels?
+**Exit question:** Does racing a real human change how the game feels?
 
 ---
 
-### Phase 7 — Content Depth
-**Theme:** A universe of missions, not just a surface.
-**Priority:** MEDIUM — extends play longevity.
-
-- [ ] Procedural mission generator — infinite unique missions with narrative seeds
-- [ ] Multi-body missions — land on asteroids, Mars, Europa (different gravity, atmosphere, terrain style)
-- [ ] Orbital insertion phase — start from orbit, deorbit burn, then descent
-- [ ] Supply drop missions — deliver cargo to a specific pad with weight penalties
-- [ ] Rescue missions — hover near a stranded lander, match velocity, dock
-- [ ] Timed speed-run mode — fastest landing wins, fuel is infinite
-- [ ] Hardcore mode — no HUD, no telemetry, instruments only (altimeter beeps)
-- [ ] Story campaign — 20-mission narrative arc with LLM-generated mission briefings and branching outcomes
-- [ ] Community mission sharing — upload/download custom terrain + mission configs
-
-**Exit question:** Does the content variety keep you coming back after 50 hours?
-
----
-
-### Phase 8 — AI Visual Layer
-**Theme:** Every run looks unique. The visuals are alive.
-**Priority:** MEDIUM — impressive tech showcase, depends on Phase 5 WebGL.
-
-- [ ] TF.js neural style transfer — Painterly and Neon Future skins as replay-mode filters
-- [ ] AI terrain textures — image gen API produces tileable textures per seed, cached locally
-- [ ] Generative skyboxes — AI-generated nebulae/starfields unique to each mission seed
-- [ ] Dynamic weather visuals — regolith dust clouds, solar flare lighting changes
-- [ ] Procedural lander skins — AI-generated hull textures unlocked by achievements
-
-**Exit question:** Do the AI visuals make you want to replay just to see what it generates?
-
----
-
-### Phase 9 — 3D Mode
-**Theme:** Same physics, completely different dimension.
-**Priority:** LOW — high effort, high wow factor, depends on Phase 5.
-
-- [ ] Three.js renderer implementing IRenderer interface
-- [ ] Lunar surface mesh generated from terrain seed (heightmap → geometry)
-- [ ] Low-poly NASA-inspired lander 3D model
-- [ ] Earth in skybox, slowly rotating
-- [ ] Volumetric thruster plume via Three.js particle system
-- [ ] Cinematic camera with lag, tilt, and multiple viewpoints (cockpit, chase, free)
-- [ ] Terrain LOD — detail increases as lander descends
-- [ ] VR/WebXR mode — land on the moon in a headset
+### Sprint 8 — 3D Cockpit Mode — XL (~5-6hr CC)
+- [ ] Three.js renderer with ThreeJSAdapter (translates 2D IRenderer calls to scene graph)
+- [ ] Lunar surface mesh from terrain seed (heightmap to geometry)
+- [ ] Low-poly LM model, Earth in skybox
+- [ ] Cockpit first-person view, chase cam, orbital zoom-out
+- [ ] Volumetric thruster plume particles
 
 **Exit question:** Does 3D mode feel like a different game or a gimmick?
 
 ---
 
-### Phase 10 — Platform and Ecosystem
-**Theme:** MoonLander is a platform, not just a game.
-**Priority:** LOW — only after the game itself is polished.
+### Sprint 9 — AI Visual Layer — M (~2hr CC)
+- [ ] TF.js neural style transfer for Painterly and Neon Future skins (replay-mode filter)
+- [ ] AI terrain textures via image gen API, cached by seed
+- [ ] Generative skyboxes per mission seed
 
-- [ ] Level editor 2.0 — full mission designer (terrain + objectives + events + narrative)
-- [ ] Mod API — expose game systems for community extensions
-- [ ] Twitch/YouTube integration — chat controls lander parameters live
-- [ ] Education mode — physics lesson overlay explaining forces in real-time
-- [ ] Speedrun.com integration — auto-submit verified runs
-- [ ] Mobile-native wrapper (Capacitor/Tauri) — App Store / Play Store distribution
-- [ ] Localization — i18n for mission text, HUD, menus
-- [ ] Analytics dashboard — aggregate play data, heatmaps of crash locations
+**Exit question:** Do AI visuals make you replay just to see what it generates?
+
+---
+
+### Sprint 10 — Education + Platform (core) — M (~2hr CC)
+- [ ] Education mode: real-time force vector overlays, physics lesson panel
+- [ ] Mission SDK: JSON schema for community missions
 
 **Exit question:** Has this grown beyond a solo project? Is that good or bad?
+
+---
+
+**Total estimated CC time:** ~28-32 hours across all sprints
 
 ---
 

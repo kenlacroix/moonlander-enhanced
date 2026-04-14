@@ -1,6 +1,28 @@
 # TODOS — MoonLander Enhanced
 
-Deferred work from CEO review (2026-04-13). Items not in current scope but worth tracking.
+Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current scope but worth tracking.
+
+---
+
+## P2 — CEO Review Findings (2026-04-14)
+
+### AI Theater Mobile Responsive Fallback
+On narrow screens, stack AI Theater panels vertically or switch to sequential mode.
+- **Why:** Split-screen doesn't work on mobile. Kill signal (sequential fallback) exists but needs explicit mobile detection.
+- **Effort:** S (CC: ~30 min)
+- **Depends on:** Sprint 2 (AI Theater MVP)
+
+### Terrain Editor URL Param Validation
+Validate/sanitize base64 custom terrain data from ?custom= URL parameter on deserialization.
+- **Why:** Pre-existing security surface. Crafted URLs could cause unexpected behavior. Becomes more visible with URL sharing expansion.
+- **Effort:** S (CC: ~30 min)
+- **Depends on:** Nothing (can be done anytime)
+
+### Service Worker Cache Verification Post-WebGL
+Verify service worker network-first cache handles WebGL asset transition correctly.
+- **Why:** Users on stale SW might see Canvas while new WebGL assets load.
+- **Effort:** S (CC: ~15 min)
+- **Depends on:** Sprint 6 (WebGL Visual Upgrade)
 
 ---
 
