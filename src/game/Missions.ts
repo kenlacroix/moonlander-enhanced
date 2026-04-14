@@ -114,6 +114,7 @@ export const CAMPAIGN: Mission[] = [
 			padMaxWidth: 100,
 			padCount: 2,
 			startingFuel: 700,
+			gravityStormsEnabled: true,
 		},
 	},
 	{
@@ -129,6 +130,7 @@ export const CAMPAIGN: Mission[] = [
 			startingFuel: 900,
 			windStrength: 30,
 			aliensEnabled: true,
+			gravityStormsEnabled: true,
 		},
 	},
 	{
@@ -144,6 +146,7 @@ export const CAMPAIGN: Mission[] = [
 			startingFuel: 600,
 			windStrength: 40,
 			aliensEnabled: true,
+			gravityStormsEnabled: true,
 		},
 	},
 ];

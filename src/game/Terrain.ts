@@ -34,6 +34,7 @@ export interface DifficultyConfig {
 	windStrength?: number; // wind force (0 = none, 50+ = strong)
 	landerType?: string; // lander variant name
 	aliensEnabled?: boolean; // force alien spawn (campaign)
+	gravityStormsEnabled?: boolean; // force gravity storms (campaign)
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */

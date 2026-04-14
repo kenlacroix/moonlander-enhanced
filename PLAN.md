@@ -83,7 +83,7 @@
 
 - [x] Black Box Flight Recorder — canvas-rendered flight report card (altitude curve, speed at touchdown, fuel efficiency grade A-F, terrain silhouette with descent path). One-tap save to camera roll. Built for screenshots and social sharing.
 - [x] Lunar Archaeology Mode — random artifacts scattered on terrain (Apollo flags, rover tracks, old lander debris). Land near one to scan it and get a real historical fact via the LLM provider. Exploration meets education.
-- [ ] Gravity Storms — periodic gravity anomalies mid-flight. Gravity doubles, halves, then normalizes. Visible terrain distortion, HUD warning, soundtrack spike. Deterministic and seeded like wind.
+- [x] Gravity Storms — periodic gravity anomalies mid-flight. Gravity doubles, halves, then normalizes. Visible terrain distortion, HUD warning, soundtrack spike. Deterministic and seeded like wind.
 - [ ] Multi-Lander Relay — land 3 landers sequentially on the same terrain. Each starts from the last landing/crash site. Combined score. Ghost replay shows all 3 overlaid.
 - [ ] Terrain Editor — draw custom terrain with mouse/touch, place pads manually, name it, share as a compact base64 URL. Replace midpoint displacement with user-drawn control points.
 

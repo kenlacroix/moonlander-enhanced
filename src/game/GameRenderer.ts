@@ -12,6 +12,10 @@ import type { Input } from "../systems/Input";
 import { getBestScore } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
+import {
+	type GravityStormState,
+	getGravityStormLabel,
+} from "./GravityStorm";
 import type { Artifact } from "./Artifacts";
 import type { Camera } from "./Camera";
 import type { LanderState } from "./Lander";
@@ -39,6 +43,7 @@ export interface GameRenderState {
 	readonly particles: ParticleSystem;
 	readonly artifacts: Artifact[];
 	readonly alien: AlienState | null;
+	readonly gravityStorm: GravityStormState | null;
 	readonly ghostPlayer: GhostPlayer | null;
 	readonly telemetry: TelemetryRecorder;
 	readonly autopilot: Autopilot;
@@ -73,7 +78,11 @@ export class GameRenderer {
 
 		this.renderer.clear();
 		this.renderer.drawBackground(state.camera);
-		this.renderer.drawTerrain(state.terrain, offset);
+		// Apply cosmetic terrain wobble during gravity storms
+		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
+		const terrainOffset =
+			wobble !== 0 ? { x: offset.x, y: offset.y + wobble } : offset;
+		this.renderer.drawTerrain(state.terrain, terrainOffset);
 		this.renderer.drawParticles(state.particles.particles, offset);
 		if (state.ghostPlayer?.isActive()) {
 			this.renderer.drawGhost(state.ghostPlayer.lander, offset);
@@ -92,6 +101,9 @@ export class GameRenderer {
 		this.renderer.drawLander(state.lander, offset);
 		const windLabel = state.wind ? getWindLabel(state.wind) : null;
 		const alienLabel = state.alien ? getAlienEffectLabel(state.alien) : null;
+		const stormLabel = state.gravityStorm
+			? getGravityStormLabel(state.gravityStorm)
+			: null;
 		this.renderer.drawHUD(
 			state.lander,
 			state.score,
@@ -100,6 +112,7 @@ export class GameRenderer {
 			state.autopilot.enabled,
 			state.adaptiveLabel,
 			alienLabel,
+			stormLabel,
 		);
 
 		// Touch controls overlay

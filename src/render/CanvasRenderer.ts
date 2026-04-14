@@ -415,6 +415,7 @@ export class CanvasRenderer {
 		autopilot = false,
 		adaptiveLabel: string | null = null,
 		alienEffect: string | null = null,
+		gravityStormLabel: string | null = null,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -425,6 +426,7 @@ export class CanvasRenderer {
 			autopilot,
 			adaptiveLabel,
 			alienEffect,
+			gravityStormLabel,
 		);
 	}
 
