@@ -92,6 +92,28 @@
 
 ---
 
+## Phase 5.5 — Cherry-Picks + Apollo Campaign
+
+**Theme:** Polish the v1.0. Then bring real history into the game.
+
+### Cherry-Picks (from CEO review)
+- [ ] Achievement badges (localStorage): 8 badges with unlock conditions. First Landing, Perfect Landing, No Thrust, Full Campaign, Beat the AI, Survive the Aliens, Fuel Miser, Archaeologist.
+- [ ] Physics sandbox: adjustable gravity selector on free-play mission select. Moon (1.62), Mars (3.72), Earth (9.81), Jupiter (24.79), Zero-G (0.0). Leaderboard keys include gravity preset.
+- [ ] Annotated autopilot: press A during autopilot flight to show force vectors, target pad indicator, decision labels (LATERAL CORRECTION, DESCENT, FINAL APPROACH, HOVER), PID error, altitude zone markers.
+
+### Apollo Missions Campaign
+- [ ] 6 playable missions recreating the 6 real Apollo landings (11, 12, 14, 15, 16, 17).
+- [ ] Real terrain profiles: elevation cross-sections from NASA LOLA data (or close approximation) for each landing site. Sea of Tranquility, Ocean of Storms, Fra Mauro, Hadley Rille, Descartes Highlands, Taurus-Littrow.
+- [ ] Accurate mission constraints: fuel limits, lander weight, and difficulty tuned to match the real mission profile. Apollo 11 had 25 seconds of fuel remaining.
+- [ ] Historical briefings: hardcoded real facts per mission + LLM elaboration when available. Radio-style streaming during first 5 seconds of flight.
+- [ ] Historically-placed artifacts: flags, rover tracks (Apollo 15-17 only), descent stages, and memorial plaques placed at positions matching the real landing sites.
+- [ ] Post-landing factoids: real historical facts about what the astronauts did at each site. Hardcoded fallbacks, LLM adds depth.
+- [ ] New title screen option: "APOLLO MISSIONS" as a separate campaign alongside the existing fictional campaign.
+
+**Exit question:** Does a science buff share this with their space-nerd friends?
+
+---
+
 ## Phase 6 — Competitive Layer
 
 **Theme:** You vs the world.

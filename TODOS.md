@@ -4,6 +4,18 @@ Deferred work from CEO review (2026-04-13). Items not in current scope but worth
 
 ---
 
+## P1 — Apollo Missions Campaign (post cherry-picks)
+
+### Apollo Missions Campaign
+6 playable missions recreating the real Apollo landings (11, 12, 14, 15, 16, 17).
+- **Why:** The strongest differentiator. Science buffs share this with their space-nerd friends. No other lunar lander game does this.
+- **Effort:** L (human: ~2 weeks / CC: ~2-3 hours)
+- **Includes:** Real terrain profiles from NASA LOLA data, accurate mission constraints, historical briefings (hardcoded + LLM), historically-placed artifacts, post-landing factoids.
+- **Depends on:** Existing LLM integration, archaeology system, campaign infrastructure. All in place.
+- **Target audience:** Nostalgic science buffs, space enthusiasts, educators.
+
+---
+
 ## P1 — Deferred Cherry-Picks (post-v1.0)
 
 ### Daily Challenge
