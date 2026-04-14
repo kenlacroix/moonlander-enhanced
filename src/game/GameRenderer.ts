@@ -71,6 +71,7 @@ export interface GameRenderState {
 	readonly activeMission: Mission | null;
 	readonly achievementToast: { name: string; description: string } | null;
 	readonly achievementToastTimer: number;
+	readonly gravityPreset: { name: string; gravity: number; color: string };
 }
 
 export class GameRenderer {
@@ -237,6 +238,7 @@ export class GameRenderer {
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {
 			this.renderer.drawRelayIndicator(state.relay !== null);
+			this.renderer.drawGravitySelector(state.gravityPreset);
 		}
 	}
 

@@ -103,16 +103,15 @@ export function applyGravityStormEffect(
 	vy: number,
 	dt: number,
 	massMultiplier: number,
+	baseGravity = GRAVITY,
 ): number {
 	if (storm.multiplier === 1.0) return vy;
 	// updateLander already applied 1x gravity. Add the delta.
-	return vy + GRAVITY * (storm.multiplier - 1) * dt * massMultiplier;
+	return vy + baseGravity * (storm.multiplier - 1) * dt * massMultiplier;
 }
 
 /** Get HUD label for active gravity anomaly */
-export function getGravityStormLabel(
-	storm: GravityStormState,
-): string | null {
+export function getGravityStormLabel(storm: GravityStormState): string | null {
 	if (storm.phase === "high") return "GRAVITY ANOMALY: 2x";
 	if (storm.phase === "low") return "GRAVITY ANOMALY: 0.5x";
 	return null;

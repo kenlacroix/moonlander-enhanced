@@ -63,6 +63,12 @@ import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
 import {
+	type GravityPreset,
+	getDefaultPreset,
+	nextPreset,
+	prevPreset,
+} from "./GravityPresets";
+import {
 	applyGravityStormEffect,
 	createGravityStorm,
 	type GravityStormState,
@@ -144,6 +150,7 @@ export class Game {
 	private editorState: EditorState | null = null;
 	private achievements = loadAchievements();
 	achievementToast: Achievement | null = null;
+	gravityPreset: GravityPreset = getDefaultPreset();
 	achievementToastTimer = 0;
 	private thrustHistory: boolean[] = []; // last N frames of thrust state
 	private embedMode: boolean;
@@ -440,6 +447,15 @@ export class Game {
 			if (inputState.toggleRelay && this.gameMode === "freeplay") {
 				this.relay = this.relay ? null : createRelayState();
 			}
+			// Gravity preset selector (left/right arrows on free-play menu)
+			if (this.gameMode === "freeplay") {
+				if (inputState.rotateLeft) {
+					this.gravityPreset = prevPreset(this.gravityPreset);
+				}
+				if (inputState.rotateRight) {
+					this.gravityPreset = nextPreset(this.gravityPreset);
+				}
+			}
 			if (inputState.importGhost) {
 				uploadGhost().then((run) => {
 					if (run) {
@@ -529,7 +545,11 @@ export class Game {
 
 		// Resolved input (autopilot or player)
 		const physicsInput = this.autopilot.enabled
-			? this.autopilot.computeInput(this.lander, this.terrain)
+			? this.autopilot.computeInput(
+					this.lander,
+					this.terrain,
+					this.gravityPreset.gameGravity,
+				)
 			: inputState;
 
 		// Fixed timestep physics
@@ -618,7 +638,12 @@ export class Game {
 		}
 
 		this.ghostRecorder.record(inputState);
-		updateLander(this.lander, resolvedInput, dt);
+		updateLander(
+			this.lander,
+			resolvedInput,
+			dt,
+			this.gravityPreset.gameGravity,
+		);
 
 		// Track thrust history for "no thrust" achievement (last 3 seconds = ~180 frames)
 		this.thrustHistory.push(this.lander.thrusting);
@@ -637,6 +662,7 @@ export class Game {
 				this.lander.vy,
 				dt,
 				this.lander.landerType.massMultiplier,
+				this.gravityPreset.gameGravity,
 			);
 		}
 

@@ -46,7 +46,11 @@ export class Autopilot {
 	}
 
 	/** Compute autopilot input for the current state */
-	computeInput(lander: LanderState, terrain: TerrainData): InputState {
+	computeInput(
+		lander: LanderState,
+		terrain: TerrainData,
+		gravityOverride?: number,
+	): InputState {
 		if (!this.enabled) return NULL_INPUT;
 
 		const pad = this.findTargetPad(lander, terrain);
@@ -93,7 +97,7 @@ export class Autopilot {
 		// At high altitude: allow faster descent to save fuel
 		// At low altitude: brake hard
 		const maxSafeSpeed = MAX_LANDING_SPEED * 0.7; // leave margin
-		const effectiveGravity = GRAVITY * lt.massMultiplier;
+		const effectiveGravity = (gravityOverride ?? GRAVITY) * lt.massMultiplier;
 		const effectiveThrust = THRUST_FORCE * lt.thrustMultiplier;
 
 		let shouldThrust = false;

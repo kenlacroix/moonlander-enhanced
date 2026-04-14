@@ -15,9 +15,13 @@ export interface CollisionResult {
 	safeLanding: boolean;
 }
 
-/** Apply gravity to velocity */
-export function applyGravity(vy: number, dt: number): number {
-	return vy + GRAVITY * dt;
+/** Apply gravity to velocity. gravityOverride replaces the constant when provided. */
+export function applyGravity(
+	vy: number,
+	dt: number,
+	gravityOverride?: number,
+): number {
+	return vy + (gravityOverride ?? GRAVITY) * dt;
 }
 
 /** Compute thrust vector from lander angle */

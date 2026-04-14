@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.6.0] - 2026-04-13
+
+### Added
+- Physics sandbox: adjustable gravity on free-play mission select. Moon (1.62 m/s²), Mars (3.72), Earth (9.81), Jupiter (24.79), Zero-G (0.0). Cycle with left/right arrows. Color-coded HUD indicator. Autopilot and gravity storms adapt to selected gravity.
+
 ## [0.4.5.0] - 2026-04-13
 
 ### Added
