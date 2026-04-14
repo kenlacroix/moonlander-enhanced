@@ -1,5 +1,5 @@
 import { type AlienState, applyAlienEffect, createAlien, getAlienEffectLabel, shouldSpawnAlien, updateAlien } from "./Alien";
-import { type Artifact, checkArtifactScan, getArtifactPrompt, placeArtifacts } from "./Artifacts";
+import { type Artifact, type ArtifactType, checkArtifactScan, getArtifactPrompt, placeArtifacts } from "./Artifacts";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
@@ -65,6 +65,7 @@ export class Game {
 	private llmConfig: LLMConfig | null = null;
 	private llmText = "";
 	private llmLoading = false;
+	private artifactText = "";
 	private settingsOverlay = new SettingsOverlay();
 	private lastTime = 0;
 	private accumulator = 0;
@@ -582,6 +583,11 @@ export class Game {
 			this.renderer.drawCommentary(this.llmText);
 		}
 
+		// Artifact scan result (separate from commentary)
+		if (this.artifactText && this.status !== "playing") {
+			this.renderer.drawArtifactFact(this.artifactText);
+		}
+
 		// Mission briefing (shown during first seconds of flight)
 		if (this.llmText && this.status === "playing" && this.flightElapsed < 5) {
 			this.renderer.drawBriefing(this.llmText);
@@ -712,10 +718,9 @@ export class Game {
 		scanned.scanned = true;
 
 		if (this.llmConfig) {
-			// Fetch a historical fact via LLM
+			// Fetch a historical fact via LLM (separate from commentary)
 			const prompt = getArtifactPrompt(scanned);
-			this.llmText = "";
-			this.llmLoading = true;
+			this.artifactText = "";
 			import("../api/LLMProvider").then(({ streamCompletion }) => {
 				streamCompletion(
 					this.llmConfig!,
@@ -723,24 +728,26 @@ export class Game {
 						{ role: "system", content: "You are a lunar historian. Give one fascinating, specific historical fact in 1-2 sentences. No markdown. Plain text only." },
 						{ role: "user", content: prompt },
 					],
-					(chunk) => { this.llmText += chunk; },
+					(chunk) => { this.artifactText += chunk; },
 				).then((full) => {
 					scanned.fact = full;
 				}).catch(() => {
 					scanned.fact = this.getOfflineFact(scanned.type);
-					this.llmText = scanned.fact;
-				}).finally(() => {
-					this.llmLoading = false;
+					this.artifactText = scanned.fact;
 				});
+			}).catch(() => {
+				// Dynamic import failed (offline/chunk load error)
+				scanned.fact = this.getOfflineFact(scanned.type);
+				this.artifactText = scanned.fact;
 			});
 		} else {
 			// Offline fallback — hardcoded facts
 			scanned.fact = this.getOfflineFact(scanned.type);
-			this.llmText = scanned.fact;
+			this.artifactText = scanned.fact;
 		}
 	}
 
-	private getOfflineFact(type: string): string {
+	private getOfflineFact(type: ArtifactType): string {
 		switch (type) {
 			case "flag": return "Five of the six Apollo flags are likely still standing. Apollo 11's flag was knocked over by the ascent engine exhaust.";
 			case "rover-tracks": return "The Lunar Roving Vehicle had a top speed of 11.2 mph. It cost $38 million in 1971 and was left on the Moon after each mission.";

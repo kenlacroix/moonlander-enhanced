@@ -52,7 +52,7 @@ export function placeArtifacts(seed: number, terrainPoints: Vec2[]): Artifact[] 
 		const y = getTerrainHeightAt(x, terrainPoints);
 
 		// Pick artifact type
-		const typeIdx = Math.floor(rng() * ARTIFACT_TYPES.length) % ARTIFACT_TYPES.length;
+		const typeIdx = Math.floor(rng() * ARTIFACT_TYPES.length);
 		const artType = ARTIFACT_TYPES[typeIdx];
 
 		artifacts.push({

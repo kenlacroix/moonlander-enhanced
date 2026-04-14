@@ -247,7 +247,6 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
-	/** Draw a ghost lander (translucent replay of best run) */
 	/** Draw artifacts on terrain */
 	drawArtifacts(artifacts: Artifact[], offset: { x: number; y: number }): void {
 		const ctx = this.ctx;
@@ -257,6 +256,10 @@ export class CanvasRenderer {
 		for (const art of artifacts) {
 			const x = art.x;
 			const y = art.y;
+
+			// Reset shadow state at top of each iteration to prevent leaking
+			ctx.shadowColor = "transparent";
+			ctx.shadowBlur = 0;
 
 			if (art.scanned) {
 				// Scanned: show a dim marker
@@ -327,7 +330,7 @@ export class CanvasRenderer {
 					break;
 			}
 
-			// Label below
+			// Label below (no glow on label text)
 			if (!art.scanned) {
 				ctx.shadowBlur = 0;
 				ctx.fillStyle = "rgba(255, 170, 0, 0.6)";
@@ -335,13 +338,12 @@ export class CanvasRenderer {
 				ctx.textAlign = "center";
 				ctx.fillText(art.label, x, y + 14);
 			}
-
-			ctx.shadowBlur = 0;
 		}
 
 		ctx.restore();
 	}
 
+	/** Draw a ghost lander (translucent replay of best run) */
 	drawGhost(lander: LanderState, offset: { x: number; y: number }): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -842,6 +844,30 @@ export class CanvasRenderer {
 				ctx.fillText(line, CANVAS_WIDTH / 2, y);
 				line = word;
 				y += 18;
+			} else {
+				line = test;
+			}
+		}
+		if (line) ctx.fillText(line, CANVAS_WIDTH / 2, y);
+		ctx.restore();
+	}
+
+	/** Draw artifact scan fact (positioned below commentary) */
+	drawArtifactFact(text: string): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.fillStyle = "rgba(255, 170, 0, 0.8)";
+		ctx.font = '13px "Courier New", monospace';
+		ctx.textAlign = "center";
+		const words = text.split(" ");
+		let line = "";
+		let y = CANVAS_HEIGHT / 2 + 140;
+		for (const word of words) {
+			const test = line ? `${line} ${word}` : word;
+			if (ctx.measureText(test).width > 600) {
+				ctx.fillText(line, CANVAS_WIDTH / 2, y);
+				line = word;
+				y += 16;
 			} else {
 				line = test;
 			}
