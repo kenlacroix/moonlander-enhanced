@@ -141,6 +141,7 @@
 
 **Theme:** Land together or crash trying.
 
+- [ ] WebRTC peer-to-peer multiplayer (no server needed). Two browsers connect directly via DataChannel. Same seed = same terrain, so only input frames (~20 bytes/sec) need to sync. Opponent renders as translucent lander (reuses ghost replay pipeline). Signaling options: copy-paste offer/answer strings (zero infra), or lightweight relay via Cloudflare Worker / PeerJS free tier. Deterministic physics means brief disconnections can replay from last known inputs.
 - [ ] Split-screen local multiplayer (2 players, same terrain, side by side).
 - [ ] Async multiplayer via WebSocket: see other players' landers in real time as ghosts.
 - [ ] Race mode: same seed, first to land wins. Visible timer.

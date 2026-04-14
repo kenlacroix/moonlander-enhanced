@@ -73,15 +73,24 @@ PixiJS WebGL renderer swap-in (game logic untouched per IRenderer pattern).
 
 ---
 
-## P3 — Phase 9: Multiplayer (beyond split-screen)
+## P2 — Phase 9: Multiplayer
 
+### WebRTC Peer-to-Peer Multiplayer (no server needed)
+Two browsers connect directly via WebRTC DataChannel. Same seed = same terrain, so only input frames (~20 bytes/sec) need syncing. Opponent renders as translucent lander reusing the ghost replay rendering pipeline.
+- **Why:** The ultimate "play with a friend" feature. Zero infrastructure cost. Works offline after connection.
+- **Effort:** M (human: ~1 week / CC: ~30 min)
+- **Signaling options:** Copy-paste offer/answer strings (zero infra, ugly UX), or lightweight relay via Cloudflare Worker (~20 LOC) or PeerJS free tier for room codes.
+- **Key advantage:** Deterministic physics means brief disconnections can replay from last known inputs without desync.
+- **~200 LOC** game-side. Reuses ghost rendering pipeline for opponent lander.
+- **Blocked by:** Game.ts decomposition (cleaner to integrate after split).
+
+### Other Multiplayer Modes
 - Async multiplayer via WebSocket: see other players' landers as real-time ghosts
 - Race mode: same seed, first to land wins, visible timer
 - Sabotage mode: interference powers using alien effect system
 
-**Why:** "Text someone 'try to beat this' and they actually do."
-**Effort:** XL. Requires WebSocket server infrastructure.
-**Depends on:** Serverless backend from Phase 6.
+**Effort:** XL for the full suite. WebRTC P2P is the minimum viable multiplayer.
+**Depends on:** WebRTC P2P as foundation. WebSocket modes need serverless backend from Phase 6.
 
 ---
 
