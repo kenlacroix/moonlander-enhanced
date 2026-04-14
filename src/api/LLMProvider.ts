@@ -76,28 +76,33 @@ async function streamAnthropic(
 	messages: LLMMessage[],
 	onChunk: (text: string) => void,
 ): Promise<string> {
-	const systemMsg = messages.find(m => m.role === "system");
-	const userMessages = messages.filter(m => m.role !== "system").map(m => ({
-		role: m.role,
-		content: m.content,
-	}));
+	const systemMsg = messages.find((m) => m.role === "system");
+	const userMessages = messages
+		.filter((m) => m.role !== "system")
+		.map((m) => ({
+			role: m.role,
+			content: m.content,
+		}));
 
-	const response = await fetch(`${config.baseUrl || DEFAULT_URLS.anthropic}/v1/messages`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"x-api-key": config.apiKey,
-			"anthropic-version": "2023-06-01",
-			"anthropic-dangerous-direct-browser-access": "true",
+	const response = await fetch(
+		`${config.baseUrl || DEFAULT_URLS.anthropic}/v1/messages`,
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-api-key": config.apiKey,
+				"anthropic-version": "2023-06-01",
+				"anthropic-dangerous-direct-browser-access": "true",
+			},
+			body: JSON.stringify({
+				model: config.model || DEFAULT_MODELS.anthropic,
+				max_tokens: 300,
+				stream: true,
+				system: systemMsg?.content ?? "",
+				messages: userMessages,
+			}),
 		},
-		body: JSON.stringify({
-			model: config.model || DEFAULT_MODELS.anthropic,
-			max_tokens: 300,
-			stream: true,
-			system: systemMsg?.content ?? "",
-			messages: userMessages,
-		}),
-	});
+	);
 
 	if (!response.ok) {
 		throw new Error(`Anthropic API error: ${response.status}`);
@@ -124,13 +129,13 @@ async function streamOpenAI(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			"Authorization": `Bearer ${config.apiKey}`,
+			Authorization: `Bearer ${config.apiKey}`,
 		},
 		body: JSON.stringify({
 			model: config.model || DEFAULT_MODELS.openai,
 			max_tokens: 300,
 			stream: true,
-			messages: messages.map(m => ({ role: m.role, content: m.content })),
+			messages: messages.map((m) => ({ role: m.role, content: m.content })),
 		}),
 	});
 
@@ -146,7 +151,10 @@ async function streamOpenAI(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: SSE events have varied shapes
-async function readSSEStream(response: Response, extractText: (event: any) => string): Promise<string> {
+async function readSSEStream(
+	response: Response,
+	extractText: (event: any) => string,
+): Promise<string> {
 	const reader = response.body?.getReader();
 	if (!reader) throw new Error("No response body");
 

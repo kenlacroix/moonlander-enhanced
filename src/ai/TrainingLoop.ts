@@ -1,4 +1,4 @@
-import { createLander, updateLander, type LanderState } from "../game/Lander";
+import { createLander, type LanderState, updateLander } from "../game/Lander";
 import { getLanderType } from "../game/LanderTypes";
 import { checkCollision } from "../game/Physics";
 import { generateTerrain, type TerrainData } from "../game/Terrain";
@@ -11,8 +11,8 @@ const TRAINING_SEED = 1969; // fixed seed for consistent training terrain
 export type TrainingState = "idle" | "training" | "paused";
 
 export interface TrainingConfig {
-	episodesPerBatch: number;  // episodes to run before yielding to UI
-	speedMultiplier: number;   // physics steps per batch tick (for visualization)
+	episodesPerBatch: number; // episodes to run before yielding to UI
+	speedMultiplier: number; // physics steps per batch tick (for visualization)
 	seed: number;
 }
 
@@ -57,7 +57,7 @@ export class TrainingLoop {
 			}
 
 			// Yield to UI — let the browser breathe
-			await new Promise(resolve => setTimeout(resolve, 0));
+			await new Promise((resolve) => setTimeout(resolve, 0));
 		}
 	}
 
@@ -83,7 +83,10 @@ export class TrainingLoop {
 			landed = result.safeLanding && result.onPad !== null;
 
 			const reward = this.agent.calculateReward(
-				lander, this.terrain, landed, result.collided && !landed,
+				lander,
+				this.terrain,
+				landed,
+				result.collided && !landed,
 			);
 
 			const nextState = this.agent.getState(lander, this.terrain);

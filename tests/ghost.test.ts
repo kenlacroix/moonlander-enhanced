@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GhostRecorder, GhostPlayer } from "../src/systems/GhostReplay";
+import { GhostPlayer, GhostRecorder } from "../src/systems/GhostReplay";
 import type { InputState } from "../src/systems/Input";
 
 describe("GhostRecorder", () => {
@@ -14,7 +14,12 @@ describe("GhostRecorder", () => {
 			restart: false,
 		};
 		recorder.record(input);
-		recorder.record({ thrustUp: false, rotateLeft: true, rotateRight: false, restart: false });
+		recorder.record({
+			thrustUp: false,
+			rotateLeft: true,
+			rotateRight: false,
+			restart: false,
+		});
 
 		// Recorder doesn't expose frames directly, but saving with score > 0
 		// shouldn't throw (localStorage may not be available in test env)

@@ -1,5 +1,9 @@
-import { type LLMConfig, type LLMMessage, streamCompletion } from "./LLMProvider";
 import type { Mission } from "../game/Missions";
+import {
+	type LLMConfig,
+	type LLMMessage,
+	streamCompletion,
+} from "./LLMProvider";
 
 /**
  * Generates a narrative mission briefing from an LLM.

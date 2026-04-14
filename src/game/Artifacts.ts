@@ -6,12 +6,17 @@
  * placement via seeded RNG.
  */
 
+import { WORLD_WIDTH } from "../utils/constants";
+import type { Vec2 } from "../utils/math";
 import { createRng } from "../utils/math";
 import { getTerrainHeightAt } from "./Physics";
-import type { Vec2 } from "../utils/math";
-import { WORLD_WIDTH } from "../utils/constants";
 
-export type ArtifactType = "flag" | "rover-tracks" | "debris" | "footprints" | "plaque";
+export type ArtifactType =
+	| "flag"
+	| "rover-tracks"
+	| "debris"
+	| "footprints"
+	| "plaque";
 
 export interface Artifact {
 	x: number;
@@ -22,13 +27,39 @@ export interface Artifact {
 	fact: string | null; // populated after LLM scan
 }
 
-const ARTIFACT_TYPES: { type: ArtifactType; label: string; prompt: string }[] = [
-	{ type: "flag", label: "AMERICAN FLAG", prompt: "Tell a short historical fact about the American flags left on the Moon by Apollo astronauts. What happened to them?" },
-	{ type: "rover-tracks", label: "ROVER TRACKS", prompt: "Tell a short historical fact about the Lunar Roving Vehicle used on Apollo 15, 16, and 17. What was surprising about driving on the Moon?" },
-	{ type: "debris", label: "DESCENT STAGE", prompt: "Tell a short historical fact about the Apollo Lunar Module descent stages left on the Moon. How many are still there?" },
-	{ type: "footprints", label: "BOOT PRINTS", prompt: "Tell a short historical fact about the first footprints on the Moon. Why will they last millions of years?" },
-	{ type: "plaque", label: "MEMORIAL PLAQUE", prompt: "Tell a short historical fact about the memorial plaques and items left on the Moon, like the fallen astronaut figurine or the Apollo 11 plaque." },
-];
+const ARTIFACT_TYPES: { type: ArtifactType; label: string; prompt: string }[] =
+	[
+		{
+			type: "flag",
+			label: "AMERICAN FLAG",
+			prompt:
+				"Tell a short historical fact about the American flags left on the Moon by Apollo astronauts. What happened to them?",
+		},
+		{
+			type: "rover-tracks",
+			label: "ROVER TRACKS",
+			prompt:
+				"Tell a short historical fact about the Lunar Roving Vehicle used on Apollo 15, 16, and 17. What was surprising about driving on the Moon?",
+		},
+		{
+			type: "debris",
+			label: "DESCENT STAGE",
+			prompt:
+				"Tell a short historical fact about the Apollo Lunar Module descent stages left on the Moon. How many are still there?",
+		},
+		{
+			type: "footprints",
+			label: "BOOT PRINTS",
+			prompt:
+				"Tell a short historical fact about the first footprints on the Moon. Why will they last millions of years?",
+		},
+		{
+			type: "plaque",
+			label: "MEMORIAL PLAQUE",
+			prompt:
+				"Tell a short historical fact about the memorial plaques and items left on the Moon, like the fallen astronaut figurine or the Apollo 11 plaque.",
+		},
+	];
 
 const SCAN_RADIUS = 80; // game units — how close lander must land to scan
 
@@ -38,7 +69,10 @@ export function shouldSpawnArtifacts(seed: number): boolean {
 }
 
 /** Place 1-2 artifacts on the terrain, deterministic by seed */
-export function placeArtifacts(seed: number, terrainPoints: Vec2[]): Artifact[] {
+export function placeArtifacts(
+	seed: number,
+	terrainPoints: Vec2[],
+): Artifact[] {
 	if (!shouldSpawnArtifacts(seed)) return [];
 
 	const rng = createRng(seed * 17 + 11);
@@ -69,7 +103,10 @@ export function placeArtifacts(seed: number, terrainPoints: Vec2[]): Artifact[] 
 }
 
 /** Check if any unscanned artifact is within scan radius of landing position */
-export function checkArtifactScan(artifacts: Artifact[], landerX: number): Artifact | null {
+export function checkArtifactScan(
+	artifacts: Artifact[],
+	landerX: number,
+): Artifact | null {
 	for (const art of artifacts) {
 		if (!art.scanned && Math.abs(art.x - landerX) < SCAN_RADIUS) {
 			return art;
@@ -80,6 +117,9 @@ export function checkArtifactScan(artifacts: Artifact[], landerX: number): Artif
 
 /** Get the LLM prompt for an artifact type */
 export function getArtifactPrompt(artifact: Artifact): string {
-	const artType = ARTIFACT_TYPES.find(a => a.type === artifact.type);
-	return artType?.prompt ?? "Tell a short historical fact about the Apollo Moon missions.";
+	const artType = ARTIFACT_TYPES.find((a) => a.type === artifact.type);
+	return (
+		artType?.prompt ??
+		"Tell a short historical fact about the Apollo Moon missions."
+	);
 }

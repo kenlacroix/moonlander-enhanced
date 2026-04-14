@@ -76,5 +76,5 @@ export function getTerrainHeightAt(x: number, points: Vec2[]): number {
 
 /** Normalize angle to -180..180 range */
 export function normAngle(angle: number): number {
-	return ((angle % 360) + 540) % 360 - 180;
+	return (((angle % 360) + 540) % 360) - 180;
 }

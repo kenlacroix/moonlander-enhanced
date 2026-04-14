@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { checkArtifactScan, placeArtifacts, shouldSpawnArtifacts } from "../src/game/Artifacts";
+import {
+	checkArtifactScan,
+	placeArtifacts,
+	shouldSpawnArtifacts,
+} from "../src/game/Artifacts";
 import { generateTerrain } from "../src/game/Terrain";
 
 describe("shouldSpawnArtifacts", () => {
@@ -33,7 +37,10 @@ describe("placeArtifacts", () => {
 		// Use a seed known to spawn artifacts
 		let spawnSeed = -1;
 		for (let s = 0; s < 100; s++) {
-			if (shouldSpawnArtifacts(s)) { spawnSeed = s; break; }
+			if (shouldSpawnArtifacts(s)) {
+				spawnSeed = s;
+				break;
+			}
 		}
 		expect(spawnSeed).toBeGreaterThanOrEqual(0);
 		const terrain = generateTerrain(spawnSeed);
@@ -100,8 +107,22 @@ describe("checkArtifactScan", () => {
 	it("skips already-scanned artifacts", () => {
 		// Use hand-crafted artifacts to avoid seed dependency
 		const arts = [
-			{ x: 100, y: 50, type: "flag" as const, scanned: true, label: "FLAG", fact: null },
-			{ x: 5000, y: 50, type: "plaque" as const, scanned: false, label: "PLAQUE", fact: null },
+			{
+				x: 100,
+				y: 50,
+				type: "flag" as const,
+				scanned: true,
+				label: "FLAG",
+				fact: null,
+			},
+			{
+				x: 5000,
+				y: 50,
+				type: "plaque" as const,
+				scanned: false,
+				label: "PLAQUE",
+				fact: null,
+			},
 		];
 		// Only the scanned artifact is nearby — should return null
 		const result = checkArtifactScan(arts, 100);

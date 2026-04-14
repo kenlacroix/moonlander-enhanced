@@ -2,11 +2,11 @@
 
 export interface LanderType {
 	name: string;
-	thrustMultiplier: number;   // multiplied against THRUST_FORCE
-	fuelMultiplier: number;     // multiplied against starting fuel
-	massMultiplier: number;     // affects gravity pull (higher = heavier)
+	thrustMultiplier: number; // multiplied against THRUST_FORCE
+	fuelMultiplier: number; // multiplied against starting fuel
+	massMultiplier: number; // affects gravity pull (higher = heavier)
 	rotationMultiplier: number; // affects rotation speed
-	color: string;              // accent color
+	color: string; // accent color
 	description: string;
 }
 

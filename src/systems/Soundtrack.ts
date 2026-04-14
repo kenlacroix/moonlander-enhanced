@@ -11,12 +11,12 @@
  */
 
 // Frequencies
-const DRONE_FREQ_1 = 61.74;     // B1
-const DRONE_FREQ_2 = 87.31;     // F2 (tritone with B1)
-const DRONE_RESOLVE_1 = 65.41;  // C2 (consonant resolution on landing)
-const DRONE_RESOLVE_2 = 98.0;   // G2
+const DRONE_FREQ_1 = 61.74; // B1
+const DRONE_FREQ_2 = 87.31; // F2 (tritone with B1)
+const DRONE_RESOLVE_1 = 65.41; // C2 (consonant resolution on landing)
+const DRONE_RESOLVE_2 = 98.0; // G2
 const TENSION_FREQ_LOW = 164.8; // E3
-const TENSION_FREQ_HIGH = 493.9;// B4
+const TENSION_FREQ_HIGH = 493.9; // B4
 const SHIMMER_FREQ = 3000;
 const LFO_RATE = 0.5;
 
@@ -153,11 +153,20 @@ export class Soundtrack {
 		// Tension layer: fades in above 0.2 tension, pitch and filter sweep
 		if (tension > 0.2) {
 			const t = (tension - 0.2) / 0.8; // normalize 0.2-1.0 to 0-1
-			const freq = TENSION_FREQ_LOW + t * (TENSION_FREQ_HIGH - TENSION_FREQ_LOW);
+			const freq =
+				TENSION_FREQ_LOW + t * (TENSION_FREQ_HIGH - TENSION_FREQ_LOW);
 			const filterFreq = FILTER_MAX - t * (FILTER_MAX - FILTER_MIN);
 			this.tensionOsc?.frequency.setTargetAtTime(freq, now, SMOOTH_TAU);
-			this.tensionFilter?.frequency.setTargetAtTime(filterFreq, now, SMOOTH_TAU);
-			this.tensionGain?.gain.setTargetAtTime(TENSION_MAX_GAIN * t, now, SMOOTH_TAU);
+			this.tensionFilter?.frequency.setTargetAtTime(
+				filterFreq,
+				now,
+				SMOOTH_TAU,
+			);
+			this.tensionGain?.gain.setTargetAtTime(
+				TENSION_MAX_GAIN * t,
+				now,
+				SMOOTH_TAU,
+			);
 		} else {
 			this.tensionGain?.gain.setTargetAtTime(0, now, SMOOTH_TAU);
 		}
@@ -165,8 +174,16 @@ export class Soundtrack {
 		// Shimmer: only on final approach (tension > 0.7)
 		if (tension > 0.7) {
 			const s = (tension - 0.7) / 0.3;
-			this.shimmerGain?.gain.setTargetAtTime(SHIMMER_MAX_GAIN * s * 0.5, now, SMOOTH_TAU);
-			this.shimmerLfoGain?.gain.setTargetAtTime(SHIMMER_MAX_GAIN * s * 0.5, now, SMOOTH_TAU);
+			this.shimmerGain?.gain.setTargetAtTime(
+				SHIMMER_MAX_GAIN * s * 0.5,
+				now,
+				SMOOTH_TAU,
+			);
+			this.shimmerLfoGain?.gain.setTargetAtTime(
+				SHIMMER_MAX_GAIN * s * 0.5,
+				now,
+				SMOOTH_TAU,
+			);
 		} else {
 			this.shimmerGain?.gain.setTargetAtTime(0, now, SMOOTH_TAU);
 			this.shimmerLfoGain?.gain.setTargetAtTime(0, now, SMOOTH_TAU);

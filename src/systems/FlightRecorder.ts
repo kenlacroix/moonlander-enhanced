@@ -7,10 +7,14 @@
  * One-tap save to camera roll on mobile.
  */
 
-import type { TelemetryFrame } from "./Telemetry";
 import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
-import { CANVAS_HEIGHT, MAX_LANDING_SPEED, STARTING_FUEL } from "../utils/constants";
+import {
+	CANVAS_HEIGHT,
+	MAX_LANDING_SPEED,
+	STARTING_FUEL,
+} from "../utils/constants";
+import type { TelemetryFrame } from "./Telemetry";
 
 const CARD_WIDTH = 800;
 const CARD_HEIGHT = 500;
@@ -38,10 +42,15 @@ function getFuelGrade(pctRemaining: number): { letter: string; color: string } {
 	return { letter: "F", color: "#ff2222" };
 }
 
-function getLandingGrade(landed: boolean, vSpeed: number): { label: string; color: string } {
+function getLandingGrade(
+	landed: boolean,
+	vSpeed: number,
+): { label: string; color: string } {
 	if (!landed) return { label: "CRASH", color: "#ff4444" };
-	if (vSpeed < MAX_LANDING_SPEED * 0.3) return { label: "PERFECT", color: "#00ff88" };
-	if (vSpeed < MAX_LANDING_SPEED * 0.6) return { label: "SMOOTH", color: "#88ff44" };
+	if (vSpeed < MAX_LANDING_SPEED * 0.3)
+		return { label: "PERFECT", color: "#00ff88" };
+	if (vSpeed < MAX_LANDING_SPEED * 0.6)
+		return { label: "SMOOTH", color: "#88ff44" };
 	return { label: "HARD", color: "#ffaa00" };
 }
 
@@ -225,7 +234,8 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 		ctx.beginPath();
 		for (let i = 0; i < r.frames.length; i++) {
 			const fx = chartX + (r.frames[i].time / maxTime) * chartW;
-			const fy = chartY + chartH - (Math.abs(r.frames[i].vSpeed) / maxSpeed) * chartH;
+			const fy =
+				chartY + chartH - (Math.abs(r.frames[i].vSpeed) / maxSpeed) * chartH;
 			if (i === 0) ctx.moveTo(fx, fy);
 			else ctx.lineTo(fx, fy);
 		}
@@ -276,7 +286,8 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 		ctx.beginPath();
 		for (let i = 0; i < r.terrainPoints.length; i++) {
 			const px = 30 + ((r.terrainPoints[i].x - minTX) / rangeX) * terrainW;
-			const py = terrainY + ((r.terrainPoints[i].y - minTY) / rangeY) * terrainH;
+			const py =
+				terrainY + ((r.terrainPoints[i].y - minTY) / rangeY) * terrainH;
 			if (i === 0) ctx.moveTo(px, py);
 			else ctx.lineTo(px, py);
 		}
@@ -307,10 +318,18 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 	ctx.fillStyle = "#333333";
 	ctx.font = '11px "Courier New", monospace';
 	ctx.textAlign = "center";
-	ctx.fillText("MOONLANDER ENHANCED  |  moonlander.dev", CARD_WIDTH / 2, CARD_HEIGHT - 18);
+	ctx.fillText(
+		"MOONLANDER ENHANCED  |  moonlander.dev",
+		CARD_WIDTH / 2,
+		CARD_HEIGHT - 18,
+	);
 
 	// Lander type
 	ctx.textAlign = "right";
 	ctx.fillStyle = "#444444";
-	ctx.fillText(new Date().toISOString().slice(0, 10), CARD_WIDTH - 30, CARD_HEIGHT - 18);
+	ctx.fillText(
+		new Date().toISOString().slice(0, 10),
+		CARD_WIDTH - 30,
+		CARD_HEIGHT - 18,
+	);
 }

@@ -33,6 +33,7 @@ export function getWindLabel(wind: WindState): string {
 	const absSpeed = Math.abs(wind.speed);
 	if (absSpeed < 1) return "CALM";
 	const arrow = wind.speed > 0 ? ">>>" : "<<<";
-	const strength = absSpeed < 15 ? "LIGHT" : absSpeed < 30 ? "MODERATE" : "STRONG";
+	const strength =
+		absSpeed < 15 ? "LIGHT" : absSpeed < 30 ? "MODERATE" : "STRONG";
 	return `${arrow} ${strength}`;
 }

@@ -1,11 +1,11 @@
 /** Records flight telemetry for post-flight visualization */
 
 export interface TelemetryFrame {
-	time: number;      // seconds into flight
-	altitude: number;  // y distance above terrain
-	vSpeed: number;    // vertical speed
-	hSpeed: number;    // horizontal speed
-	fuel: number;      // remaining fuel
+	time: number; // seconds into flight
+	altitude: number; // y distance above terrain
+	vSpeed: number; // vertical speed
+	hSpeed: number; // horizontal speed
+	fuel: number; // remaining fuel
 }
 
 export class TelemetryRecorder {
@@ -21,7 +21,13 @@ export class TelemetryRecorder {
 	}
 
 	/** Call every frame with dt and current lander state */
-	update(dt: number, altitude: number, vSpeed: number, hSpeed: number, fuel: number): void {
+	update(
+		dt: number,
+		altitude: number,
+		vSpeed: number,
+		hSpeed: number,
+		fuel: number,
+	): void {
 		this.elapsed += dt;
 		if (this.elapsed >= this.nextSample) {
 			this.frames.push({

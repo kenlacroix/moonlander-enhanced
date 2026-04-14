@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAMPAIGN, MISSIONS, isMissionUnlocked } from "../src/game/Missions";
+import { CAMPAIGN, isMissionUnlocked, MISSIONS } from "../src/game/Missions";
 
 describe("missions", () => {
 	it("has 10 free play missions with unique seeds", () => {

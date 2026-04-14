@@ -10,20 +10,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-              background: #000;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              overflow: hidden;
-            }
-            canvas {
-              display: block;
-              image-rendering: pixelated;
-              touch-action: none;
-              user-select: none;
-            }
+                body {
+                  background: #000;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  height: 100vh;
+                  overflow: hidden;
+                }
+                canvas {
+                  display: block;
+                  image-rendering: pixelated;
+                  touch-action: none;
+                  user-select: none;
+                }
   </style>
 </head>
 <body>
@@ -31,8 +31,8 @@
   <script type="module" src="/src/main.ts"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        }
   </script>
 </body>
 </html>
