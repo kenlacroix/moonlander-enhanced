@@ -69,6 +69,8 @@ export interface GameRenderState {
 	readonly trainingLoop: TrainingLoop | null;
 	readonly seed: number;
 	readonly activeMission: Mission | null;
+	readonly achievementToast: { name: string; description: string } | null;
+	readonly achievementToastTimer: number;
 }
 
 export class GameRenderer {
@@ -197,6 +199,15 @@ export class GameRenderer {
 			state.flightElapsed < 5
 		) {
 			this.renderer.drawBriefing(state.llmText);
+		}
+
+		// Achievement toast notification
+		if (state.achievementToast && state.achievementToastTimer > 0) {
+			this.renderer.drawAchievementToast(
+				state.achievementToast.name,
+				state.achievementToast.description,
+				state.achievementToastTimer,
+			);
 		}
 	}
 

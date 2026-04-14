@@ -973,6 +973,39 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw achievement unlock toast */
+	drawAchievementToast(name: string, description: string, timer: number): void {
+		const ctx = this.ctx;
+		ctx.save();
+		// Fade out in last second
+		const alpha = Math.min(1, timer);
+		ctx.globalAlpha = alpha;
+		// Toast background
+		const w = 320;
+		const h = 50;
+		const x = CANVAS_WIDTH / 2 - w / 2;
+		const y = 80;
+		ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeStyle = "#ffaa00";
+		ctx.lineWidth = 2;
+		ctx.strokeRect(x, y, w, h);
+		// Badge icon (star)
+		ctx.fillStyle = "#ffaa00";
+		ctx.font = '20px "Courier New", monospace';
+		ctx.textAlign = "left";
+		ctx.fillText("\u2605", x + 12, y + 30);
+		// Name
+		ctx.fillStyle = "#ffaa00";
+		ctx.font = 'bold 14px "Courier New", monospace';
+		ctx.fillText(name, x + 38, y + 22);
+		// Description
+		ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+		ctx.font = '11px "Courier New", monospace';
+		ctx.fillText(description, x + 38, y + 40);
+		ctx.restore();
+	}
+
 	/** Draw semi-transparent touch control zones for mobile */
 	drawTouchControls(): void {
 		const ctx = this.ctx;

@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.5.0] - 2026-04-13
+
+### Added
+- Achievement badges: 8 unlockable badges with toast notifications. First Contact, Textbook (perfect landing), Deadstick (no thrust), Mission Control (full campaign), Human Spirit (beat the AI), Close Encounter (survive aliens), Fuel Miser (>80% fuel), Archaeologist (scan all artifacts). Persisted in localStorage.
+
 ## [0.4.4.0] - 2026-04-13
 
 ### Added
