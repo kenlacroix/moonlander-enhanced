@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.3.0] - 2026-04-13
+
+### Added
+- Multi-Lander Relay Mode: press L on free-play mission select to toggle. Land 3 landers sequentially on the same terrain. Each spawns 100 units above the previous lander's final position. Combined score at the end. 1.5-second pause between landers with status display.
+
 ## [0.4.2.0] - 2026-04-13
 
 ### Added
