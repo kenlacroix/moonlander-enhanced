@@ -22,7 +22,11 @@ export interface LanderState {
 	landerType: LanderType;
 }
 
-export function createLander(x: number, y: number, landerType: LanderType): LanderState {
+export function createLander(
+	x: number,
+	y: number,
+	landerType: LanderType,
+): LanderState {
 	return {
 		x,
 		y,

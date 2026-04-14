@@ -35,7 +35,11 @@ export class RetroVectorSkin {
 	}
 
 	/** Draw scanline overlay effect */
-	drawScanlines(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+	drawScanlines(
+		ctx: CanvasRenderingContext2D,
+		width: number,
+		height: number,
+	): void {
 		if (!this.active) return;
 		ctx.save();
 		ctx.fillStyle = "rgba(0, 0, 0, 0.1)";

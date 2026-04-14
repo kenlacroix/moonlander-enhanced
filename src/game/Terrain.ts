@@ -25,19 +25,22 @@ export interface TerrainData {
 
 /** Difficulty overrides for campaign mode */
 export interface DifficultyConfig {
-	roughness?: number;        // 0-1, higher = rougher terrain
-	padMinWidth?: number;      // minimum pad width in px
-	padMaxWidth?: number;      // maximum pad width in px
-	padCount?: number;         // number of landing pads
-	startingFuel?: number;     // fuel override
-	spawnY?: number;           // starting altitude (lower = harder)
-	windStrength?: number;     // wind force (0 = none, 50+ = strong)
-	landerType?: string;       // lander variant name
-	aliensEnabled?: boolean;   // force alien spawn (campaign)
+	roughness?: number; // 0-1, higher = rougher terrain
+	padMinWidth?: number; // minimum pad width in px
+	padMaxWidth?: number; // maximum pad width in px
+	padCount?: number; // number of landing pads
+	startingFuel?: number; // fuel override
+	spawnY?: number; // starting altitude (lower = harder)
+	windStrength?: number; // wind force (0 = none, 50+ = strong)
+	landerType?: string; // lander variant name
+	aliensEnabled?: boolean; // force alien spawn (campaign)
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */
-export function generateTerrain(seed: number, difficulty?: DifficultyConfig): TerrainData {
+export function generateTerrain(
+	seed: number,
+	difficulty?: DifficultyConfig,
+): TerrainData {
 	const rng = createRng(seed);
 
 	const roughness = difficulty?.roughness ?? TERRAIN_ROUGHNESS;
@@ -76,7 +79,11 @@ export function generateTerrain(seed: number, difficulty?: DifficultyConfig): Te
 	return { points, pads, seed };
 }
 
-function placeLandingPads(points: Vec2[], rng: () => number, difficulty?: DifficultyConfig): LandingPad[] {
+function placeLandingPads(
+	points: Vec2[],
+	rng: () => number,
+	difficulty?: DifficultyConfig,
+): LandingPad[] {
 	const pads: LandingPad[] = [];
 	const padCount = difficulty?.padCount ?? PAD_COUNT;
 	const padMin = difficulty?.padMinWidth ?? PAD_MIN_WIDTH;
@@ -116,8 +123,7 @@ function placeLandingPads(points: Vec2[], rng: () => number, difficulty?: Diffic
 		}
 
 		// Score inversely proportional to width
-		const widthRatio =
-			1 - (padWidth - padMin) / (padMax - padMin);
+		const widthRatio = 1 - (padWidth - padMin) / (padMax - padMin);
 		const scoreMultiplier = 1 + Math.floor(widthRatio * 3); // 1x to 4x
 
 		pads.push({

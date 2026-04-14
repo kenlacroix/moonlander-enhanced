@@ -7,12 +7,16 @@
  */
 
 import type { InputState } from "../systems/Input";
-import type { LanderState } from "./Lander";
-import type { DifficultyConfig } from "./Terrain";
 import { FUEL_BURN_RATE } from "../utils/constants";
 import { createRng } from "../utils/math";
+import type { LanderState } from "./Lander";
+import type { DifficultyConfig } from "./Terrain";
 
-export type AlienEffectType = "fuel-siphon" | "controls-reversed" | "thrust-reduced" | "drag";
+export type AlienEffectType =
+	| "fuel-siphon"
+	| "controls-reversed"
+	| "thrust-reduced"
+	| "drag";
 
 export interface AlienEffect {
 	type: AlienEffectType;
@@ -42,10 +46,18 @@ const THRUST_REDUCTION = 0.4;
 const DRAG_FACTOR_H = 0.3;
 const DRAG_FACTOR_V = 0.15;
 
-const EFFECT_TYPES: AlienEffectType[] = ["fuel-siphon", "controls-reversed", "thrust-reduced", "drag"];
+const EFFECT_TYPES: AlienEffectType[] = [
+	"fuel-siphon",
+	"controls-reversed",
+	"thrust-reduced",
+	"drag",
+];
 
 /** Check if aliens should spawn for this seed */
-export function shouldSpawnAlien(seed: number, difficulty?: DifficultyConfig): boolean {
+export function shouldSpawnAlien(
+	seed: number,
+	difficulty?: DifficultyConfig,
+): boolean {
 	if (difficulty?.aliensEnabled === true) return true;
 	if (difficulty?.aliensEnabled === false) return false;
 	return (seed * 7 + 13) % 10 < 3;
@@ -68,10 +80,17 @@ export function createAlien(seed: number): AlienState {
 }
 
 /** Update alien position and effect timers */
-export function updateAlien(alien: AlienState, landerX: number, landerY: number, dt: number, elapsed: number): void {
+export function updateAlien(
+	alien: AlienState,
+	landerX: number,
+	landerY: number,
+	dt: number,
+	elapsed: number,
+): void {
 	// Orbit around lander with oscillating radius
 	alien.orbitAngle += ORBIT_SPEED * dt;
-	alien.orbitRadius = ORBIT_BASE_RADIUS + Math.sin(elapsed * 0.5) * ORBIT_RADIUS_VARIANCE;
+	alien.orbitRadius =
+		ORBIT_BASE_RADIUS + Math.sin(elapsed * 0.5) * ORBIT_RADIUS_VARIANCE;
 	alien.x = landerX + Math.cos(alien.orbitAngle) * alien.orbitRadius;
 	alien.y = landerY + Math.sin(alien.orbitAngle) * alien.orbitRadius * 0.6; // oval orbit
 
@@ -82,28 +101,40 @@ export function updateAlien(alien: AlienState, landerX: number, landerY: number,
 		alien.effectTimer -= dt;
 		if (alien.effectTimer <= 0) {
 			alien.activeEffect = null;
-			alien.cooldownTimer = COOLDOWN_MIN + alien.rng() * (COOLDOWN_MAX - COOLDOWN_MIN);
+			alien.cooldownTimer =
+				COOLDOWN_MIN + alien.rng() * (COOLDOWN_MAX - COOLDOWN_MIN);
 		}
 	} else {
 		// Count down cooldown
 		alien.cooldownTimer -= dt;
 		if (alien.cooldownTimer <= 0) {
 			// Pick a random effect
-			const idx = Math.floor(alien.rng() * EFFECT_TYPES.length) % EFFECT_TYPES.length;
+			const idx =
+				Math.floor(alien.rng() * EFFECT_TYPES.length) % EFFECT_TYPES.length;
 			alien.activeEffect = { type: EFFECT_TYPES[idx] };
-			alien.effectTimer = EFFECT_DURATION_MIN + alien.rng() * (EFFECT_DURATION_MAX - EFFECT_DURATION_MIN);
+			alien.effectTimer =
+				EFFECT_DURATION_MIN +
+				alien.rng() * (EFFECT_DURATION_MAX - EFFECT_DURATION_MIN);
 			alien.effectJustStarted = true;
 		}
 	}
 }
 
 /** Apply alien effect to lander and input. Returns (potentially modified) input. */
-export function applyAlienEffect(alien: AlienState, lander: LanderState, input: InputState, dt: number): InputState {
+export function applyAlienEffect(
+	alien: AlienState,
+	lander: LanderState,
+	input: InputState,
+	dt: number,
+): InputState {
 	if (!alien.activeEffect) return input;
 
 	switch (alien.activeEffect.type) {
 		case "fuel-siphon":
-			lander.fuel = Math.max(0, lander.fuel - FUEL_BURN_RATE * SIPHON_RATE * dt);
+			lander.fuel = Math.max(
+				0,
+				lander.fuel - FUEL_BURN_RATE * SIPHON_RATE * dt,
+			);
 			return input;
 
 		case "controls-reversed":
@@ -144,10 +175,15 @@ export function applyAlienEffect(alien: AlienState, lander: LanderState, input: 
 export function getAlienEffectLabel(alien: AlienState): string | null {
 	if (!alien.activeEffect) return null;
 	switch (alien.activeEffect.type) {
-		case "fuel-siphon": return "SIPHONING FUEL";
-		case "controls-reversed": return "CONTROLS REVERSED";
-		case "thrust-reduced": return "THRUST REDUCED";
-		case "drag": return "APPLYING DRAG";
-		default: return null;
+		case "fuel-siphon":
+			return "SIPHONING FUEL";
+		case "controls-reversed":
+			return "CONTROLS REVERSED";
+		case "thrust-reduced":
+			return "THRUST REDUCED";
+		case "drag":
+			return "APPLYING DRAG";
+		default:
+			return null;
 	}
 }

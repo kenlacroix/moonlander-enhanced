@@ -171,8 +171,10 @@ export class CanvasRenderer {
 			ctx.stroke();
 			// Legs
 			ctx.beginPath();
-			ctx.moveTo(-hw * 0.6, hh * 0.6); ctx.lineTo(-hw * 1.0, hh);
-			ctx.moveTo(hw * 0.6, hh * 0.6); ctx.lineTo(hw * 1.0, hh);
+			ctx.moveTo(-hw * 0.6, hh * 0.6);
+			ctx.lineTo(-hw * 1.0, hh);
+			ctx.moveTo(hw * 0.6, hh * 0.6);
+			ctx.lineTo(hw * 1.0, hh);
 			ctx.stroke();
 			// Thrust glow
 			if (lander.thrusting) {
@@ -405,11 +407,32 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
-	drawHUD(lander: LanderState, score: number, windLabel: string | null, fuelLeak = false, autopilot = false, adaptiveLabel: string | null = null, alienEffect: string | null = null): void {
-		this.hud.draw(this.ctx, lander, score, windLabel, fuelLeak, autopilot, adaptiveLabel, alienEffect);
+	drawHUD(
+		lander: LanderState,
+		score: number,
+		windLabel: string | null,
+		fuelLeak = false,
+		autopilot = false,
+		adaptiveLabel: string | null = null,
+		alienEffect: string | null = null,
+	): void {
+		this.hud.draw(
+			this.ctx,
+			lander,
+			score,
+			windLabel,
+			fuelLeak,
+			autopilot,
+			adaptiveLabel,
+			alienEffect,
+		);
 	}
 
-	drawTitle(selection: number, completedCount: number, totalCampaign: number): void {
+	drawTitle(
+		selection: number,
+		completedCount: number,
+		totalCampaign: number,
+	): void {
 		const ctx = this.ctx;
 		ctx.save();
 
@@ -421,7 +444,11 @@ export class CanvasRenderer {
 
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("A LUNAR DESCENT SIMULATOR", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 80);
+		ctx.fillText(
+			"A LUNAR DESCENT SIMULATOR",
+			CANVAS_WIDTH / 2,
+			CANVAS_HEIGHT / 2 - 80,
+		);
 
 		// Mode options
 		const options = ["FREE PLAY", "CAMPAIGN", "AI TRAINING"];
@@ -448,7 +475,9 @@ export class CanvasRenderer {
 			ctx.textAlign = "center";
 			ctx.fillText(options[i], CANVAS_WIDTH / 2, y + 8);
 
-			ctx.fillStyle = isSelected ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.25)";
+			ctx.fillStyle = isSelected
+				? "rgba(255, 255, 255, 0.5)"
+				: "rgba(255, 255, 255, 0.25)";
 			ctx.font = '13px "Courier New", monospace';
 			ctx.fillText(descriptions[i], CANVAS_WIDTH / 2, y + 26);
 		}
@@ -456,12 +485,21 @@ export class CanvasRenderer {
 		// Controls
 		ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("[UP/DOWN] Select    [ENTER] Start    [S] AI Settings", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+		ctx.fillText(
+			"[UP/DOWN] Select    [ENTER] Start    [S] AI Settings",
+			CANVAS_WIDTH / 2,
+			CANVAS_HEIGHT - 30,
+		);
 
 		ctx.restore();
 	}
 
-	drawMissionSelect(missions: Mission[], selectedIndex: number, bestScores: Map<number, number>, campaignProgress?: Set<number>): void {
+	drawMissionSelect(
+		missions: Mission[],
+		selectedIndex: number,
+		bestScores: Map<number, number>,
+		campaignProgress?: Set<number>,
+	): void {
 		const ctx = this.ctx;
 		ctx.save();
 
@@ -486,7 +524,10 @@ export class CanvasRenderer {
 			const isSelected = i === selectedIndex;
 
 			// Campaign: check locked/completed
-			const isLocked = campaignProgress !== undefined && m.id > 1 && !campaignProgress.has(m.id - 1);
+			const isLocked =
+				campaignProgress !== undefined &&
+				m.id > 1 &&
+				!campaignProgress.has(m.id - 1);
 			const isCompleted = campaignProgress?.has(m.id) ?? false;
 
 			// Selection highlight
@@ -516,7 +557,11 @@ export class CanvasRenderer {
 			} else {
 				ctx.fillStyle = isSelected ? "#00ff88" : "#888888";
 				ctx.font = 'bold 16px "Courier New", monospace';
-				ctx.fillText(`${String(m.id).padStart(2, "0")}`, CANVAS_WIDTH / 2 - 300, y + 6);
+				ctx.fillText(
+					`${String(m.id).padStart(2, "0")}`,
+					CANVAS_WIDTH / 2 - 300,
+					y + 6,
+				);
 			}
 
 			// Mission name
@@ -526,9 +571,17 @@ export class CanvasRenderer {
 			ctx.fillText(m.name, CANVAS_WIDTH / 2 - 220, y + 6);
 
 			// Description
-			ctx.fillStyle = dimmed ? "rgba(255, 255, 255, 0.15)" : isSelected ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)";
+			ctx.fillStyle = dimmed
+				? "rgba(255, 255, 255, 0.15)"
+				: isSelected
+					? "rgba(255, 255, 255, 0.6)"
+					: "rgba(255, 255, 255, 0.3)";
 			ctx.font = '12px "Courier New", monospace';
-			ctx.fillText(isLocked ? "Complete previous mission to unlock" : m.description, CANVAS_WIDTH / 2 - 220, y + 22);
+			ctx.fillText(
+				isLocked ? "Complete previous mission to unlock" : m.description,
+				CANVAS_WIDTH / 2 - 220,
+				y + 22,
+			);
 
 			// Best score
 			const best = bestScores.get(m.seed);
@@ -544,7 +597,11 @@ export class CanvasRenderer {
 		ctx.textAlign = "center";
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("[UP/DOWN] Select    [ENTER] Launch    [I] Import ghost    [ESC] Back", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+		ctx.fillText(
+			"[UP/DOWN] Select    [ENTER] Launch    [I] Import ghost    [ESC] Back",
+			CANVAS_WIDTH / 2,
+			CANVAS_HEIGHT - 30,
+		);
 
 		ctx.restore();
 	}
@@ -574,14 +631,18 @@ export class CanvasRenderer {
 		const lh = 26;
 
 		ctx.fillStyle = "#00ff88";
-		ctx.fillText(`Episode:     ${episode}`, sx, sy); sy += lh;
-		ctx.fillText(`Exploration: ${(epsilon * 100).toFixed(1)}%`, sx, sy); sy += lh;
+		ctx.fillText(`Episode:     ${episode}`, sx, sy);
+		sy += lh;
+		ctx.fillText(`Exploration: ${(epsilon * 100).toFixed(1)}%`, sx, sy);
+		sy += lh;
 
 		ctx.fillStyle = lastLanded ? "#00ff88" : "#ff4444";
-		ctx.fillText(`Last result: ${lastLanded ? "LANDED" : "CRASHED"}`, sx, sy); sy += lh;
+		ctx.fillText(`Last result: ${lastLanded ? "LANDED" : "CRASHED"}`, sx, sy);
+		sy += lh;
 
 		ctx.fillStyle = "#ffffff";
-		ctx.fillText(`Last reward: ${lastReward.toFixed(1)}`, sx, sy); sy += lh;
+		ctx.fillText(`Last reward: ${lastReward.toFixed(1)}`, sx, sy);
+		sy += lh;
 
 		// Moving average
 		if (rewardHistory.length > 0) {
@@ -622,11 +683,13 @@ export class CanvasRenderer {
 			ctx.lineWidth = 1.5;
 			ctx.beginPath();
 			const maxPoints = Math.min(rewardHistory.length, 500);
-			const step = rewardHistory.length > maxPoints ? rewardHistory.length / maxPoints : 1;
+			const step =
+				rewardHistory.length > maxPoints ? rewardHistory.length / maxPoints : 1;
 			for (let i = 0; i < maxPoints; i++) {
 				const idx = Math.floor(i * step);
 				const rx = graphX + (i / maxPoints) * graphW;
-				const ry = graphY + graphH - ((rewardHistory[idx] - minR) / range) * graphH;
+				const ry =
+					graphY + graphH - ((rewardHistory[idx] - minR) / range) * graphH;
 				if (i === 0) ctx.moveTo(rx, ry);
 				else ctx.lineTo(rx, ry);
 			}
@@ -673,7 +736,11 @@ export class CanvasRenderer {
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
 		ctx.textAlign = "center";
-		ctx.fillText("[ENTER] Watch agent play    [ESC] Back to menu", CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+		ctx.fillText(
+			"[ENTER] Watch agent play    [ESC] Back to menu",
+			CANVAS_WIDTH / 2,
+			CANVAS_HEIGHT - 30,
+		);
 
 		ctx.restore();
 	}
@@ -723,7 +790,10 @@ export class CanvasRenderer {
 		if (maxAlt < 10) maxAlt = 10;
 
 		const maxTime = frames[frames.length - 1].time;
-		if (maxTime <= 0) { ctx.restore(); return; }
+		if (maxTime <= 0) {
+			ctx.restore();
+			return;
+		}
 
 		// Altitude line
 		ctx.strokeStyle = "#00ff88";
@@ -745,13 +815,22 @@ export class CanvasRenderer {
 		ctx.textAlign = "right";
 		ctx.fillText(`${Math.round(maxAlt)}`, chartX + chartW, chartY + 12);
 		ctx.textAlign = "center";
-		ctx.fillText(`${maxTime.toFixed(1)}s`, chartX + chartW / 2, chartY + chartH + 14);
+		ctx.fillText(
+			`${maxTime.toFixed(1)}s`,
+			chartX + chartW / 2,
+			chartY + chartH + 14,
+		);
 
 		ctx.restore();
 	}
 
 	/** Draw alien UFO sprite */
-	drawAlien(alien: AlienState, landerX: number, landerY: number, offset: { x: number; y: number }): void {
+	drawAlien(
+		alien: AlienState,
+		landerX: number,
+		landerY: number,
+		offset: { x: number; y: number },
+	): void {
 		const ctx = this.ctx;
 		ctx.save();
 		ctx.translate(offset.x + alien.x, offset.y + alien.y);

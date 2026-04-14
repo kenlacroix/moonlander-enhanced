@@ -1,4 +1,10 @@
-import { type LLMConfig, type ProviderType, loadLLMConfig, saveLLMConfig, clearLLMConfig } from "../api/LLMProvider";
+import {
+	clearLLMConfig,
+	type LLMConfig,
+	loadLLMConfig,
+	type ProviderType,
+	saveLLMConfig,
+} from "../api/LLMProvider";
 
 /**
  * HTML overlay for LLM API settings.
@@ -60,26 +66,41 @@ export class SettingsOverlay {
 		document.body.appendChild(this.overlay);
 
 		// Wire events
-		const providerSelect = this.overlay.querySelector("#llm-provider") as HTMLSelectElement;
+		const providerSelect = this.overlay.querySelector(
+			"#llm-provider",
+		) as HTMLSelectElement;
 		providerSelect.addEventListener("change", () => {
-			const customUrl = this.overlay.querySelector("#llm-custom-url") as HTMLDivElement;
-			customUrl.style.display = providerSelect.value === "custom" ? "block" : "none";
+			const customUrl = this.overlay.querySelector(
+				"#llm-custom-url",
+			) as HTMLDivElement;
+			customUrl.style.display =
+				providerSelect.value === "custom" ? "block" : "none";
 		});
 
-		this.overlay.querySelector("#llm-save")!.addEventListener("click", () => this.handleSave());
-		this.overlay.querySelector("#llm-clear")!.addEventListener("click", () => this.handleClear());
-		this.overlay.querySelector("#llm-cancel")!.addEventListener("click", () => this.hide());
+		this.overlay
+			.querySelector("#llm-save")!
+			.addEventListener("click", () => this.handleSave());
+		this.overlay
+			.querySelector("#llm-clear")!
+			.addEventListener("click", () => this.handleClear());
+		this.overlay
+			.querySelector("#llm-cancel")!
+			.addEventListener("click", () => this.hide());
 	}
 
 	show(onClose: (config: LLMConfig | null) => void): void {
 		this.onClose = onClose;
 		const config = loadLLMConfig();
 
-		const provider = this.overlay.querySelector("#llm-provider") as HTMLSelectElement;
+		const provider = this.overlay.querySelector(
+			"#llm-provider",
+		) as HTMLSelectElement;
 		const key = this.overlay.querySelector("#llm-key") as HTMLInputElement;
 		const model = this.overlay.querySelector("#llm-model") as HTMLInputElement;
 		const url = this.overlay.querySelector("#llm-url") as HTMLInputElement;
-		const status = this.overlay.querySelector("#llm-status") as HTMLParagraphElement;
+		const status = this.overlay.querySelector(
+			"#llm-status",
+		) as HTMLParagraphElement;
 
 		provider.value = config?.provider ?? "anthropic";
 		key.value = config?.apiKey ?? "";
@@ -87,7 +108,9 @@ export class SettingsOverlay {
 		url.value = config?.baseUrl ?? "";
 		status.textContent = config ? "Currently configured." : "No API key set.";
 
-		const customUrl = this.overlay.querySelector("#llm-custom-url") as HTMLDivElement;
+		const customUrl = this.overlay.querySelector(
+			"#llm-custom-url",
+		) as HTMLDivElement;
 		customUrl.style.display = provider.value === "custom" ? "block" : "none";
 
 		this.overlay.style.display = "flex";
@@ -101,11 +124,21 @@ export class SettingsOverlay {
 	}
 
 	private handleSave(): void {
-		const provider = (this.overlay.querySelector("#llm-provider") as HTMLSelectElement).value as ProviderType;
-		const apiKey = (this.overlay.querySelector("#llm-key") as HTMLInputElement).value.trim();
-		const model = (this.overlay.querySelector("#llm-model") as HTMLInputElement).value.trim();
-		const baseUrl = (this.overlay.querySelector("#llm-url") as HTMLInputElement).value.trim();
-		const status = this.overlay.querySelector("#llm-status") as HTMLParagraphElement;
+		const provider = (
+			this.overlay.querySelector("#llm-provider") as HTMLSelectElement
+		).value as ProviderType;
+		const apiKey = (
+			this.overlay.querySelector("#llm-key") as HTMLInputElement
+		).value.trim();
+		const model = (
+			this.overlay.querySelector("#llm-model") as HTMLInputElement
+		).value.trim();
+		const baseUrl = (
+			this.overlay.querySelector("#llm-url") as HTMLInputElement
+		).value.trim();
+		const status = this.overlay.querySelector(
+			"#llm-status",
+		) as HTMLParagraphElement;
 
 		if (!apiKey) {
 			status.textContent = "API key is required.";
@@ -113,7 +146,12 @@ export class SettingsOverlay {
 			return;
 		}
 
-		const config: LLMConfig = { provider, apiKey, model: model || "", baseUrl: baseUrl || undefined };
+		const config: LLMConfig = {
+			provider,
+			apiKey,
+			model: model || "",
+			baseUrl: baseUrl || undefined,
+		};
 		saveLLMConfig(config);
 		status.textContent = "Saved!";
 		status.style.color = "#00ff88";
@@ -125,7 +163,9 @@ export class SettingsOverlay {
 		(this.overlay.querySelector("#llm-key") as HTMLInputElement).value = "";
 		(this.overlay.querySelector("#llm-model") as HTMLInputElement).value = "";
 		(this.overlay.querySelector("#llm-url") as HTMLInputElement).value = "";
-		const status = this.overlay.querySelector("#llm-status") as HTMLParagraphElement;
+		const status = this.overlay.querySelector(
+			"#llm-status",
+		) as HTMLParagraphElement;
 		status.textContent = "Cleared.";
 		status.style.color = "#888";
 	}

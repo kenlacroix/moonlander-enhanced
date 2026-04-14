@@ -1,9 +1,13 @@
 import * as tf from "@tensorflow/tfjs";
-import type { InputState } from "../systems/Input";
 import type { LanderState } from "../game/Lander";
-import type { TerrainData, LandingPad } from "../game/Terrain";
 import { getTerrainHeightAt, normAngle } from "../game/Physics";
-import { LANDER_HEIGHT, MAX_LANDING_SPEED, STARTING_FUEL } from "../utils/constants";
+import type { LandingPad, TerrainData } from "../game/Terrain";
+import type { InputState } from "../systems/Input";
+import {
+	LANDER_HEIGHT,
+	MAX_LANDING_SPEED,
+	STARTING_FUEL,
+} from "../utils/constants";
 
 /**
  * Deep Q-Network (DQN) agent that learns to land through trial and error.
@@ -73,19 +77,25 @@ export class RLAgent {
 
 	private buildModel(): tf.Sequential {
 		const model = tf.sequential();
-		model.add(tf.layers.dense({
-			inputShape: [STATE_SIZE],
-			units: 64,
-			activation: "relu",
-		}));
-		model.add(tf.layers.dense({
-			units: 64,
-			activation: "relu",
-		}));
-		model.add(tf.layers.dense({
-			units: ACTION_COUNT,
-			activation: "linear",
-		}));
+		model.add(
+			tf.layers.dense({
+				inputShape: [STATE_SIZE],
+				units: 64,
+				activation: "relu",
+			}),
+		);
+		model.add(
+			tf.layers.dense({
+				units: 64,
+				activation: "relu",
+			}),
+		);
+		model.add(
+			tf.layers.dense({
+				units: ACTION_COUNT,
+				activation: "linear",
+			}),
+		);
 		model.compile({
 			optimizer: tf.train.adam(LEARNING_RATE),
 			loss: "meanSquaredError",
@@ -96,7 +106,7 @@ export class RLAgent {
 	private syncTargetModel(): void {
 		if (!this.model || !this.targetModel) return;
 		const weights = this.model.getWeights();
-		this.targetModel.setWeights(weights.map(w => w.clone()));
+		this.targetModel.setWeights(weights.map((w) => w.clone()));
 	}
 
 	/** Extract normalized state vector from game state */
@@ -108,13 +118,13 @@ export class RLAgent {
 		const altitude = terrainY - (lander.y + LANDER_HEIGHT / 2);
 
 		return [
-			(padCenterX - lander.x) / 2000,            // dx to pad (normalized)
-			Math.min(altitude / 500, 1),                 // altitude (capped)
-			lander.vx / 300,                             // horizontal velocity
-			lander.vy / 300,                             // vertical velocity
-			normAngle(lander.angle) / 180,               // angle (-1..1)
-			0,                                           // angular velocity (unused for now)
-			lander.fuel / (STARTING_FUEL),               // fuel fraction
+			(padCenterX - lander.x) / 2000, // dx to pad (normalized)
+			Math.min(altitude / 500, 1), // altitude (capped)
+			lander.vx / 300, // horizontal velocity
+			lander.vy / 300, // vertical velocity
+			normAngle(lander.angle) / 180, // angle (-1..1)
+			0, // angular velocity (unused for now)
+			lander.fuel / STARTING_FUEL, // fuel fraction
 			pad ? Math.abs(lander.x - padCenterX) / padWidth : 1, // distance to pad center ratio
 		];
 	}
@@ -128,7 +138,7 @@ export class RLAgent {
 			if (!this.model) return 0;
 			const input = tf.tensor2d([state]);
 			const prediction = this.model.predict(input) as tf.Tensor;
-			return (prediction.argMax(1).dataSync()[0]);
+			return prediction.argMax(1).dataSync()[0];
 		});
 	}
 
@@ -191,7 +201,13 @@ export class RLAgent {
 	}
 
 	/** Store experience in replay buffer */
-	remember(state: number[], action: number, reward: number, nextState: number[], done: boolean): void {
+	remember(
+		state: number[],
+		action: number,
+		reward: number,
+		nextState: number[],
+		done: boolean,
+	): void {
 		const exp: Experience = { state, action, reward, nextState, done };
 		if (this.memory.length < MEMORY_SIZE) {
 			this.memory.push(exp);
@@ -214,14 +230,18 @@ export class RLAgent {
 		}
 
 		await tf.tidy(() => {
-			const states = tf.tensor2d(batch.map(e => e.state));
-			const nextStates = tf.tensor2d(batch.map(e => e.nextState));
+			const states = tf.tensor2d(batch.map((e) => e.state));
+			const nextStates = tf.tensor2d(batch.map((e) => e.nextState));
 
 			// Current Q values
-			const currentQ = (this.model!.predict(states) as tf.Tensor).arraySync() as number[][];
+			const currentQ = (
+				this.model!.predict(states) as tf.Tensor
+			).arraySync() as number[][];
 
 			// Target Q values from target network
-			const nextQ = (this.targetModel!.predict(nextStates) as tf.Tensor).arraySync() as number[][];
+			const nextQ = (
+				this.targetModel!.predict(nextStates) as tf.Tensor
+			).arraySync() as number[][];
 
 			// Update Q values with Bellman equation
 			for (let i = 0; i < BATCH_SIZE; i++) {
@@ -263,13 +283,19 @@ export class RLAgent {
 		return recent.reduce((a, b) => a + b, 0) / recent.length;
 	}
 
-	private findNearestPad(lander: LanderState, terrain: TerrainData): LandingPad | null {
+	private findNearestPad(
+		lander: LanderState,
+		terrain: TerrainData,
+	): LandingPad | null {
 		if (terrain.pads.length === 0) return null;
 		let best = terrain.pads[0];
 		let bestDist = Math.abs(lander.x - (best.x + best.width / 2));
 		for (const pad of terrain.pads) {
 			const dist = Math.abs(lander.x - (pad.x + pad.width / 2));
-			if (dist < bestDist) { best = pad; bestDist = dist; }
+			if (dist < bestDist) {
+				best = pad;
+				bestDist = dist;
+			}
 		}
 		return best;
 	}

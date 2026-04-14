@@ -1,7 +1,11 @@
-import { type LLMConfig, type LLMMessage, streamCompletion } from "./LLMProvider";
 import type { LanderState } from "../game/Lander";
 import { normAngle } from "../game/Physics";
-import { MAX_LANDING_SPEED, MAX_LANDING_ANGLE } from "../utils/constants";
+import { MAX_LANDING_ANGLE, MAX_LANDING_SPEED } from "../utils/constants";
+import {
+	type LLMConfig,
+	type LLMMessage,
+	streamCompletion,
+} from "./LLMProvider";
 
 /**
  * Post-landing commentary from mission control.
@@ -24,9 +28,24 @@ export async function getMissionControlCommentary(
 	if (!landed) {
 		situation = `The lander crashed. Final speed: ${vy.toFixed(0)} vertical, ${vx.toFixed(0)} horizontal. Angle: ${angle.toFixed(0)} degrees. Fuel remaining: ${fuelPct}%.`;
 	} else {
-		const speedQuality = vy < MAX_LANDING_SPEED * 0.3 ? "feather-light" : vy < MAX_LANDING_SPEED * 0.7 ? "clean" : "hard but safe";
-		const angleQuality = angle < 2 ? "dead center" : angle < MAX_LANDING_ANGLE * 0.5 ? "well-aligned" : "tilted but within limits";
-		const fuelQuality = fuelPct > 50 ? "plenty of fuel left" : fuelPct > 20 ? "fuel was getting tight" : "running on fumes";
+		const speedQuality =
+			vy < MAX_LANDING_SPEED * 0.3
+				? "feather-light"
+				: vy < MAX_LANDING_SPEED * 0.7
+					? "clean"
+					: "hard but safe";
+		const angleQuality =
+			angle < 2
+				? "dead center"
+				: angle < MAX_LANDING_ANGLE * 0.5
+					? "well-aligned"
+					: "tilted but within limits";
+		const fuelQuality =
+			fuelPct > 50
+				? "plenty of fuel left"
+				: fuelPct > 20
+					? "fuel was getting tight"
+					: "running on fumes";
 		situation = `Successful landing. Touchdown was ${speedQuality}, ${angleQuality}. ${fuelQuality}. Score: ${score}.`;
 	}
 

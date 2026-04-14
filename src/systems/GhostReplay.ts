@@ -1,14 +1,18 @@
-import type { InputState } from "./Input";
 import type { LanderState } from "../game/Lander";
 import { createLander, updateLander } from "../game/Lander";
 import { getLanderType } from "../game/LanderTypes";
 import { FIXED_TIMESTEP, WORLD_WIDTH } from "../utils/constants";
+import type { InputState } from "./Input";
 
 /** Compact input frame: 3 bits packed into a number */
 type InputFrame = number;
 
 function packInput(input: InputState): InputFrame {
-	return (input.thrustUp ? 1 : 0) | (input.rotateLeft ? 2 : 0) | (input.rotateRight ? 4 : 0);
+	return (
+		(input.thrustUp ? 1 : 0) |
+		(input.rotateLeft ? 2 : 0) |
+		(input.rotateRight ? 4 : 0)
+	);
 }
 
 function unpackInput(frame: InputFrame): InputState {
@@ -144,7 +148,11 @@ export function exportGhost(seed: number): string | null {
 export function importGhost(json: string): GhostRun | null {
 	try {
 		const run = JSON.parse(json) as GhostRun;
-		if (typeof run.seed !== "number" || typeof run.score !== "number" || !Array.isArray(run.frames)) {
+		if (
+			typeof run.seed !== "number" ||
+			typeof run.score !== "number" ||
+			!Array.isArray(run.frames)
+		) {
 			return null;
 		}
 		// Save it to localStorage
@@ -189,7 +197,10 @@ export function uploadGhost(): Promise<GhostRun | null> {
 		input.accept = ".json";
 		input.addEventListener("change", () => {
 			const file = input.files?.[0];
-			if (!file) { resolve(null); return; }
+			if (!file) {
+				resolve(null);
+				return;
+			}
 			const reader = new FileReader();
 			reader.onload = () => {
 				const result = importGhost(reader.result as string);

@@ -39,7 +39,8 @@ export class Input {
 	readonly isTouchDevice: boolean;
 
 	constructor() {
-		this.isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+		this.isTouchDevice =
+			"ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 		window.addEventListener("keydown", (e) => {
 			this.keys.add(e.code);
@@ -91,42 +92,54 @@ export class Input {
 		});
 
 		// Touch events
-		window.addEventListener("touchstart", (e) => {
-			e.preventDefault();
-			for (let i = 0; i < e.changedTouches.length; i++) {
-				const t = e.changedTouches[i];
-				const zone = this.getTouchZone(t.clientX, t.clientY);
-				this.touchActive.set(t.identifier, zone);
-			}
-		}, { passive: false });
-
-		window.addEventListener("touchmove", (e) => {
-			e.preventDefault();
-			for (let i = 0; i < e.changedTouches.length; i++) {
-				const t = e.changedTouches[i];
-				const zone = this.getTouchZone(t.clientX, t.clientY);
-				this.touchActive.set(t.identifier, zone);
-			}
-		}, { passive: false });
-
-		window.addEventListener("touchend", (e) => {
-			e.preventDefault();
-			for (let i = 0; i < e.changedTouches.length; i++) {
-				const t = e.changedTouches[i];
-				const zone = this.touchActive.get(t.identifier);
-				this.touchActive.delete(t.identifier);
-
-				const relY = t.clientY / window.innerHeight;
-				if (relY < 0.3) {
-					// Tap upper area = restart / launch mission
-					this._touchRestart = true;
-					this._touchMenuSelect = true;
-				} else if (relY >= 0.3 && relY < 0.7) {
-					// Tap middle area in menu = scroll down through missions
-					this._menuDownPressed = true;
+		window.addEventListener(
+			"touchstart",
+			(e) => {
+				e.preventDefault();
+				for (let i = 0; i < e.changedTouches.length; i++) {
+					const t = e.changedTouches[i];
+					const zone = this.getTouchZone(t.clientX, t.clientY);
+					this.touchActive.set(t.identifier, zone);
 				}
-			}
-		}, { passive: false });
+			},
+			{ passive: false },
+		);
+
+		window.addEventListener(
+			"touchmove",
+			(e) => {
+				e.preventDefault();
+				for (let i = 0; i < e.changedTouches.length; i++) {
+					const t = e.changedTouches[i];
+					const zone = this.getTouchZone(t.clientX, t.clientY);
+					this.touchActive.set(t.identifier, zone);
+				}
+			},
+			{ passive: false },
+		);
+
+		window.addEventListener(
+			"touchend",
+			(e) => {
+				e.preventDefault();
+				for (let i = 0; i < e.changedTouches.length; i++) {
+					const t = e.changedTouches[i];
+					const zone = this.touchActive.get(t.identifier);
+					this.touchActive.delete(t.identifier);
+
+					const relY = t.clientY / window.innerHeight;
+					if (relY < 0.3) {
+						// Tap upper area = restart / launch mission
+						this._touchRestart = true;
+						this._touchMenuSelect = true;
+					} else if (relY >= 0.3 && relY < 0.7) {
+						// Tap middle area in menu = scroll down through missions
+						this._menuDownPressed = true;
+					}
+				}
+			},
+			{ passive: false },
+		);
 
 		window.addEventListener("touchcancel", (e) => {
 			for (let i = 0; i < e.changedTouches.length; i++) {
@@ -151,9 +164,18 @@ export class Input {
 
 	getState(): InputState {
 		const state: InputState = {
-			thrustUp: this.keys.has("ArrowUp") || this.keys.has("KeyW") || this.hasTouchZone("thrust"),
-			rotateLeft: this.keys.has("ArrowLeft") || this.keys.has("KeyA") || this.hasTouchZone("left"),
-			rotateRight: this.keys.has("ArrowRight") || this.keys.has("KeyD") || this.hasTouchZone("right"),
+			thrustUp:
+				this.keys.has("ArrowUp") ||
+				this.keys.has("KeyW") ||
+				this.hasTouchZone("thrust"),
+			rotateLeft:
+				this.keys.has("ArrowLeft") ||
+				this.keys.has("KeyA") ||
+				this.hasTouchZone("left"),
+			rotateRight:
+				this.keys.has("ArrowRight") ||
+				this.keys.has("KeyD") ||
+				this.hasTouchZone("right"),
 			restart: this._restartPressed || this._touchRestart,
 			menuUp: this._menuUpPressed,
 			menuDown: this._menuDownPressed,

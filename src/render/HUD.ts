@@ -113,7 +113,12 @@ export class HUD {
 
 		// Adaptive difficulty label (top right, below score)
 		if (adaptiveLabel && adaptiveLabel !== "NORMAL") {
-			const labelColor = adaptiveLabel === "EASY" ? "#44aaff" : adaptiveLabel === "HARD" ? "#ffaa00" : "#ff4444";
+			const labelColor =
+				adaptiveLabel === "EASY"
+					? "#44aaff"
+					: adaptiveLabel === "HARD"
+						? "#ffaa00"
+						: "#ff4444";
 			ctx.fillStyle = labelColor;
 			ctx.font = '12px "Courier New", monospace';
 			ctx.textAlign = "right";

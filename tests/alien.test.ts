@@ -55,9 +55,15 @@ describe("alien effects", () => {
 		alien.activeEffect = { type: "controls-reversed" };
 		const lander = createLander(2000, 300, getLanderType());
 		const input = {
-			thrustUp: false, rotateLeft: true, rotateRight: false,
-			restart: false, menuUp: false, menuDown: false,
-			menuSelect: false, menuBack: false, toggleAutopilot: false,
+			thrustUp: false,
+			rotateLeft: true,
+			rotateRight: false,
+			restart: false,
+			menuUp: false,
+			menuDown: false,
+			menuSelect: false,
+			menuBack: false,
+			toggleAutopilot: false,
 			openSettings: false,
 		};
 		const result = applyAlienEffect(alien, lander, input, 1 / 60);
@@ -71,9 +77,15 @@ describe("alien effects", () => {
 		const lander = createLander(2000, 300, getLanderType());
 		const startFuel = lander.fuel;
 		const input = {
-			thrustUp: false, rotateLeft: false, rotateRight: false,
-			restart: false, menuUp: false, menuDown: false,
-			menuSelect: false, menuBack: false, toggleAutopilot: false,
+			thrustUp: false,
+			rotateLeft: false,
+			rotateRight: false,
+			restart: false,
+			menuUp: false,
+			menuDown: false,
+			menuSelect: false,
+			menuBack: false,
+			toggleAutopilot: false,
 			openSettings: false,
 		};
 		applyAlienEffect(alien, lander, input, 1);

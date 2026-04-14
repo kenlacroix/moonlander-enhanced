@@ -1,8 +1,13 @@
-import type { InputState } from "../systems/Input";
 import type { LanderState } from "../game/Lander";
-import type { TerrainData, LandingPad } from "../game/Terrain";
 import { getTerrainHeightAt, normAngle } from "../game/Physics";
-import { GRAVITY, LANDER_HEIGHT, MAX_LANDING_SPEED, THRUST_FORCE } from "../utils/constants";
+import type { LandingPad, TerrainData } from "../game/Terrain";
+import type { InputState } from "../systems/Input";
+import {
+	GRAVITY,
+	LANDER_HEIGHT,
+	MAX_LANDING_SPEED,
+	THRUST_FORCE,
+} from "../utils/constants";
 
 /**
  * Rule-based autopilot controller.
@@ -146,7 +151,10 @@ export class Autopilot {
 	}
 
 	/** Find the best landing pad to target */
-	private findTargetPad(lander: LanderState, terrain: TerrainData): LandingPad | null {
+	private findTargetPad(
+		lander: LanderState,
+		terrain: TerrainData,
+	): LandingPad | null {
 		if (terrain.pads.length === 0) return null;
 
 		// Pick the closest pad by horizontal distance
