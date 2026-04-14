@@ -130,143 +130,262 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ## Roadmap
 
-### Phase 1 — Playable Core (MVP)
+### Phase 1 — Playable Core (MVP) ✅ COMPLETE
 **Theme:** It works. It feels good. You can lose.
-- [ ] Vite + TypeScript project scaffold
-- [ ] Canvas renderer with game loop
-- [ ] Lander with thrust + rotation + real lunar gravity
-- [ ] Procedural terrain (midpoint displacement)
-- [ ] Landing pad placement and detection
-- [ ] Crash vs safe landing detection
-- [ ] Telemetry HUD (altitude, vertical speed, horizontal speed, fuel, angle)
-- [ ] Thruster particle system (exhaust plume)
-- [ ] Landing dust particle burst
-- [ ] Explosion on crash
-- [ ] Parallax starfield background
-- [ ] Keyboard input (arrow keys + space)
-- [ ] Basic scoring
-- [ ] "Try again" restart flow
+- [x] Vite + TypeScript project scaffold
+- [x] Canvas renderer with game loop
+- [x] Lander with thrust + rotation + real lunar gravity
+- [x] Procedural terrain (midpoint displacement)
+- [x] Landing pad placement and detection
+- [x] Crash vs safe landing detection
+- [x] Telemetry HUD (altitude, vertical speed, horizontal speed, fuel, angle)
+- [x] Thruster particle system (exhaust plume)
+- [x] Landing dust particle burst
+- [x] Explosion on crash
+- [x] Parallax starfield background
+- [x] Keyboard input (arrow keys + space)
+- [x] Basic scoring
+- [x] "Try again" restart flow
 
 **Exit question:** Is the physics fun to fight against? Does landing feel rewarding?
 
 ---
 
-### Phase 2 — Depth and Replayability
+### Phase 2 — Depth and Replayability ✅ COMPLETE
 **Theme:** Every run is different. You want one more go.
-- [ ] Multiple terrain seeds / mission select
-- [ ] Wind system (direction + strength shown on HUD)
-- [ ] Multiple lander types (different thrust/weight/fuel ratios)
-- [ ] Ghost replay system (record inputs, play back best run)
-- [ ] Persistent leaderboard per terrain seed (localStorage)
-- [ ] Session telemetry log (altitude curve, speed over time)
-- [ ] Touch/mobile input support
-- [ ] Sound design (Web Audio API — thruster hum, crash, success jingle)
-- [ ] Earth rise parallax layer
-- [ ] Fuel leak random event
-- [ ] Campaign mode (5 missions, escalating difficulty)
+- [x] Multiple terrain seeds / mission select (10 free-play + 5 campaign missions)
+- [x] Wind system (direction + strength shown on HUD)
+- [x] Multiple lander types (Eagle, Atlas, Sparrow — different thrust/weight/fuel)
+- [x] Ghost replay system (record inputs, play back best run)
+- [x] Persistent leaderboard per terrain seed (localStorage)
+- [x] Session telemetry log (altitude curve, speed over time at 4Hz)
+- [x] Touch/mobile input support
+- [x] Sound design (Web Audio API — synthesized thruster hum, crash, landing chime)
+- [x] Earth rise parallax layer
+- [x] Fuel leak random event
+- [x] Campaign mode (5 missions, escalating difficulty)
 
 **Exit question:** Do you come back to beat your own ghost? Is the campaign satisfying?
 
 ---
 
-### Phase 3 — AI and Learning Layer
+### Phase 3 — AI and Learning Layer ✅ COMPLETE
 **Theme:** The game teaches you how AI thinks.
-- [ ] Rule-based autopilot (toggle on/off mid-flight, watch it solve)
-- [ ] TensorFlow.js RL agent — trains in browser, visible reward curve
-- [ ] Training mode UI (episode count, reward graph, speed multiplier)
-- [ ] Agent replay viewer (watch best agent run at normal speed)
-- [ ] Claude API — dynamic mission briefings per terrain seed
-- [ ] Claude API — mission control commentary on landing quality
-- [ ] Difficulty adaptation based on player history
+- [x] Rule-based autopilot (toggle with P key, PID-style guidance across 4 altitude zones)
+- [x] TensorFlow.js RL agent — DQN with 8-D state, trains in browser
+- [x] Training mode UI (episode count, reward stats, speed multiplier)
+- [x] Agent replay viewer (watch best agent run at normal speed)
+- [x] Claude API — dynamic mission briefings per terrain seed (streaming, cached)
+- [x] Claude API — mission control commentary on landing quality
+- [x] Difficulty adaptation based on player history (Easy/Normal/Hard/Expert)
 
 **Exit question:** Can you watch the RL agent improve in real time and understand why?
 
 ---
 
-### Phase 4 — Polish and Shareability
+### Phase 4 — Polish and Shareability ⚠️ MOSTLY COMPLETE
 **Theme:** Send someone a link. They get it in 10 seconds.
-- [ ] URL-encoded terrain seeds (share exact map with friends)
-- [ ] Async ghost sharing (export/import ghost run as JSON)
-- [ ] Retro vector graphics skin (unlockable)
+- [x] URL-encoded terrain seeds (`?seed=1969` — share exact map with friends)
+- [x] Async ghost sharing (export/import ghost run as JSON)
+- [x] Retro vector graphics skin (unlockable, toggle with V key)
 - [ ] 3D mode exploration (Three.js spike — actual lunar surface)
-- [ ] PWA support (installable, offline play)
-- [ ] Embed mode (plays in an iframe for portfolio/blog)
+- [x] PWA support (installable, offline play via service worker)
+- [x] Embed mode (`?embed=1` — plays in an iframe for portfolio/blog)
 
 **Exit question:** Would a stranger share this with a friend?
 
 ---
 
+### Bonus Features (shipped beyond original roadmap)
+- [x] Alien/UFO hazard system — deterministic UFO orbits with fuel-siphon, controls-reversed, thrust-reduced, drag effects (~30% of missions)
+- [x] Gravity storms — periodic gravity anomalies with cosmetic terrain wobble (~20% of missions)
+- [x] Lunar archaeology — historical artifacts (flags, rover tracks, plaques) with LLM-powered Apollo facts (~40% of missions)
+- [x] Terrain editor — draw custom terrain with mouse/touch, base64 URL sharing, undo stack
+- [x] Multi-lander relay mode — land 3 landers sequentially, combined scoring
+- [x] Gravity sandbox — Moon/Mars/Earth/Jupiter/Zero-G presets
+- [x] Achievement system — 8 badges with localStorage persistence and toast notifications
+- [x] Flight report card — post-flight altitude curve, descent visualization, shareable canvas card
+- [x] Dynamic soundtrack — Web Audio synthesized 3-layer adaptive music (bass, melody, drums)
+- [x] Autopilot annotations — visual debug overlay with force vectors and decision labels (toggle with A key)
+- [x] Settings overlay — configure LLM API key, toggle features
+- [x] Terrain crevices — difficulty-scaling hazards
+
+---
+
 ## Graphics Roadmap
 
-### Graphics Phase 1 — Canvas 2D (ships with game Phase 1)
+### Graphics Phase 1 — Canvas 2D ✅ COMPLETE
 **Theme:** Looks intentional, not unfinished.
-- Vector lander shape with dynamic rotation
-- Filled terrain polygon with flat color + edge highlight
-- Radial gradient glow on thruster (Canvas compositing)
-- Particle system: exhaust plume, dust burst, explosion fragments
-- Parallax starfield (3 depth layers, different scroll speeds)
-- Earth rise on horizon (semi-circle, subtle glow)
-- Landing pad with blinking beacon lights
-- HUD in clean monospace font — altitude, v-speed, h-speed, fuel, angle
+- [x] Vector lander shape with dynamic rotation
+- [x] Filled terrain polygon with flat color + edge highlight
+- [x] Radial gradient glow on thruster (Canvas compositing)
+- [x] Particle system: exhaust plume, dust burst, explosion fragments
+- [x] Parallax starfield (3 depth layers, different scroll speeds)
+- [x] Earth rise on horizon (semi-circle, subtle glow)
+- [x] Landing pad with blinking beacon lights
+- [x] HUD in clean monospace font — altitude, v-speed, h-speed, fuel, angle
 
 **What you learn:** Canvas API, 2D transforms, compositing modes, particle systems
 
 ---
 
-### Graphics Phase 2 — WebGL via PixiJS (ships with game Phase 2)
+### Graphics Phase 2 — WebGL via PixiJS ❌ NOT STARTED
 **Theme:** It looks like a real game now.
-- Swap `CanvasRenderer.ts` for `WebGLRenderer.ts` — game logic untouched
-- Bloom/glow shader on thruster plume and landing pad lights (`bloom.glsl`)
-- Heat distortion shader behind engine bell (`heatwave.glsl`)
-- Normal mapping on terrain surface — flat polygon looks 3D (`normalmap.glsl`)
-- Dynamic sun lighting — angle changes per mission, casts lander shadow on ground
-- Lander spotlight — illuminates terrain directly below on final approach
-- Procedural rock detail on terrain surface (noise-driven micro-geometry)
-- Smoother particle rendering via PixiJS particle container (10x more particles)
-- Screen shake on crash (camera trauma system)
+- [ ] Swap `CanvasRenderer.ts` for `WebGLRenderer.ts` — game logic untouched
+- [ ] Bloom/glow shader on thruster plume and landing pad lights (`bloom.glsl`)
+- [ ] Heat distortion shader behind engine bell (`heatwave.glsl`)
+- [ ] Normal mapping on terrain surface — flat polygon looks 3D (`normalmap.glsl`)
+- [ ] Dynamic sun lighting — angle changes per mission, casts lander shadow on ground
+- [ ] Lander spotlight — illuminates terrain directly below on final approach
+- [ ] Procedural rock detail on terrain surface (noise-driven micro-geometry)
+- [ ] Smoother particle rendering via PixiJS particle container (10x more particles)
+- [ ] Screen shake on crash (camera trauma system)
 
 **What you learn:** WebGL pipeline, GLSL shader basics, PixiJS API, GPU compositing
 
 ---
 
-### Graphics Phase 3 — AI Visual Layer (ships with game Phase 3)
+### Graphics Phase 3 — AI Visual Layer ⚠️ PARTIAL
 **Theme:** The visuals are generative. Every run looks unique.
 
 **Neural Style Transfer Skins (TensorFlow.js, runs in browser)**
-- `StyleTransfer.ts` captures canvas frame, runs TF.js style model, outputs styled frame
-- Style images live in `public/assets/styles/` — one per skin
-- Skins available: Painterly (impressionist), Retro Vector (1979 arcade), Neon Future (synthwave)
-- Performance note: style transfer runs at ~10fps — used as a "replay mode" filter, not real-time
-- Unlocked by: completing campaign missions
+- [ ] `StyleTransfer.ts` captures canvas frame, runs TF.js style model, outputs styled frame
+- [ ] Style images live in `public/assets/styles/` — one per skin
+- [ ] Skins available: Painterly (impressionist), Neon Future (synthwave)
+- [ ] Performance note: style transfer runs at ~10fps — used as a "replay mode" filter, not real-time
+- [ ] Unlocked by: completing campaign missions
 
-**Retro Vector Skin (pure code, no ML)**
-- `RetroVector.ts` overrides all draw calls with green vector lines on black
-- Phosphor glow effect via Canvas shadow blur
-- Mimics original 1979 Atari vector display
-- Unlocked by: landing perfectly (zero horizontal speed, perfect angle)
+**Retro Vector Skin (pure code, no ML)** ✅ COMPLETE
+- [x] `RetroVector.ts` overrides all draw calls with green vector lines on black
+- [x] Phosphor glow effect via Canvas shadow blur
+- [x] Mimics original 1979 Atari vector display
+- [x] Toggle with V key
 
 **AI Terrain Textures (image generation API)**
-- `TextureGen.ts` builds a prompt from mission seed: terrain type, lighting, mineral content
-- Calls image generation API (e.g. fal.ai, Replicate, or similar)
-- Returns a tileable 512x512 texture applied to terrain polygon surface
-- Cached to localStorage by seed — only generates once per mission
-- Graceful fallback: flat color if API unavailable or offline
+- [ ] `TextureGen.ts` builds a prompt from mission seed: terrain type, lighting, mineral content
+- [ ] Calls image generation API (e.g. fal.ai, Replicate, or similar)
+- [ ] Returns a tileable 512x512 texture applied to terrain polygon surface
+- [ ] Cached to localStorage by seed — only generates once per mission
+- [ ] Graceful fallback: flat color if API unavailable or offline
 
 **What you learn:** TensorFlow.js model inference, image generation APIs, texture mapping, browser performance constraints
 
 ---
 
-### Graphics Phase 4 — 3D Mode (optional spike, game Phase 4)
+### Graphics Phase 4 — 3D Mode ❌ NOT STARTED
 **Theme:** Same physics, completely different dimension.
-- Three.js replaces PixiJS for this mode only — separate entry point
-- Actual lunar surface mesh generated from same terrain seed
-- Lander is a 3D model (low-poly NASA-inspired descent stage)
-- Earth visible in skybox, slowly rotating
-- Volumetric thruster plume via Three.js particle system
-- Camera follows lander with cinematic lag and tilt
-- Same physics engine underneath — only the renderer changes
+- [ ] Three.js replaces PixiJS for this mode only — separate entry point
+- [ ] Actual lunar surface mesh generated from same terrain seed
+- [ ] Lander is a 3D model (low-poly NASA-inspired descent stage)
+- [ ] Earth visible in skybox, slowly rotating
+- [ ] Volumetric thruster plume via Three.js particle system
+- [ ] Camera follows lander with cinematic lag and tilt
+- [ ] Same physics engine underneath — only the renderer changes
 
 **What you learn:** Three.js scene graph, 3D camera systems, mesh generation from 2D data, skyboxes
+
+---
+
+## Long-Term Roadmap
+
+### Phase 5 — Visual Upgrade (WebGL + Shaders)
+**Theme:** Same game, dramatically better looking.
+**Priority:** HIGH — unlocks all subsequent graphics work.
+
+- [ ] PixiJS v8 WebGLRenderer implementing existing IRenderer interface
+- [ ] Bloom/glow shader on thruster plume and landing pad beacons
+- [ ] Heat distortion shader behind engine bell
+- [ ] Normal mapping on terrain — flat polygon looks 3D
+- [ ] Dynamic sun lighting per mission — lander shadow on ground
+- [ ] Lander spotlight on final approach (illuminates terrain below)
+- [ ] Procedural rock detail on terrain (noise-driven micro-geometry)
+- [ ] GPU particle rendering via PixiJS particle container (10x particle budget)
+- [ ] Screen shake on crash (camera trauma system)
+- [ ] Seamless Canvas fallback when WebGL unavailable
+
+**Exit question:** Does the WebGL version make you go "whoa" compared to Canvas?
+
+---
+
+### Phase 6 — Multiplayer and Competition
+**Theme:** You're not alone up there.
+**Priority:** HIGH — biggest engagement multiplier.
+
+- [ ] Real-time ghost racing — race against another player's ghost in split-screen or overlay
+- [ ] WebSocket lobby — see other players' landers in real-time (spectate or co-land)
+- [ ] Daily challenge seed — one terrain per day, global leaderboard
+- [ ] Ranked seasons — ELO-style rating based on daily challenge placement
+- [ ] Async challenge mode — send a friend a URL, they try to beat your score on your terrain
+- [ ] Replay theater — watch top-ranked runs with commentary overlay
+- [ ] Clan/team support — aggregate scores for groups
+
+**Exit question:** Does competing against real humans change how the game feels?
+
+---
+
+### Phase 7 — Content Depth
+**Theme:** A universe of missions, not just a surface.
+**Priority:** MEDIUM — extends play longevity.
+
+- [ ] Procedural mission generator — infinite unique missions with narrative seeds
+- [ ] Multi-body missions — land on asteroids, Mars, Europa (different gravity, atmosphere, terrain style)
+- [ ] Orbital insertion phase — start from orbit, deorbit burn, then descent
+- [ ] Supply drop missions — deliver cargo to a specific pad with weight penalties
+- [ ] Rescue missions — hover near a stranded lander, match velocity, dock
+- [ ] Timed speed-run mode — fastest landing wins, fuel is infinite
+- [ ] Hardcore mode — no HUD, no telemetry, instruments only (altimeter beeps)
+- [ ] Story campaign — 20-mission narrative arc with LLM-generated mission briefings and branching outcomes
+- [ ] Community mission sharing — upload/download custom terrain + mission configs
+
+**Exit question:** Does the content variety keep you coming back after 50 hours?
+
+---
+
+### Phase 8 — AI Visual Layer
+**Theme:** Every run looks unique. The visuals are alive.
+**Priority:** MEDIUM — impressive tech showcase, depends on Phase 5 WebGL.
+
+- [ ] TF.js neural style transfer — Painterly and Neon Future skins as replay-mode filters
+- [ ] AI terrain textures — image gen API produces tileable textures per seed, cached locally
+- [ ] Generative skyboxes — AI-generated nebulae/starfields unique to each mission seed
+- [ ] Dynamic weather visuals — regolith dust clouds, solar flare lighting changes
+- [ ] Procedural lander skins — AI-generated hull textures unlocked by achievements
+
+**Exit question:** Do the AI visuals make you want to replay just to see what it generates?
+
+---
+
+### Phase 9 — 3D Mode
+**Theme:** Same physics, completely different dimension.
+**Priority:** LOW — high effort, high wow factor, depends on Phase 5.
+
+- [ ] Three.js renderer implementing IRenderer interface
+- [ ] Lunar surface mesh generated from terrain seed (heightmap → geometry)
+- [ ] Low-poly NASA-inspired lander 3D model
+- [ ] Earth in skybox, slowly rotating
+- [ ] Volumetric thruster plume via Three.js particle system
+- [ ] Cinematic camera with lag, tilt, and multiple viewpoints (cockpit, chase, free)
+- [ ] Terrain LOD — detail increases as lander descends
+- [ ] VR/WebXR mode — land on the moon in a headset
+
+**Exit question:** Does 3D mode feel like a different game or a gimmick?
+
+---
+
+### Phase 10 — Platform and Ecosystem
+**Theme:** MoonLander is a platform, not just a game.
+**Priority:** LOW — only after the game itself is polished.
+
+- [ ] Level editor 2.0 — full mission designer (terrain + objectives + events + narrative)
+- [ ] Mod API — expose game systems for community extensions
+- [ ] Twitch/YouTube integration — chat controls lander parameters live
+- [ ] Education mode — physics lesson overlay explaining forces in real-time
+- [ ] Speedrun.com integration — auto-submit verified runs
+- [ ] Mobile-native wrapper (Capacitor/Tauri) — App Store / Play Store distribution
+- [ ] Localization — i18n for mission text, HUD, menus
+- [ ] Analytics dashboard — aggregate play data, heatmaps of crash locations
+
+**Exit question:** Has this grown beyond a solo project? Is that good or bad?
 
 ---
 
