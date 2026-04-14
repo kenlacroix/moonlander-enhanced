@@ -160,6 +160,7 @@ export class RLAgent {
 			importGhost: false,
 			flightReport: false,
 			toggleRelay: false,
+			toggleAnnotations: false,
 		};
 	}
 

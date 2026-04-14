@@ -32,6 +32,7 @@ function unpackInput(frame: InputFrame): InputState {
 		importGhost: false,
 		flightReport: false,
 		toggleRelay: false,
+		toggleAnnotations: false,
 	};
 }
 
