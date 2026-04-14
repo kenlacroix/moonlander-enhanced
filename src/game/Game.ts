@@ -8,6 +8,11 @@ import { TrainingLoop } from "../ai/TrainingLoop";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { CanvasRenderer } from "../render/CanvasRenderer";
+import {
+	type Achievement,
+	checkLandingAchievements,
+	loadAchievements,
+} from "../systems/Achievements";
 import { Audio } from "../systems/Audio";
 import { generateFlightReport } from "../systems/FlightRecorder";
 import {
@@ -137,6 +142,10 @@ export class Game {
 	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
 	private editorState: EditorState | null = null;
+	private achievements = loadAchievements();
+	achievementToast: Achievement | null = null;
+	achievementToastTimer = 0;
+	private thrustHistory: boolean[] = []; // last N frames of thrust state
 	private embedMode: boolean;
 
 	// Accessors for GameRenderState interface compatibility
@@ -221,6 +230,7 @@ export class Game {
 		this.flightElapsed = 0;
 		this.fuelLeakActive = false;
 		this.fuelLeakTriggered = false;
+		this.thrustHistory = [];
 		const windStrength = diff?.windStrength ?? 0;
 		this.wind = windStrength > 0 ? createWind(this.seed_, windStrength) : null;
 		this.alien = shouldSpawnAlien(this.seed_, diff)
@@ -574,6 +584,14 @@ export class Game {
 			this.messageTimer += dt;
 		}
 
+		// Achievement toast countdown
+		if (this.achievementToastTimer > 0) {
+			this.achievementToastTimer -= dt;
+			if (this.achievementToastTimer <= 0) {
+				this.achievementToast = null;
+			}
+		}
+
 		this.gameRenderer.render(this);
 		requestAnimationFrame((t) => this.loop(t));
 	}
@@ -601,6 +619,10 @@ export class Game {
 
 		this.ghostRecorder.record(inputState);
 		updateLander(this.lander, resolvedInput, dt);
+
+		// Track thrust history for "no thrust" achievement (last 3 seconds = ~180 frames)
+		this.thrustHistory.push(this.lander.thrusting);
+		if (this.thrustHistory.length > 180) this.thrustHistory.shift();
 
 		if (this.wind) {
 			updateWind(this.wind, this.flightElapsed);
@@ -655,6 +677,24 @@ export class Game {
 				if (this.gameMode === "campaign" && this.activeMission) {
 					this.campaignCompleted.add(this.activeMission.id);
 					saveCampaignProgress(this.campaignCompleted);
+				}
+				// Check achievements
+				const thrustingLast3s = this.thrustHistory.some((t) => t);
+				const scannedCount = this.artifacts.filter((a) => a.scanned).length;
+				const newBadges = checkLandingAchievements(this.achievements, {
+					landed: true,
+					hSpeed: this.lander.vx,
+					angle: normAngle(this.lander.angle),
+					fuelPercent: (this.lander.fuel / STARTING_FUEL) * 100,
+					thrustingLast3Seconds: thrustingLast3s,
+					aliensActive: this.alien !== null,
+					campaignComplete: this.campaignCompleted.size >= CAMPAIGN.length,
+					artifactsScanned: scannedCount,
+					artifactsTotal: this.artifacts.length,
+				});
+				if (newBadges.length > 0) {
+					this.achievementToast = newBadges[0];
+					this.achievementToastTimer = 4;
 				}
 			} else {
 				this.lander.status = "crashed";
