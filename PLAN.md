@@ -97,7 +97,7 @@
 **Theme:** Polish the v1.0. Then bring real history into the game.
 
 ### Cherry-Picks (from CEO review)
-- [ ] Achievement badges (localStorage): 8 badges with unlock conditions. First Landing, Perfect Landing, No Thrust, Full Campaign, Beat the AI, Survive the Aliens, Fuel Miser, Archaeologist.
+- [x] Achievement badges (localStorage): 8 badges with unlock conditions. First Landing, Perfect Landing, No Thrust, Full Campaign, Beat the AI, Survive the Aliens, Fuel Miser, Archaeologist.
 - [ ] Physics sandbox: adjustable gravity selector on free-play mission select. Moon (1.62), Mars (3.72), Earth (9.81), Jupiter (24.79), Zero-G (0.0). Leaderboard keys include gravity preset.
 - [ ] Annotated autopilot: press A during autopilot flight to show force vectors, target pad indicator, decision labels (LATERAL CORRECTION, DESCENT, FINAL APPROACH, HOVER), PID error, altitude zone markers.
 
