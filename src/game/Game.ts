@@ -1,4 +1,5 @@
 import { type AlienState, applyAlienEffect, createAlien, getAlienEffectLabel, shouldSpawnAlien, updateAlien } from "./Alien";
+import { type Artifact, type ArtifactType, checkArtifactScan, getArtifactPrompt, placeArtifacts } from "./Artifacts";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { Autopilot } from "../ai/Autopilot";
 import { getAdaptiveModifiers, applyAdaptiveModifiers } from "../ai/DifficultyAdapter";
@@ -64,6 +65,7 @@ export class Game {
 	private llmConfig: LLMConfig | null = null;
 	private llmText = "";
 	private llmLoading = false;
+	private artifactText = "";
 	private settingsOverlay = new SettingsOverlay();
 	private lastTime = 0;
 	private accumulator = 0;
@@ -80,6 +82,7 @@ export class Game {
 	private fuelLeakActive = false;
 	private fuelLeakTriggered = false;
 	private alien: AlienState | null = null;
+	private artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
 
 	private embedMode: boolean;
@@ -140,6 +143,7 @@ export class Game {
 		const windStrength = diff?.windStrength ?? 0;
 		this.wind = windStrength > 0 ? createWind(this.seed, windStrength) : null;
 		this.alien = shouldSpawnAlien(this.seed, diff) ? createAlien(this.seed) : null;
+		this.artifacts = placeArtifacts(this.seed, this.terrain.points);
 		this.audio.soundtrack.start();
 		const ghostRun = loadGhostForSeed(this.seed);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
@@ -486,6 +490,7 @@ export class Game {
 				this.audio.soundtrack.onLanded();
 				this.ghostRecorder.save(this.score);
 				this.lastRank = addScore(this.seed, this.score);
+				this.scanNearbyArtifact();
 				this.fetchCommentary(true);
 				if (this.gameMode === "campaign" && this.activeMission) {
 					this.campaignCompleted.add(this.activeMission.id);
@@ -534,6 +539,9 @@ export class Game {
 		if (this.ghostPlayer?.isActive()) {
 			this.renderer.drawGhost(this.ghostPlayer.lander, offset);
 		}
+		if (this.artifacts.length > 0) {
+			this.renderer.drawArtifacts(this.artifacts, offset);
+		}
 		if (this.alien) {
 			this.renderer.drawAlien(this.alien, this.lander.x, this.lander.y, offset);
 		}
@@ -573,6 +581,11 @@ export class Game {
 		// LLM commentary (streams in word by word)
 		if (this.llmText && this.status !== "playing") {
 			this.renderer.drawCommentary(this.llmText);
+		}
+
+		// Artifact scan result (separate from commentary)
+		if (this.artifactText && this.status !== "playing") {
+			this.renderer.drawArtifactFact(this.artifactText);
 		}
 
 		// Mission briefing (shown during first seconds of flight)
@@ -696,6 +709,53 @@ export class Game {
 		}).finally(() => {
 			this.llmLoading = false;
 		});
+	}
+
+	private scanNearbyArtifact(): void {
+		const scanned = checkArtifactScan(this.artifacts, this.lander.x);
+		if (!scanned) return;
+
+		scanned.scanned = true;
+
+		if (this.llmConfig) {
+			// Fetch a historical fact via LLM (separate from commentary)
+			const prompt = getArtifactPrompt(scanned);
+			this.artifactText = "";
+			import("../api/LLMProvider").then(({ streamCompletion }) => {
+				streamCompletion(
+					this.llmConfig!,
+					[
+						{ role: "system", content: "You are a lunar historian. Give one fascinating, specific historical fact in 1-2 sentences. No markdown. Plain text only." },
+						{ role: "user", content: prompt },
+					],
+					(chunk) => { this.artifactText += chunk; },
+				).then((full) => {
+					scanned.fact = full;
+				}).catch(() => {
+					scanned.fact = this.getOfflineFact(scanned.type);
+					this.artifactText = scanned.fact;
+				});
+			}).catch(() => {
+				// Dynamic import failed (offline/chunk load error)
+				scanned.fact = this.getOfflineFact(scanned.type);
+				this.artifactText = scanned.fact;
+			});
+		} else {
+			// Offline fallback — hardcoded facts
+			scanned.fact = this.getOfflineFact(scanned.type);
+			this.artifactText = scanned.fact;
+		}
+	}
+
+	private getOfflineFact(type: ArtifactType): string {
+		switch (type) {
+			case "flag": return "Five of the six Apollo flags are likely still standing. Apollo 11's flag was knocked over by the ascent engine exhaust.";
+			case "rover-tracks": return "The Lunar Roving Vehicle had a top speed of 11.2 mph. It cost $38 million in 1971 and was left on the Moon after each mission.";
+			case "debris": return "Six Apollo descent stages sit on the Moon today. They served as launch pads for the ascent stage and were never designed to return.";
+			case "footprints": return "With no wind or water, the Apollo bootprints will remain undisturbed for millions of years, slowly eroded only by micrometeorites.";
+			case "plaque": return "A small aluminum figurine called 'Fallen Astronaut' was placed on the Moon by Apollo 15 in 1971, memorializing 14 astronauts and cosmonauts who died.";
+			default: return "The Apollo program left over 800 pounds of equipment on the lunar surface across six landing sites.";
+		}
 	}
 
 	private updateURL(seed: number | null): void {

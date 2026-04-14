@@ -82,7 +82,7 @@
 **Theme:** Things only this game can do. Make it unforgettable.
 
 - [x] Black Box Flight Recorder — canvas-rendered flight report card (altitude curve, speed at touchdown, fuel efficiency grade A-F, terrain silhouette with descent path). One-tap save to camera roll. Built for screenshots and social sharing.
-- [ ] Lunar Archaeology Mode — random artifacts scattered on terrain (Apollo flags, rover tracks, old lander debris). Land near one to scan it and get a real historical fact via the LLM provider. Exploration meets education.
+- [x] Lunar Archaeology Mode — random artifacts scattered on terrain (Apollo flags, rover tracks, old lander debris). Land near one to scan it and get a real historical fact via the LLM provider. Exploration meets education.
 - [ ] Gravity Storms — periodic gravity anomalies mid-flight. Gravity doubles, halves, then normalizes. Visible terrain distortion, HUD warning, soundtrack spike. Deterministic and seeded like wind.
 - [ ] Multi-Lander Relay — land 3 landers sequentially on the same terrain. Each starts from the last landing/crash site. Combined score. Ghost replay shows all 3 overlaid.
 - [ ] Terrain Editor — draw custom terrain with mouse/touch, place pads manually, name it, share as a compact base64 URL. Replace midpoint displacement with user-drawn control points.
@@ -141,6 +141,7 @@
 
 **Theme:** Land together or crash trying.
 
+- [ ] WebRTC peer-to-peer multiplayer (no server needed). Two browsers connect directly via DataChannel. Same seed = same terrain, so only input frames (~20 bytes/sec) need to sync. Opponent renders as translucent lander (reuses ghost replay pipeline). Signaling options: copy-paste offer/answer strings (zero infra), or lightweight relay via Cloudflare Worker / PeerJS free tier. Deterministic physics means brief disconnections can replay from last known inputs.
 - [ ] Split-screen local multiplayer (2 players, same terrain, side by side).
 - [ ] Async multiplayer via WebSocket: see other players' landers in real time as ghosts.
 - [ ] Race mode: same seed, first to land wins. Visible timer.
