@@ -45,6 +45,13 @@ import type { Artifact } from "./Artifacts";
 import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
+import {
+	type GravityStormState,
+	applyGravityStormEffect,
+	createGravityStorm,
+	shouldSpawnGravityStorm,
+	updateGravityStorm,
+} from "./GravityStorm";
 import { createLander, type LanderState, updateLander } from "./Lander";
 import { getLanderType } from "./LanderTypes";
 import { LLMIntegration } from "./LLMIntegration";
@@ -106,6 +113,7 @@ export class Game {
 	fuelLeakActive = false;
 	private fuelLeakTriggered = false;
 	alien: AlienState | null = null;
+	gravityStorm: GravityStormState | null = null;
 	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
 	private embedMode: boolean;
@@ -182,6 +190,9 @@ export class Game {
 		this.wind = windStrength > 0 ? createWind(this.seed_, windStrength) : null;
 		this.alien = shouldSpawnAlien(this.seed_, diff)
 			? createAlien(this.seed_)
+			: null;
+		this.gravityStorm = shouldSpawnGravityStorm(this.seed_, diff)
+			? createGravityStorm(this.seed_)
 			: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		this.audio.soundtrack.start();
@@ -520,6 +531,17 @@ export class Game {
 		if (this.wind) {
 			updateWind(this.wind, this.flightElapsed);
 			this.lander.vx += this.wind.speed * dt;
+		}
+
+		// Gravity storm
+		if (this.gravityStorm) {
+			updateGravityStorm(this.gravityStorm, dt, this.flightElapsed);
+			this.lander.vy = applyGravityStormEffect(
+				this.gravityStorm,
+				this.lander.vy,
+				dt,
+				this.lander.landerType.massMultiplier,
+			);
 		}
 
 		// Fuel leak random event

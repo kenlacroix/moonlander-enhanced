@@ -19,6 +19,7 @@ export class HUD {
 		autopilot = false,
 		adaptiveLabel: string | null = null,
 		alienEffect: string | null = null,
+		gravityStormLabel: string | null = null,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -101,6 +102,14 @@ export class HUD {
 			// Override color to alien green
 			ctx.fillStyle = "#88ffaa";
 			ctx.fillText(alienEffect, x + 60, y);
+		}
+
+		// Gravity storm warning
+		if (gravityStormLabel) {
+			y += lineHeight;
+			ctx.fillStyle = "#ff4444";
+			ctx.textAlign = "left";
+			ctx.fillText(gravityStormLabel, x, y);
 		}
 
 		// Score (top right)
