@@ -9,10 +9,12 @@ if (!canvas) {
 const params = new URLSearchParams(window.location.search);
 const urlSeed = params.get("seed");
 const embedMode = params.get("embed") === "1";
+const customTerrain = params.get("custom");
 
 const game = new Game(
 	canvas,
 	urlSeed ? Number.parseInt(urlSeed, 10) : undefined,
 	embedMode,
+	customTerrain ?? undefined,
 );
 game.start();
