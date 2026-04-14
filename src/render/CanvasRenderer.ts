@@ -973,6 +973,32 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw gravity preset selector on mission select menu */
+	drawGravitySelector(preset: {
+		name: string;
+		gravity: number;
+		color: string;
+	}): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.font = '14px "Courier New", monospace';
+		ctx.textAlign = "right";
+		ctx.fillStyle = preset.color;
+		ctx.fillText(
+			`GRAVITY: ${preset.name} (${preset.gravity} m/s\u00B2)`,
+			CANVAS_WIDTH - 20,
+			CANVAS_HEIGHT - 40,
+		);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+		ctx.font = '11px "Courier New", monospace';
+		ctx.fillText(
+			"[\u2190 \u2192] Change gravity",
+			CANVAS_WIDTH - 20,
+			CANVAS_HEIGHT - 56,
+		);
+		ctx.restore();
+	}
+
 	/** Draw achievement unlock toast */
 	drawAchievementToast(name: string, description: string, timer: number): void {
 		const ctx = this.ctx;
