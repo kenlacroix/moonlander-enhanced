@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.1.1] - 2026-04-13
+
+### Changed
+- Decompose Game.ts (920 lines) into 3 focused modules: GameRenderer.ts (rendering dispatch), LLMIntegration.ts (mission briefings, commentary, artifact scanning), and Game.ts (orchestrator). No gameplay changes.
+
 ## [0.4.1.0] - 2026-04-13
 
 ### Added

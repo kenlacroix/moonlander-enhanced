@@ -6,8 +6,6 @@ import {
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
-import { getMissionBriefing } from "../api/MissionBriefing";
-import { getMissionControlCommentary } from "../api/MissionControl";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { Audio } from "../systems/Audio";
@@ -20,7 +18,7 @@ import {
 	uploadGhost,
 } from "../systems/GhostReplay";
 import { Input, type InputState } from "../systems/Input";
-import { addScore, getBestScore } from "../systems/Leaderboard";
+import { addScore } from "../systems/Leaderboard";
 import { TelemetryRecorder } from "../systems/Telemetry";
 import { SettingsOverlay } from "../ui/SettingsOverlay";
 import {
@@ -40,20 +38,16 @@ import {
 	type AlienState,
 	applyAlienEffect,
 	createAlien,
-	getAlienEffectLabel,
 	shouldSpawnAlien,
 	updateAlien,
 } from "./Alien";
-import {
-	type Artifact,
-	type ArtifactType,
-	checkArtifactScan,
-	getArtifactPrompt,
-	placeArtifacts,
-} from "./Artifacts";
+import type { Artifact } from "./Artifacts";
+import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
+import { GameRenderer, type GameStatus } from "./GameRenderer";
 import { createLander, type LanderState, updateLander } from "./Lander";
 import { getLanderType } from "./LanderTypes";
+import { LLMIntegration } from "./LLMIntegration";
 import {
 	CAMPAIGN,
 	isMissionUnlocked,
@@ -66,43 +60,36 @@ import { ParticleSystem } from "./Particles";
 import { checkCollision, getTerrainHeightAt, normAngle } from "./Physics";
 import type { DifficultyConfig } from "./Terrain";
 import { generateTerrain, type TerrainData } from "./Terrain";
-import { createWind, getWindLabel, updateWind, type WindState } from "./Wind";
+import { createWind, updateWind, type WindState } from "./Wind";
 
-export type GameStatus =
-	| "title"
-	| "menu"
-	| "playing"
-	| "landed"
-	| "crashed"
-	| "training"
-	| "agent-replay"
-	| "settings";
-type GameMode = "freeplay" | "campaign";
+export type { GameStatus } from "./GameRenderer";
 
 export class Game {
-	private renderer: CanvasRenderer;
+	private canvasRenderer: CanvasRenderer;
+	private gameRenderer: GameRenderer;
+	private llm: LLMIntegration;
 	private audio: Audio;
-	private input: Input;
-	private camera: Camera;
-	private particles: ParticleSystem;
-	private lander!: LanderState;
-	private terrain!: TerrainData;
-	private status: GameStatus = "title";
-	private score = 0;
-	private seed: number;
-	private selectedMission = 0;
-	private lastRank: number | null = null;
-	private gameMode: GameMode = "freeplay";
-	private activeMission: Mission | null = null;
-	private campaignCompleted = loadCampaignProgress();
-	private titleSelection = 0; // 0 = free play, 1 = campaign, 2 = AI training
-	private trainingLoop: TrainingLoop | null = null;
-	private latestTrainingStats: TrainingStats | null = null;
-	private adaptiveLabel: string | null = null;
+	input: Input;
+	private camera_: Camera;
+	private particles_: ParticleSystem;
+	lander!: LanderState;
+	terrain!: TerrainData;
+	status: GameStatus = "title";
+	score = 0;
+	private seed_: number;
+	selectedMission = 0;
+	lastRank: number | null = null;
+	gameMode: "freeplay" | "campaign" = "freeplay";
+	activeMission: Mission | null = null;
+	campaignCompleted = loadCampaignProgress();
+	titleSelection = 0;
+	trainingLoop: TrainingLoop | null = null;
+	latestTrainingStats: TrainingStats | null = null;
+	adaptiveLabel: string | null = null;
 	private llmConfig: LLMConfig | null = null;
-	private llmText = "";
-	private llmLoading = false;
-	private artifactText = "";
+	llmText = "";
+	llmLoading = false;
+	artifactText = "";
 	private settingsOverlay = new SettingsOverlay();
 	private lastTime = 0;
 	private accumulator = 0;
@@ -111,32 +98,43 @@ export class Game {
 	private fuelWarningCooldown = 0;
 	private audioInitialized = false;
 	private ghostRecorder = new GhostRecorder();
-	private ghostPlayer: GhostPlayer | null = null;
-	private telemetry = new TelemetryRecorder();
-	private autopilot = new Autopilot();
-	private wind: WindState | null = null;
-	private flightElapsed = 0;
-	private fuelLeakActive = false;
+	ghostPlayer: GhostPlayer | null = null;
+	telemetry = new TelemetryRecorder();
+	autopilot = new Autopilot();
+	wind: WindState | null = null;
+	flightElapsed = 0;
+	fuelLeakActive = false;
 	private fuelLeakTriggered = false;
-	private alien: AlienState | null = null;
-	private artifacts: Artifact[] = [];
+	alien: AlienState | null = null;
+	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
-
 	private embedMode: boolean;
+
+	// Accessors for GameRenderState interface compatibility
+	get camera(): Camera {
+		return this.camera_;
+	}
+	get particles(): ParticleSystem {
+		return this.particles_;
+	}
+	get seed(): number {
+		return this.seed_;
+	}
 
 	constructor(canvas: HTMLCanvasElement, urlSeed?: number, embedMode = false) {
 		this.embedMode = embedMode;
-		this.renderer = new CanvasRenderer(canvas);
+		this.canvasRenderer = new CanvasRenderer(canvas);
+		this.gameRenderer = new GameRenderer(this.canvasRenderer);
+		this.llm = new LLMIntegration(() => this.llmConfig);
 		this.audio = new Audio();
 		this.input = new Input();
-		this.camera = new Camera();
-		this.particles = new ParticleSystem();
-		this.seed = urlSeed ?? MISSIONS[0].seed;
+		this.camera_ = new Camera();
+		this.particles_ = new ParticleSystem();
+		this.seed_ = urlSeed ?? MISSIONS[0].seed;
 		this.llmConfig = loadLLMConfig();
 		this.reset();
 
 		if (urlSeed && !Number.isNaN(urlSeed)) {
-			// URL seed provided — jump straight into the mission
 			this.gameMode = "freeplay";
 			this.activeMission = {
 				id: 0,
@@ -152,16 +150,14 @@ export class Game {
 
 	private reset(): void {
 		let diff = this.activeMission?.difficulty;
-		// Apply adaptive difficulty for free-play missions
 		if (this.gameMode === "freeplay" && !diff) {
-			const modifiers = getAdaptiveModifiers(this.seed);
+			const modifiers = getAdaptiveModifiers(this.seed_);
 			diff = applyAdaptiveModifiers(undefined, modifiers);
 			this.adaptiveLabel = modifiers.label;
 		} else {
 			this.adaptiveLabel = null;
 		}
-		this.terrain = generateTerrain(this.seed, diff);
-		// Spawn lander above center of the world
+		this.terrain = generateTerrain(this.seed_, diff);
 		const spawnX = WORLD_WIDTH / 2;
 		const spawnY = diff?.spawnY ?? 80;
 		const landerType = getLanderType(diff?.landerType);
@@ -171,25 +167,25 @@ export class Game {
 		}
 		this.status = "playing";
 		this.score = 0;
-		this.particles.clear();
-		this.camera = new Camera();
+		this.particles_.clear();
+		this.camera_ = new Camera();
 		this.firstFrame = true;
 		this.messageTimer = 0;
 		this.fuelWarningCooldown = 0;
-		this.ghostRecorder.start(this.seed);
+		this.ghostRecorder.start(this.seed_);
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.flightElapsed = 0;
 		this.fuelLeakActive = false;
 		this.fuelLeakTriggered = false;
 		const windStrength = diff?.windStrength ?? 0;
-		this.wind = windStrength > 0 ? createWind(this.seed, windStrength) : null;
-		this.alien = shouldSpawnAlien(this.seed, diff)
-			? createAlien(this.seed)
+		this.wind = windStrength > 0 ? createWind(this.seed_, windStrength) : null;
+		this.alien = shouldSpawnAlien(this.seed_, diff)
+			? createAlien(this.seed_)
 			: null;
-		this.artifacts = placeArtifacts(this.seed, this.terrain.points);
+		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		this.audio.soundtrack.start();
-		const ghostRun = loadGhostForSeed(this.seed);
+		const ghostRun = loadGhostForSeed(this.seed_);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
 	}
 
@@ -199,17 +195,13 @@ export class Game {
 	}
 
 	private loop(time: number): void {
-		// Delta time in seconds
 		let dt = (time - this.lastTime) / 1000;
 		this.lastTime = time;
 
-		// Skip first frame (large delta from engine warmup)
 		if (this.firstFrame) {
 			this.firstFrame = false;
 			dt = 0;
 		}
-
-		// Clamp to prevent physics explosion on tab refocus
 		dt = Math.min(dt, MAX_DELTA);
 
 		const inputState = this.input.getState();
@@ -227,7 +219,7 @@ export class Game {
 			this.audioInitialized = true;
 		}
 
-		// Title screen (Free Play vs Campaign vs AI Training)
+		// Title screen
 		if (this.status === "title") {
 			if (inputState.menuUp) {
 				this.titleSelection = (this.titleSelection - 1 + 3) % 3;
@@ -244,13 +236,12 @@ export class Game {
 					this.status = "menu";
 				}
 			}
-			// Open settings with S key
 			if (inputState.openSettings) {
 				this.settingsOverlay.show((config) => {
 					this.llmConfig = config;
 				});
 			}
-			this.renderTitle();
+			this.gameRenderer.renderTitle(this);
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
@@ -266,16 +257,15 @@ export class Game {
 				this.trainingLoop &&
 				this.trainingLoop.agent.episodeCount > 0
 			) {
-				// Launch agent replay
 				this.stopTraining();
 				this.startAgentReplay();
 			}
-			this.renderTraining();
+			this.gameRenderer.renderTraining(this);
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
 
-		// Agent replay mode — watch the trained agent play at normal speed
+		// Agent replay mode
 		if (this.status === "agent-replay") {
 			if (inputState.menuBack) {
 				this.status = "title";
@@ -287,7 +277,6 @@ export class Game {
 				requestAnimationFrame((t) => this.loop(t));
 				return;
 			}
-			// Run physics with agent's chosen action
 			this.accumulator += dt;
 			while (this.accumulator >= FIXED_TIMESTEP) {
 				if (this.lander.status === "flying" && this.trainingLoop) {
@@ -308,30 +297,30 @@ export class Game {
 							this.audio.playSuccess();
 						} else {
 							this.lander.status = "crashed";
-							this.particles.emitExplosion(this.lander.x, this.lander.y);
-							this.camera.shake(15);
+							this.particles_.emitExplosion(this.lander.x, this.lander.y);
+							this.camera_.shake(15);
 							this.audio.playCrash();
 						}
 					}
 				}
 				this.accumulator -= FIXED_TIMESTEP;
 			}
-			this.particles.update(dt);
+			this.particles_.update(dt);
 			if (this.lander.thrusting) {
 				const rad = (this.lander.angle + 90) * (Math.PI / 180);
-				this.particles.emitExhaust(
+				this.particles_.emitExhaust(
 					this.lander.x + Math.cos(rad) * 18,
 					this.lander.y + Math.sin(rad) * 18,
 					this.lander.angle,
 				);
 			}
-			this.camera.follow(this.lander.x, this.lander.y, dt);
-			this.renderAgentReplay();
+			this.camera_.follow(this.lander.x, this.lander.y, dt);
+			this.gameRenderer.renderAgentReplay(this);
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
 
-		// Mission select navigation
+		// Mission select
 		if (this.status === "menu") {
 			const missions = this.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
 			if (inputState.menuUp) {
@@ -343,17 +332,16 @@ export class Game {
 			}
 			if (inputState.menuSelect) {
 				const mission = missions[this.selectedMission];
-				// In campaign, check if mission is unlocked
 				if (
 					this.gameMode === "campaign" &&
 					!isMissionUnlocked(mission.id, this.campaignCompleted)
 				) {
-					// Can't select locked mission — do nothing
+					// Locked
 				} else {
 					this.activeMission = mission;
-					this.seed = mission.seed;
+					this.seed_ = mission.seed;
 					this.reset();
-					this.fetchBriefing(mission);
+					this.llm.fetchBriefing(this, mission);
 					this.updateURL(mission.seed);
 				}
 			}
@@ -369,17 +357,17 @@ export class Game {
 			if (inputState.menuBack) {
 				this.status = "title";
 			}
-			this.renderMenu();
+			this.gameRenderer.renderMenu(this);
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
 
-		// Ghost export (G key on post-flight screen)
+		// Ghost export
 		if (inputState.exportGhost && this.status === "landed") {
-			downloadGhost(this.seed);
+			downloadGhost(this.seed_);
 		}
 
-		// Flight report card (F key on post-flight screen)
+		// Flight report card
 		if (
 			inputState.flightReport &&
 			(this.status === "landed" || this.status === "crashed")
@@ -388,8 +376,8 @@ export class Game {
 				this.lander,
 				this.terrain,
 				this.telemetry.frames,
-				this.activeMission?.name ?? `SEED ${this.seed}`,
-				this.seed,
+				this.activeMission?.name ?? `SEED ${this.seed_}`,
+				this.seed_,
 				this.score,
 				this.status === "landed",
 			);
@@ -397,13 +385,11 @@ export class Game {
 
 		// Handle restart
 		if (inputState.restart && this.status !== "playing") {
-			// Embed mode: restart same seed, never show menu
 			if (this.embedMode) {
 				this.reset();
 				requestAnimationFrame((t) => this.loop(t));
 				return;
 			}
-			// In campaign, advance to next mission on success
 			if (
 				this.gameMode === "campaign" &&
 				this.status === "landed" &&
@@ -413,7 +399,7 @@ export class Game {
 				if (nextIdx < CAMPAIGN.length) {
 					this.selectedMission = nextIdx;
 					this.activeMission = CAMPAIGN[nextIdx];
-					this.seed = this.activeMission.seed;
+					this.seed_ = this.activeMission.seed;
 					this.reset();
 					requestAnimationFrame((t) => this.loop(t));
 					return;
@@ -441,22 +427,24 @@ export class Game {
 		// Retro skin toggle
 		if (inputState.toggleRetroSkin) {
 			this.retroSkin.toggle();
-			this.renderer.setRetroSkin(this.retroSkin.active ? this.retroSkin : null);
+			this.gameRenderer.setRetroSkin(
+				this.retroSkin.active ? this.retroSkin : null,
+			);
 		}
 
-		// If autopilot is active, use its computed input instead of player input
+		// Resolved input (autopilot or player)
 		const physicsInput = this.autopilot.enabled
 			? this.autopilot.computeInput(this.lander, this.terrain)
 			: inputState;
 
-		// Fixed timestep physics — pass the resolved input state
+		// Fixed timestep physics
 		this.accumulator += dt;
 		while (this.accumulator >= FIXED_TIMESTEP) {
 			this.fixedUpdate(FIXED_TIMESTEP, physicsInput);
 			this.accumulator -= FIXED_TIMESTEP;
 		}
 
-		// Record telemetry and update soundtrack tension
+		// Telemetry and soundtrack
 		if (this.status === "playing") {
 			const terrainY = getTerrainHeightAt(this.lander.x, this.terrain.points);
 			const altitude = terrainY - (this.lander.y + LANDER_HEIGHT / 2);
@@ -467,18 +455,14 @@ export class Game {
 				this.lander.vx,
 				this.lander.fuel,
 			);
-			// Soundtrack tension: 0 at spawn altitude, 1 at ground
 			const tension = Math.max(0, Math.min(1, 1 - altitude / 500));
 			this.audio.updateSoundtrack(tension);
 		}
 
-		// Update particles with real dt for smooth visuals
-		this.particles.update(dt);
-
-		// Audio: thruster hum follows thrust state
+		this.particles_.update(dt);
 		this.audio.setThruster(this.lander.thrusting && this.status === "playing");
 
-		// Audio: low fuel warning
+		// Low fuel warning
 		if (
 			this.lander.fuel > 0 &&
 			this.lander.fuel < STARTING_FUEL * 0.15 &&
@@ -491,34 +475,29 @@ export class Game {
 			}
 		}
 
-		// Emit exhaust particles while thrusting
+		// Exhaust particles
 		if (this.lander.thrusting && this.status === "playing") {
 			const rad = (this.lander.angle + 90) * (Math.PI / 180);
 			const exhaustX = this.lander.x + Math.cos(rad) * 18;
 			const exhaustY = this.lander.y + Math.sin(rad) * 18;
-			this.particles.emitExhaust(exhaustX, exhaustY, this.lander.angle);
+			this.particles_.emitExhaust(exhaustX, exhaustY, this.lander.angle);
 		}
 
-		// Camera follows lander
-		this.camera.follow(this.lander.x, this.lander.y, dt);
+		this.camera_.follow(this.lander.x, this.lander.y, dt);
 
-		// Track message display time
 		if (this.status !== "playing") {
 			this.messageTimer += dt;
 		}
 
-		this.render();
-
+		this.gameRenderer.render(this);
 		requestAnimationFrame((t) => this.loop(t));
 	}
 
 	private fixedUpdate(dt: number, inputState: InputState): void {
 		if (this.status !== "playing") return;
 
-		// Step ghost replay alongside player physics
 		this.ghostPlayer?.step();
 
-		// Apply alien effects to input before physics
 		this.flightElapsed += dt;
 		let resolvedInput = inputState;
 		if (this.alien) {
@@ -535,20 +514,18 @@ export class Game {
 			}
 		}
 
-		this.ghostRecorder.record(inputState); // record raw input, not alien-modified
+		this.ghostRecorder.record(inputState);
 		updateLander(this.lander, resolvedInput, dt);
 
-		// Apply wind
 		if (this.wind) {
 			updateWind(this.wind, this.flightElapsed);
 			this.lander.vx += this.wind.speed * dt;
 		}
 
-		// Fuel leak random event — 10% chance, triggers after a few seconds
+		// Fuel leak random event
 		if (!this.fuelLeakTriggered && this.flightElapsed > 5) {
 			this.fuelLeakTriggered = true;
-			// Deterministic "random" based on seed — no Math.random in physics
-			this.fuelLeakActive = this.seed % 10 === 7;
+			this.fuelLeakActive = this.seed_ % 10 === 7;
 		}
 		if (this.fuelLeakActive && this.lander.fuel > 0) {
 			this.lander.fuel = Math.max(
@@ -557,18 +534,17 @@ export class Game {
 			);
 		}
 
-		// Check collision
+		// Collision
 		const result = checkCollision(this.lander, this.terrain);
 		if (result.collided) {
 			if (result.safeLanding && result.onPad) {
-				// Successful landing
 				this.lander.status = "landed";
 				this.lander.vy = 0;
 				this.lander.vx = 0;
 				this.lander.y = result.onPad.y - LANDER_HEIGHT / 2;
 				this.status = "landed";
 				this.score = this.calculateScore(result.onPad);
-				this.particles.emitDust(
+				this.particles_.emitDust(
 					this.lander.x,
 					result.onPad.y,
 					result.onPad.width,
@@ -577,154 +553,36 @@ export class Game {
 				this.audio.playSuccess();
 				this.audio.soundtrack.onLanded();
 				this.ghostRecorder.save(this.score);
-				this.lastRank = addScore(this.seed, this.score);
-				this.scanNearbyArtifact();
-				this.fetchCommentary(true);
+				this.lastRank = addScore(this.seed_, this.score);
+				this.llm.scanNearbyArtifact(this, this.artifacts, this.lander.x);
+				this.llm.fetchCommentary(this, this.lander, this.score, true);
 				if (this.gameMode === "campaign" && this.activeMission) {
 					this.campaignCompleted.add(this.activeMission.id);
 					saveCampaignProgress(this.campaignCompleted);
 				}
 			} else {
-				// Crash
 				this.lander.status = "crashed";
 				this.status = "crashed";
-				this.particles.emitExplosion(this.lander.x, this.lander.y);
-				this.camera.shake(15);
+				this.particles_.emitExplosion(this.lander.x, this.lander.y);
+				this.camera_.shake(15);
 				this.audio.setThruster(false);
 				this.audio.playCrash();
 				this.audio.soundtrack.onCrashed();
-				this.fetchCommentary(false);
+				this.llm.fetchCommentary(this, this.lander, this.score, false);
 			}
 		}
 	}
 
 	private calculateScore(pad: { points: number }): number {
 		let score = 100 * pad.points;
-
-		// Fuel bonus
 		score += Math.floor(this.lander.fuel * SCORE_FUEL_MULTIPLIER);
-
-		// Gentle landing bonus
 		if (Math.abs(this.lander.vy) < MAX_LANDING_SPEED * 0.5) {
 			score += SCORE_SPEED_BONUS;
 		}
-
-		// Angle bonus
 		if (Math.abs(normAngle(this.lander.angle)) < MAX_LANDING_ANGLE * 0.5) {
 			score += SCORE_ANGLE_BONUS;
 		}
-
 		return score;
-	}
-
-	private render(): void {
-		const offset = this.camera.getOffset();
-
-		this.renderer.clear();
-		this.renderer.drawBackground(this.camera);
-		this.renderer.drawTerrain(this.terrain, offset);
-		this.renderer.drawParticles(this.particles.particles, offset);
-		if (this.ghostPlayer?.isActive()) {
-			this.renderer.drawGhost(this.ghostPlayer.lander, offset);
-		}
-		if (this.artifacts.length > 0) {
-			this.renderer.drawArtifacts(this.artifacts, offset);
-		}
-		if (this.alien) {
-			this.renderer.drawAlien(this.alien, this.lander.x, this.lander.y, offset);
-		}
-		this.renderer.drawLander(this.lander, offset);
-		const windLabel = this.wind ? getWindLabel(this.wind) : null;
-		const alienLabel = this.alien ? getAlienEffectLabel(this.alien) : null;
-		this.renderer.drawHUD(
-			this.lander,
-			this.score,
-			windLabel,
-			this.fuelLeakActive,
-			this.autopilot.enabled,
-			this.adaptiveLabel,
-			alienLabel,
-		);
-
-		// Touch controls overlay
-		if (this.input.isTouchDevice) {
-			this.renderer.drawTouchControls();
-		}
-
-		// Post-flight telemetry chart
-		if (this.status !== "playing" && this.telemetry.frames.length > 2) {
-			this.renderer.drawTelemetry(this.telemetry.frames);
-		}
-
-		// Status messages
-		if (this.status === "landed") {
-			const isTouch = this.input.isTouchDevice;
-			const isCampaignNext =
-				this.gameMode === "campaign" &&
-				this.selectedMission < CAMPAIGN.length - 1;
-			const nextHint = isCampaignNext ? "next mission" : "mission select";
-			const ghostHint = isTouch ? "" : "  |  G ghost  |  F report";
-			const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
-			const title =
-				this.gameMode === "campaign"
-					? "MISSION COMPLETE"
-					: "LANDING SUCCESSFUL";
-			const rankText =
-				this.lastRank === 1
-					? "  NEW BEST!"
-					: this.lastRank
-						? `  #${this.lastRank}`
-						: "";
-			this.renderer.drawMessage(
-				title,
-				`Score: ${this.score}${rankText}  |  ${hint}${ghostHint}`,
-			);
-		} else if (this.status === "crashed") {
-			const crashHint = this.input.isTouchDevice
-				? "Tap top to continue"
-				: "R mission select  |  F report";
-			this.renderer.drawMessage("CRASH", crashHint);
-		}
-
-		// LLM commentary (streams in word by word)
-		if (this.llmText && this.status !== "playing") {
-			this.renderer.drawCommentary(this.llmText);
-		}
-
-		// Artifact scan result (separate from commentary)
-		if (this.artifactText && this.status !== "playing") {
-			this.renderer.drawArtifactFact(this.artifactText);
-		}
-
-		// Mission briefing (shown during first seconds of flight)
-		if (this.llmText && this.status === "playing" && this.flightElapsed < 5) {
-			this.renderer.drawBriefing(this.llmText);
-		}
-	}
-
-	private renderTitle(): void {
-		this.renderer.clear();
-		this.renderer.drawTitle(
-			this.titleSelection,
-			this.campaignCompleted.size,
-			CAMPAIGN.length,
-		);
-	}
-
-	private renderMenu(): void {
-		const missions = this.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
-		const bestScores = new Map<number, number>();
-		for (const m of missions) {
-			const best = getBestScore(m.seed);
-			if (best !== undefined) bestScores.set(m.seed, best);
-		}
-		this.renderer.clear();
-		this.renderer.drawMissionSelect(
-			missions,
-			this.selectedMission,
-			bestScores,
-			this.gameMode === "campaign" ? this.campaignCompleted : undefined,
-		);
 	}
 
 	private async startTraining(): Promise<void> {
@@ -732,7 +590,6 @@ export class Game {
 		if (!this.trainingLoop) {
 			this.trainingLoop = new TrainingLoop();
 		}
-		// Save epsilon so we can resume
 		const savedEpsilon = this.trainingLoop.agent.epsilon;
 		if (!this.trainingLoop.agent.ready) {
 			await this.trainingLoop.init();
@@ -749,163 +606,17 @@ export class Game {
 
 	private startAgentReplay(): void {
 		if (!this.trainingLoop) return;
-		// Set up a game with training terrain
-		this.seed = 1969;
+		this.seed_ = 1969;
 		this.activeMission = null;
-		this.terrain = generateTerrain(this.seed);
+		this.terrain = generateTerrain(this.seed_);
 		const landerType = getLanderType();
 		this.lander = createLander(WORLD_WIDTH / 2, 80, landerType);
-		this.particles.clear();
-		this.camera = new Camera();
+		this.particles_.clear();
+		this.camera_ = new Camera();
 		this.accumulator = 0;
 		this.firstFrame = true;
-		// Force epsilon to 0 so agent uses learned policy, no exploration
 		this.trainingLoop.agent.epsilon = 0;
 		this.status = "agent-replay";
-	}
-
-	private renderTraining(): void {
-		this.renderer.clear();
-		const history = this.trainingLoop?.agent.getRewardHistory() ?? [];
-		const stats = this.latestTrainingStats;
-		this.renderer.drawTrainingUI(
-			stats?.episode ?? 0,
-			stats?.epsilon ?? 1,
-			stats?.landed ?? false,
-			stats?.totalReward ?? 0,
-			history,
-		);
-	}
-
-	private renderAgentReplay(): void {
-		const offset = this.camera.getOffset();
-		this.renderer.clear();
-		this.renderer.drawBackground(this.camera);
-		this.renderer.drawTerrain(this.terrain, offset);
-		this.renderer.drawParticles(this.particles.particles, offset);
-		this.renderer.drawLander(this.lander, offset);
-		this.renderer.drawHUD(this.lander, 0, null, false, false);
-
-		// Status overlay
-		if (this.lander.status === "landed") {
-			this.renderer.drawMessage(
-				"AGENT LANDED!",
-				"Press R to replay  |  ESC for menu",
-			);
-		} else if (this.lander.status === "crashed") {
-			this.renderer.drawMessage(
-				"AGENT CRASHED",
-				"Press R to replay  |  ESC for menu",
-			);
-		} else {
-			// Show "AI PLAYING" indicator
-			this.renderer.drawMessage("", "AI AGENT PLAYING  |  ESC for menu");
-		}
-	}
-
-	private fetchBriefing(mission: Mission): void {
-		if (!this.llmConfig) {
-			this.llmText = "";
-			return;
-		}
-		this.llmText = "";
-		this.llmLoading = true;
-		getMissionBriefing(this.llmConfig, mission, (chunk) => {
-			this.llmText += chunk;
-		})
-			.catch(() => {
-				// API error — silent, game is playable without it
-			})
-			.finally(() => {
-				this.llmLoading = false;
-			});
-	}
-
-	private fetchCommentary(landed: boolean): void {
-		if (!this.llmConfig) {
-			this.llmText = "";
-			return;
-		}
-		this.llmText = "";
-		this.llmLoading = true;
-		getMissionControlCommentary(
-			this.llmConfig,
-			this.lander,
-			this.score,
-			landed,
-			(chunk) => {
-				this.llmText += chunk;
-			},
-		)
-			.catch(() => {
-				// API error — silent
-			})
-			.finally(() => {
-				this.llmLoading = false;
-			});
-	}
-
-	private scanNearbyArtifact(): void {
-		const scanned = checkArtifactScan(this.artifacts, this.lander.x);
-		if (!scanned) return;
-
-		scanned.scanned = true;
-
-		if (this.llmConfig) {
-			// Fetch a historical fact via LLM (separate from commentary)
-			const prompt = getArtifactPrompt(scanned);
-			this.artifactText = "";
-			import("../api/LLMProvider")
-				.then(({ streamCompletion }) => {
-					streamCompletion(
-						this.llmConfig!,
-						[
-							{
-								role: "system",
-								content:
-									"You are a lunar historian. Give one fascinating, specific historical fact in 1-2 sentences. No markdown. Plain text only.",
-							},
-							{ role: "user", content: prompt },
-						],
-						(chunk) => {
-							this.artifactText += chunk;
-						},
-					)
-						.then((full) => {
-							scanned.fact = full;
-						})
-						.catch(() => {
-							scanned.fact = this.getOfflineFact(scanned.type);
-							this.artifactText = scanned.fact;
-						});
-				})
-				.catch(() => {
-					// Dynamic import failed (offline/chunk load error)
-					scanned.fact = this.getOfflineFact(scanned.type);
-					this.artifactText = scanned.fact;
-				});
-		} else {
-			// Offline fallback — hardcoded facts
-			scanned.fact = this.getOfflineFact(scanned.type);
-			this.artifactText = scanned.fact;
-		}
-	}
-
-	private getOfflineFact(type: ArtifactType): string {
-		switch (type) {
-			case "flag":
-				return "Five of the six Apollo flags are likely still standing. Apollo 11's flag was knocked over by the ascent engine exhaust.";
-			case "rover-tracks":
-				return "The Lunar Roving Vehicle had a top speed of 11.2 mph. It cost $38 million in 1971 and was left on the Moon after each mission.";
-			case "debris":
-				return "Six Apollo descent stages sit on the Moon today. They served as launch pads for the ascent stage and were never designed to return.";
-			case "footprints":
-				return "With no wind or water, the Apollo bootprints will remain undisturbed for millions of years, slowly eroded only by micrometeorites.";
-			case "plaque":
-				return "A small aluminum figurine called 'Fallen Astronaut' was placed on the Moon by Apollo 15 in 1971, memorializing 14 astronauts and cosmonauts who died.";
-			default:
-				return "The Apollo program left over 800 pounds of equipment on the lunar surface across six landing sites.";
-		}
 	}
 
 	private updateURL(seed: number | null): void {
