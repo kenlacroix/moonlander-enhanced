@@ -973,6 +973,111 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw autopilot decision annotations */
+	drawAutopilotAnnotations(
+		lander: LanderState,
+		decision: {
+			mode: string;
+			targetPadX: number;
+			targetPadY: number;
+			targetPadWidth: number;
+			desiredAngle: number;
+			thrusting: boolean;
+			altitude: number;
+		},
+		offset: { x: number; y: number },
+	): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.translate(offset.x, offset.y);
+
+		const lx = lander.x;
+		const ly = lander.y;
+
+		// Target pad indicator (dotted circle + line)
+		const padCx = decision.targetPadX + decision.targetPadWidth / 2;
+		const padY = decision.targetPadY;
+		ctx.setLineDash([4, 4]);
+		ctx.strokeStyle = "rgba(255, 170, 0, 0.6)";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.arc(padCx, padY - 10, decision.targetPadWidth / 2 + 10, 0, Math.PI * 2);
+		ctx.stroke();
+		// Line from lander to pad
+		ctx.beginPath();
+		ctx.moveTo(lx, ly);
+		ctx.lineTo(padCx, padY - 10);
+		ctx.stroke();
+		ctx.setLineDash([]);
+
+		// Thrust vector (green arrow from lander in thrust direction)
+		if (decision.thrusting) {
+			const rad = ((lander.angle - 90) * Math.PI) / 180;
+			const vecLen = 40;
+			ctx.strokeStyle = "#00ff88";
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(lx, ly);
+			ctx.lineTo(lx + Math.cos(rad) * vecLen, ly + Math.sin(rad) * vecLen);
+			ctx.stroke();
+			// Arrow head
+			const headLen = 8;
+			const headAngle = 0.4;
+			ctx.beginPath();
+			ctx.moveTo(lx + Math.cos(rad) * vecLen, ly + Math.sin(rad) * vecLen);
+			ctx.lineTo(
+				lx + Math.cos(rad - headAngle) * (vecLen - headLen),
+				ly + Math.sin(rad - headAngle) * (vecLen - headLen),
+			);
+			ctx.moveTo(lx + Math.cos(rad) * vecLen, ly + Math.sin(rad) * vecLen);
+			ctx.lineTo(
+				lx + Math.cos(rad + headAngle) * (vecLen - headLen),
+				ly + Math.sin(rad + headAngle) * (vecLen - headLen),
+			);
+			ctx.stroke();
+		}
+
+		// Gravity vector (red arrow downward)
+		ctx.strokeStyle = "#ff4444";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.moveTo(lx + 15, ly);
+		ctx.lineTo(lx + 15, ly + 30);
+		ctx.lineTo(lx + 12, ly + 25);
+		ctx.moveTo(lx + 15, ly + 30);
+		ctx.lineTo(lx + 18, ly + 25);
+		ctx.stroke();
+
+		// Mode label above lander
+		ctx.fillStyle = "#ffaa00";
+		ctx.font = 'bold 11px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText(decision.mode, lx, ly - 25);
+
+		// Altitude readout
+		ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+		ctx.font = '10px "Courier New", monospace';
+		ctx.fillText(`ALT: ${Math.round(decision.altitude)}`, lx, ly - 38);
+
+		// Altitude zone markers (horizontal lines)
+		ctx.strokeStyle = "rgba(255, 170, 0, 0.15)";
+		ctx.lineWidth = 1;
+		ctx.setLineDash([8, 8]);
+		const zones = [20, 100, 300];
+		for (const z of zones) {
+			const zoneY = padY - z;
+			if (zoneY > 0) {
+				ctx.beginPath();
+				ctx.moveTo(padCx - 100, zoneY);
+				ctx.lineTo(padCx + 100, zoneY);
+				ctx.stroke();
+			}
+		}
+		ctx.setLineDash([]);
+
+		ctx.restore();
+	}
+
 	/** Draw gravity preset selector on mission select menu */
 	drawGravitySelector(preset: {
 		name: string;

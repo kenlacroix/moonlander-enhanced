@@ -107,6 +107,20 @@ export class GameRenderer {
 			);
 		}
 		this.renderer.drawLander(state.lander, offset);
+
+		// Autopilot annotations (force vectors, target, decision labels)
+		if (
+			state.autopilot.annotationsVisible &&
+			state.autopilot.decision &&
+			state.status === "playing"
+		) {
+			this.renderer.drawAutopilotAnnotations(
+				state.lander,
+				state.autopilot.decision,
+				offset,
+			);
+		}
+
 		const windLabel = state.wind ? getWindLabel(state.wind) : null;
 		const alienLabel = state.alien ? getAlienEffectLabel(state.alien) : null;
 		const stormLabel = state.gravityStorm

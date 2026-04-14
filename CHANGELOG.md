@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.7.0] - 2026-04-13
+
+### Added
+- Annotated autopilot: press A during autopilot flight to visualize AI decision-making. Shows thrust vector (green arrow), gravity vector (red arrow), target pad indicator (dotted circle + line), current mode label (NAVIGATING, MID DESCENT, CLOSE APPROACH, FINAL APPROACH), altitude readout, and altitude zone markers.
+
 ## [0.4.6.0] - 2026-04-13
 
 ### Added

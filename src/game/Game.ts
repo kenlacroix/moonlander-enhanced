@@ -535,6 +535,11 @@ export class Game {
 			this.autopilot.toggle();
 		}
 
+		// Annotations toggle (A key, only when autopilot active)
+		if (inputState.toggleAnnotations && this.status === "playing") {
+			this.autopilot.toggleAnnotations();
+		}
+
 		// Retro skin toggle
 		if (inputState.toggleRetroSkin) {
 			this.retroSkin.toggle();

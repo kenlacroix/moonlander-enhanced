@@ -36,13 +36,44 @@ const NULL_INPUT: InputState = {
 	importGhost: false,
 	flightReport: false,
 	toggleRelay: false,
+	toggleAnnotations: false,
 };
+
+export type AutopilotMode =
+	| "FINAL APPROACH"
+	| "CLOSE APPROACH"
+	| "MID DESCENT"
+	| "HIGH ALTITUDE"
+	| "NAVIGATING";
+
+export interface AutopilotDecision {
+	mode: AutopilotMode;
+	targetPadX: number;
+	targetPadY: number;
+	targetPadWidth: number;
+	desiredAngle: number;
+	angleError: number;
+	thrusting: boolean;
+	altitude: number;
+}
 
 export class Autopilot {
 	enabled = false;
+	annotationsVisible = false;
+	decision: AutopilotDecision | null = null;
 
 	toggle(): void {
 		this.enabled = !this.enabled;
+		if (!this.enabled) {
+			this.annotationsVisible = false;
+			this.decision = null;
+		}
+	}
+
+	toggleAnnotations(): void {
+		if (this.enabled) {
+			this.annotationsVisible = !this.annotationsVisible;
+		}
 	}
 
 	/** Compute autopilot input for the current state */
@@ -51,7 +82,10 @@ export class Autopilot {
 		terrain: TerrainData,
 		gravityOverride?: number,
 	): InputState {
-		if (!this.enabled) return NULL_INPUT;
+		if (!this.enabled) {
+			this.decision = null;
+			return NULL_INPUT;
+		}
 
 		const pad = this.findTargetPad(lander, terrain);
 		if (!pad) return NULL_INPUT;
@@ -101,18 +135,23 @@ export class Autopilot {
 		const effectiveThrust = THRUST_FORCE * lt.thrustMultiplier;
 
 		let shouldThrust = false;
+		let mode: AutopilotMode =
+			distToPad > pad.width * 0.3 ? "NAVIGATING" : "HIGH ALTITUDE";
 
 		if (altitude < 20) {
 			// Final approach: thrust if descending at all
 			shouldThrust = lander.vy > maxSafeSpeed * 0.3;
+			mode = "FINAL APPROACH";
 		} else if (altitude < 100) {
 			// Close approach: maintain slow descent
 			const targetVy = maxSafeSpeed * 0.6;
 			shouldThrust = lander.vy > targetVy;
+			mode = "CLOSE APPROACH";
 		} else if (altitude < 300) {
 			// Mid approach: allow moderate descent
 			const targetVy = maxSafeSpeed * 1.5;
 			shouldThrust = lander.vy > targetVy;
+			mode = "MID DESCENT";
 		} else {
 			// High altitude: save fuel, only thrust if falling too fast
 			// Calculate stopping distance: v²/(2a) where a = thrust - gravity
@@ -137,6 +176,18 @@ export class Autopilot {
 			shouldThrust = shouldThrust && lander.vy > maxSafeSpeed * 2;
 		}
 
+		// Store decision for annotation rendering
+		this.decision = {
+			mode,
+			targetPadX: pad.x,
+			targetPadY: pad.y,
+			targetPadWidth: pad.width,
+			desiredAngle,
+			angleError,
+			thrusting: shouldThrust,
+			altitude,
+		};
+
 		return {
 			thrustUp: shouldThrust,
 			rotateLeft,
@@ -153,6 +204,7 @@ export class Autopilot {
 			importGhost: false,
 			flightReport: false,
 			toggleRelay: false,
+			toggleAnnotations: false,
 		};
 	}
 
