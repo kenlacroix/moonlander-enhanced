@@ -12,15 +12,18 @@ import type { Input } from "../systems/Input";
 import { getBestScore } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
-import {
-	type GravityStormState,
-	getGravityStormLabel,
-} from "./GravityStorm";
 import type { Artifact } from "./Artifacts";
 import type { Camera } from "./Camera";
+import { type GravityStormState, getGravityStormLabel } from "./GravityStorm";
 import type { LanderState } from "./Lander";
 import { CAMPAIGN, MISSIONS, type Mission } from "./Missions";
 import type { ParticleSystem } from "./Particles";
+import {
+	getRelayLabel,
+	getRelaySummary,
+	isRelayComplete,
+	type RelayState,
+} from "./RelayMode";
 import type { TerrainData } from "./Terrain";
 import { getWindLabel, type WindState } from "./Wind";
 
@@ -44,6 +47,7 @@ export interface GameRenderState {
 	readonly artifacts: Artifact[];
 	readonly alien: AlienState | null;
 	readonly gravityStorm: GravityStormState | null;
+	readonly relay: RelayState | null;
 	readonly ghostPlayer: GhostPlayer | null;
 	readonly telemetry: TelemetryRecorder;
 	readonly autopilot: Autopilot;
@@ -125,34 +129,54 @@ export class GameRenderer {
 			this.renderer.drawTelemetry(state.telemetry.frames);
 		}
 
+		// Relay HUD label
+		if (state.relay && state.status === "playing") {
+			this.renderer.drawMessage("", getRelayLabel(state.relay));
+		}
+
 		// Status messages
-		if (state.status === "landed") {
-			const isTouch = state.input.isTouchDevice;
-			const isCampaignNext =
-				state.gameMode === "campaign" &&
-				state.selectedMission < CAMPAIGN.length - 1;
-			const nextHint = isCampaignNext ? "next mission" : "mission select";
-			const ghostHint = isTouch ? "" : "  |  G ghost  |  F report";
-			const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
-			const title =
-				state.gameMode === "campaign"
-					? "MISSION COMPLETE"
-					: "LANDING SUCCESSFUL";
-			const rankText =
-				state.lastRank === 1
-					? "  NEW BEST!"
-					: state.lastRank
-						? `  #${state.lastRank}`
-						: "";
-			this.renderer.drawMessage(
-				title,
-				`Score: ${state.score}${rankText}  |  ${hint}${ghostHint}`,
-			);
-		} else if (state.status === "crashed") {
-			const crashHint = state.input.isTouchDevice
-				? "Tap top to continue"
-				: "R mission select  |  F report";
-			this.renderer.drawMessage("CRASH", crashHint);
+		if (state.status === "landed" || state.status === "crashed") {
+			if (state.relay && !isRelayComplete(state.relay)) {
+				// Relay mid-run: show brief status, next lander spawns automatically
+				const msg = state.status === "landed" ? "LANDED!" : "CRASHED!";
+				this.renderer.drawMessage(
+					`${getRelayLabel(state.relay)} — ${msg}`,
+					"Next lander incoming...",
+				);
+			} else if (state.relay && isRelayComplete(state.relay)) {
+				// Relay complete: show combined results
+				this.renderer.drawMessage(
+					"RELAY COMPLETE",
+					getRelaySummary(state.relay),
+				);
+			} else if (state.status === "landed") {
+				const isTouch = state.input.isTouchDevice;
+				const isCampaignNext =
+					state.gameMode === "campaign" &&
+					state.selectedMission < CAMPAIGN.length - 1;
+				const nextHint = isCampaignNext ? "next mission" : "mission select";
+				const ghostHint = isTouch ? "" : "  |  G ghost  |  F report";
+				const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
+				const title =
+					state.gameMode === "campaign"
+						? "MISSION COMPLETE"
+						: "LANDING SUCCESSFUL";
+				const rankText =
+					state.lastRank === 1
+						? "  NEW BEST!"
+						: state.lastRank
+							? `  #${state.lastRank}`
+							: "";
+				this.renderer.drawMessage(
+					title,
+					`Score: ${state.score}${rankText}  |  ${hint}${ghostHint}`,
+				);
+			} else {
+				const crashHint = state.input.isTouchDevice
+					? "Tap top to continue"
+					: "R mission select  |  F report";
+				this.renderer.drawMessage("CRASH", crashHint);
+			}
 		}
 
 		// LLM commentary (streams in word by word)
@@ -198,6 +222,10 @@ export class GameRenderer {
 			bestScores,
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
 		);
+		// Show relay mode indicator on free-play menu
+		if (state.gameMode === "freeplay") {
+			this.renderer.drawRelayIndicator(state.relay !== null);
+		}
 	}
 
 	renderTraining(state: GameRenderState): void {
