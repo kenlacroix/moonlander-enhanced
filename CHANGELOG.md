@@ -2,6 +2,12 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.4.0] - 2026-04-13
+
+### Added
+- Terrain Editor: draw custom terrain from the title screen. Click to add control points, drag to move them, right-click to delete. Catmull-Rom spline interpolation for smooth curves. Place 1-2 landing pads with P key. Share custom terrain via URL with S key (`?custom=<base64>`). Ctrl+Z to undo.
+- Terrain Crevices: sharp V-shaped dips carved into procedural terrain on harder missions. Campaign mission 4 has 2 crevices, mission 5 has 3. Configurable via `crevices` in DifficultyConfig.
+
 ## [0.4.3.0] - 2026-04-13
 
 ### Added

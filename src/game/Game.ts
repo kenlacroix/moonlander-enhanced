@@ -22,6 +22,18 @@ import { addScore } from "../systems/Leaderboard";
 import { TelemetryRecorder } from "../systems/Telemetry";
 import { SettingsOverlay } from "../ui/SettingsOverlay";
 import {
+	buildTerrainFromEditor,
+	createEditorState,
+	deserializeEditor,
+	type EditorState,
+	editorClick,
+	editorDrag,
+	editorRelease,
+	editorUndo,
+	renderEditor,
+	serializeEditor,
+} from "../ui/TerrainEditor";
+import {
 	FIXED_TIMESTEP,
 	FUEL_BURN_RATE,
 	LANDER_HEIGHT,
@@ -124,6 +136,7 @@ export class Game {
 	relay: RelayState | null = null;
 	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
+	private editorState: EditorState | null = null;
 	private embedMode: boolean;
 
 	// Accessors for GameRenderState interface compatibility
@@ -137,7 +150,12 @@ export class Game {
 		return this.seed_;
 	}
 
-	constructor(canvas: HTMLCanvasElement, urlSeed?: number, embedMode = false) {
+	constructor(
+		canvas: HTMLCanvasElement,
+		urlSeed?: number,
+		embedMode = false,
+		customTerrain?: string,
+	) {
 		this.embedMode = embedMode;
 		this.canvasRenderer = new CanvasRenderer(canvas);
 		this.gameRenderer = new GameRenderer(this.canvasRenderer);
@@ -150,7 +168,16 @@ export class Game {
 		this.llmConfig = loadLLMConfig();
 		this.reset();
 
-		if (urlSeed && !Number.isNaN(urlSeed)) {
+		if (customTerrain) {
+			// Load custom terrain from URL parameter
+			const editor = deserializeEditor(customTerrain);
+			if (editor) {
+				this.editorState = editor;
+				this.playCustomTerrain();
+			} else {
+				this.status = "title";
+			}
+		} else if (urlSeed && !Number.isNaN(urlSeed)) {
 			this.gameMode = "freeplay";
 			this.activeMission = {
 				id: 0,
@@ -238,17 +265,19 @@ export class Game {
 			this.audioInitialized = true;
 		}
 
-		// Title screen
+		// Title screen (4 options: Free Play, Campaign, AI Training, Editor)
 		if (this.status === "title") {
 			if (inputState.menuUp) {
-				this.titleSelection = (this.titleSelection - 1 + 3) % 3;
+				this.titleSelection = (this.titleSelection - 1 + 4) % 4;
 			}
 			if (inputState.menuDown) {
-				this.titleSelection = (this.titleSelection + 1) % 3;
+				this.titleSelection = (this.titleSelection + 1) % 4;
 			}
 			if (inputState.menuSelect) {
 				if (this.titleSelection === 2) {
 					this.startTraining();
+				} else if (this.titleSelection === 3) {
+					this.startEditor();
 				} else {
 					this.gameMode = this.titleSelection === 0 ? "freeplay" : "campaign";
 					this.selectedMission = 0;
@@ -280,6 +309,39 @@ export class Game {
 				this.startAgentReplay();
 			}
 			this.gameRenderer.renderTraining(this);
+			requestAnimationFrame((t) => this.loop(t));
+			return;
+		}
+
+		// Editor mode
+		if (this.status === "editor" && this.editorState) {
+			if (inputState.menuBack) {
+				this.editorState = null;
+				this.status = "title";
+				requestAnimationFrame((t) => this.loop(t));
+				return;
+			}
+			if (inputState.menuSelect) {
+				// Play the custom terrain
+				this.playCustomTerrain();
+				requestAnimationFrame((t) => this.loop(t));
+				return;
+			}
+			if (inputState.toggleAutopilot) {
+				// P key: toggle pad placement mode
+				this.editorState.placingPad = !this.editorState.placingPad;
+			}
+			if (inputState.openSettings) {
+				// S key: share URL
+				const encoded = serializeEditor(this.editorState);
+				const url = new URL(window.location.href);
+				url.searchParams.set("custom", encoded);
+				url.searchParams.delete("seed");
+				navigator.clipboard?.writeText(url.toString());
+				window.history.replaceState(null, "", url.toString());
+			}
+			// Ctrl+Z undo handled via keydown listener below
+			this.renderEditorFrame();
 			requestAnimationFrame((t) => this.loop(t));
 			return;
 		}
@@ -678,6 +740,94 @@ export class Game {
 
 	private stopTraining(): void {
 		this.trainingLoop?.pause();
+	}
+
+	private startEditor(): void {
+		this.editorState = createEditorState();
+		this.status = "editor";
+		// Set up mouse/touch handlers for the editor
+		const canvas = this.canvasRenderer.canvas;
+		const onDown = (e: MouseEvent) => {
+			if (this.status !== "editor" || !this.editorState) return;
+			const rect = canvas.getBoundingClientRect();
+			editorClick(
+				this.editorState,
+				e.clientX - rect.left,
+				e.clientY - rect.top,
+				e.button === 2,
+			);
+		};
+		const onMove = (e: MouseEvent) => {
+			if (this.status !== "editor" || !this.editorState) return;
+			if (e.buttons === 1) {
+				const rect = canvas.getBoundingClientRect();
+				editorDrag(
+					this.editorState,
+					e.clientX - rect.left,
+					e.clientY - rect.top,
+				);
+			}
+		};
+		const onUp = () => {
+			if (this.editorState) editorRelease(this.editorState);
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (this.status !== "editor" || !this.editorState) return;
+			if (e.ctrlKey && e.code === "KeyZ") {
+				e.preventDefault();
+				editorUndo(this.editorState);
+			}
+		};
+		const onContext = (e: MouseEvent) => {
+			if (this.status === "editor") e.preventDefault();
+		};
+		canvas.addEventListener("mousedown", onDown);
+		canvas.addEventListener("mousemove", onMove);
+		canvas.addEventListener("mouseup", onUp);
+		canvas.addEventListener("contextmenu", onContext);
+		document.addEventListener("keydown", onKey);
+	}
+
+	private playCustomTerrain(): void {
+		if (!this.editorState) return;
+		this.terrain = buildTerrainFromEditor(this.editorState);
+		this.seed_ = 0;
+		this.gameMode = "freeplay";
+		this.activeMission = {
+			id: 0,
+			name: "CUSTOM TERRAIN",
+			seed: 0,
+			description: "Player-designed terrain",
+		};
+		const landerType = getLanderType();
+		this.lander = createLander(WORLD_WIDTH / 2, 80, landerType);
+		this.status = "playing";
+		this.score = 0;
+		this.particles_.clear();
+		this.camera_ = new Camera();
+		this.firstFrame = true;
+		this.messageTimer = 0;
+		this.fuelWarningCooldown = 0;
+		this.ghostRecorder.start(0);
+		this.telemetry.reset();
+		this.autopilot.enabled = false;
+		this.flightElapsed = 0;
+		this.fuelLeakActive = false;
+		this.fuelLeakTriggered = false;
+		this.wind = null;
+		this.alien = null;
+		this.gravityStorm = null;
+		this.artifacts = [];
+		this.relay = null;
+		this.audio.soundtrack.start();
+		this.ghostPlayer = null;
+	}
+
+	private renderEditorFrame(): void {
+		const ctx = this.canvasRenderer.ctx;
+		if (this.editorState) {
+			renderEditor(ctx, this.editorState);
+		}
 	}
 
 	private startAgentReplay(): void {

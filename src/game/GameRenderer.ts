@@ -35,7 +35,8 @@ export type GameStatus =
 	| "crashed"
 	| "training"
 	| "agent-replay"
-	| "settings";
+	| "settings"
+	| "editor";
 
 /** Read-only view of Game state needed by the renderer. */
 export interface GameRenderState {

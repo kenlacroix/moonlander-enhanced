@@ -121,7 +121,7 @@ export const CAMPAIGN: Mission[] = [
 		id: 4,
 		name: "NEEDLE THREADING",
 		seed: 4004,
-		description: "Jagged terrain, tiny pads. Precision landing.",
+		description: "Jagged terrain with crevices, tiny pads. Precision landing.",
 		difficulty: {
 			roughness: 0.8,
 			padMinWidth: 40,
@@ -131,13 +131,15 @@ export const CAMPAIGN: Mission[] = [
 			windStrength: 30,
 			aliensEnabled: true,
 			gravityStormsEnabled: true,
+			crevices: 2,
 		},
 	},
 	{
 		id: 5,
 		name: "THE IMPOSSIBLE",
 		seed: 5005,
-		description: "Extreme terrain, one small pad, minimal fuel. Good luck.",
+		description:
+			"Extreme terrain with deep crevices, one small pad. Good luck.",
 		difficulty: {
 			roughness: 0.9,
 			padMinWidth: 35,
@@ -147,6 +149,7 @@ export const CAMPAIGN: Mission[] = [
 			windStrength: 40,
 			aliensEnabled: true,
 			gravityStormsEnabled: true,
+			crevices: 3,
 		},
 	},
 ];

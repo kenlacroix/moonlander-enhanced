@@ -35,6 +35,7 @@ export interface DifficultyConfig {
 	landerType?: string; // lander variant name
 	aliensEnabled?: boolean; // force alien spawn (campaign)
 	gravityStormsEnabled?: boolean; // force gravity storms (campaign)
+	crevices?: number; // number of sharp crevices to carve (0 = none)
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */
@@ -63,6 +64,25 @@ export function generateTerrain(
 		}
 		newHeights.push(heights[heights.length - 1]);
 		heights = newHeights;
+	}
+
+	// Carve crevices — sharp V-shaped dips for harder missions
+	const creviceCount = difficulty?.crevices ?? 0;
+	if (creviceCount > 0) {
+		const segmentLen = Math.floor(heights.length / (creviceCount + 1));
+		for (let c = 0; c < creviceCount; c++) {
+			const center =
+				segmentLen * (c + 1) + Math.floor((rng() - 0.5) * segmentLen * 0.4);
+			const depth = 60 + rng() * 80; // 60-140 units deep
+			const halfWidth = 3 + Math.floor(rng() * 5); // 3-7 points wide each side
+			for (let j = -halfWidth; j <= halfWidth; j++) {
+				const idx = center + j;
+				if (idx >= 0 && idx < heights.length) {
+					const t = 1 - Math.abs(j) / (halfWidth + 1);
+					heights[idx] += depth * t * t; // quadratic falloff for V shape
+				}
+			}
+		}
 	}
 
 	// Clamp heights to valid range (remember: y increases downward in screen coords)

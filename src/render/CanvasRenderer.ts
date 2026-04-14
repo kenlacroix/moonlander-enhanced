@@ -24,8 +24,8 @@ import { Background } from "./Background";
 import { HUD } from "./HUD";
 
 export class CanvasRenderer {
-	private canvas: HTMLCanvasElement;
-	private ctx: CanvasRenderingContext2D;
+	readonly canvas: HTMLCanvasElement;
+	readonly ctx: CanvasRenderingContext2D;
 	private background: Background;
 	private hud: HUD;
 	private beaconPhase = 0;
@@ -453,14 +453,15 @@ export class CanvasRenderer {
 		);
 
 		// Mode options
-		const options = ["FREE PLAY", "CAMPAIGN", "AI TRAINING"];
+		const options = ["FREE PLAY", "CAMPAIGN", "AI TRAINING", "EDITOR"];
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
 			"Watch an AI learn to land from scratch.",
+			"Draw custom terrain. Share with a link.",
 		];
 
-		for (let i = 0; i < 3; i++) {
+		for (let i = 0; i < options.length; i++) {
 			const y = CANVAS_HEIGHT / 2 + i * 60;
 			const isSelected = i === selection;
 
