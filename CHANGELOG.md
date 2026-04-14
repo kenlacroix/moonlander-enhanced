@@ -2,6 +2,11 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.4.2.0] - 2026-04-13
+
+### Added
+- Gravity Storms: periodic gravity anomalies on ~20% of free-play missions and campaign missions 3-5. Gravity doubles for 5 seconds, then halves for 3 seconds, then normalizes. Repeats every 20-30 seconds. Cosmetic terrain wobble during anomalies. Red HUD warning shows active multiplier. Fully deterministic for ghost replay compatibility.
+
 ## [0.4.1.1] - 2026-04-13
 
 ### Changed
