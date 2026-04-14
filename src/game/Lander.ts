@@ -46,6 +46,7 @@ export function updateLander(
 	lander: LanderState,
 	input: InputState,
 	dt: number,
+	gravityOverride?: number,
 ): void {
 	if (lander.status !== "flying") return;
 
@@ -69,7 +70,7 @@ export function updateLander(
 	}
 
 	// Gravity — mass multiplier makes heavier landers harder to slow down
-	lander.vy = applyGravity(lander.vy, dt * lt.massMultiplier);
+	lander.vy = applyGravity(lander.vy, dt * lt.massMultiplier, gravityOverride);
 
 	// Integrate position
 	lander.x += lander.vx * dt;
