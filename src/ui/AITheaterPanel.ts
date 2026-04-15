@@ -154,10 +154,25 @@ export class AITheaterPanel {
 			"#at-fork-btn",
 		) as HTMLButtonElement;
 
-		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
-		this.forkBtn.addEventListener("click", () => this.triggerFork());
+		this.chartCanvas.addEventListener("click", (e) => {
+			console.log("[AITheater] chart click");
+			this.handleChartClick(e);
+		});
+		this.forkBtn.addEventListener("click", () => {
+			console.log(
+				"[AITheater] REPLAY & FORK clicked",
+				{ selectedEpisodeId: this.selectedEpisodeId, hasHandler: !!this.onForkRequested, disabled: this.forkBtn.disabled },
+			);
+			this.triggerFork();
+		});
 
-		this.watchBtn.addEventListener("click", () => this.onWatchBest?.());
+		this.watchBtn.addEventListener("click", () => {
+			console.log(
+				"[AITheater] WATCH DQN clicked",
+				{ hasHandler: !!this.onWatchBest, disabled: this.watchBtn.disabled },
+			);
+			this.onWatchBest?.();
+		});
 		this.watchBtn.addEventListener("mouseenter", () => {
 			if (!this.watchBtn.disabled) this.watchBtn.style.background = "#00ff8822";
 		});
