@@ -209,6 +209,10 @@ IDLE → FLYING → LANDING_SUCCESS
 - [x] Autopilot annotations — visual debug overlay with force vectors and decision labels (toggle with A key)
 - [x] Settings overlay — configure LLM API key, toggle features
 - [x] Terrain crevices — difficulty-scaling hazards
+- [x] Daily challenge (client-side) — UTC date as seed, shared terrain per day, reuses seed-keyed leaderboard
+- [x] Post-crash flight analysis — LLM-generated coaching tip with deterministic rule-based fallback
+- [x] Speedrun timer — live MM:SS.SS in HUD, per-seed best time tracking, beats-best-time highlight
+- [x] RL model persistence — DQN weights saved/loaded via IndexedDB across sessions
 
 ---
 
@@ -292,23 +296,23 @@ IDLE → FLYING → LANDING_SUCCESS
 
 **Approach:** AI Theater First (validated by CEO review + cross-model consensus). Lead with the unique differentiator (visible AI learning), then add content depth, then visual upgrade, then multiplayer and 3D.
 
-### Sprint 1 — Foundation (Game.ts Decomposition) — S (~1hr CC)
-- [ ] Split Game.ts (~900 lines) into GameLoop, GameState, Game orchestrator (GameRenderer.ts already extracted)
-- [ ] Generalize existing TrainingLoop.ts into reusable HeadlessGame class
-- [ ] Target: Game.ts under 350 lines, all tests pass, game plays identically
+### Sprint 1 — Foundation (Game.ts Decomposition) ✅ COMPLETE
+- [x] Split Game.ts (~900 lines) into GameLoop, GameState, Game orchestrator (GameRenderer.ts already extracted)
+- [x] Generalize existing TrainingLoop.ts into reusable HeadlessGame class
+- [x] Target: Game.ts under 350 lines, all tests pass, game plays identically
 
 **Exit question:** Is Game.ts maintainable now? Can you add a feature without touching 5 concerns?
 
 ---
 
-### Sprint 2 — AI Theater MVP — M (~3hr CC)
-- [ ] Split-screen layout: player (left) + AI training (right, same seed, 50x real-time)
-- [ ] Live reward curve below AI panel (canvas line chart)
-- [ ] Episode counter, best score, current score updating in real time
-- [ ] "Watch AI's best run" button using existing ghost replay
-- [ ] Comparison card on landing: player vs AI scores
-- [ ] Human vs AI shareable scorecard (extends FlightRecorder.ts pattern)
-- [ ] AI narration of decisions via LLM reading autopilot decision state
+### Sprint 2 — AI Theater MVP ✅ COMPLETE
+- [x] Split-screen layout: player (left) + AI training (right, same seed, 50x real-time)
+- [x] Live reward curve below AI panel (canvas line chart)
+- [x] Episode counter, best score, current score updating in real time
+- [x] "Watch AI's best run" button using existing ghost replay (gated behind 20-episode minimum)
+- [x] Comparison card on landing: player vs AI scores
+- [x] Human vs AI shareable scorecard (extends FlightRecorder.ts pattern)
+- [x] AI narration of decisions via LLM reading autopilot decision state
 
 **Exit question:** Does watching the AI learn make you understand RL better than reading about it?
 
