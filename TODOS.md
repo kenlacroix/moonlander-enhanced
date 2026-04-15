@@ -4,6 +4,16 @@ Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current sc
 
 ---
 
+## P3 — Polish
+
+### Add a favicon
+Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but produces a console error on every page load.
+- **Why:** Clean console on load; tiny branding win.
+- **Effort:** XS (CC: ~5 min — SVG lunar lander silhouette or 1969 Apollo mission patch vibe)
+- **Depends on:** Nothing
+
+---
+
 ## P2 — CEO Review Findings (2026-04-14)
 
 ### AI Theater Mobile Responsive Fallback
