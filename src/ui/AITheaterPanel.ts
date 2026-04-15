@@ -14,8 +14,11 @@ export class AITheaterPanel {
 	private epsilonEl: HTMLSpanElement;
 	private statusEl: HTMLSpanElement;
 	private watchBtn: HTMLButtonElement;
+	private narrationEl: HTMLDivElement = null!;
 	private rewardHistory: number[] = [];
 	private bestReward = -Infinity;
+	private bestLanded = false;
+	private firstCrash = false;
 	private onWatchBest: (() => void) | null = null;
 
 	constructor() {
@@ -71,6 +74,11 @@ export class AITheaterPanel {
 				<canvas id="at-chart" width="${PANEL_WIDTH - 32}" height="${CHART_HEIGHT}"
 					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
 			</div>
+			<div id="at-narration"
+				style="color:#aaa;font-size:12px;font-style:italic;min-height:36px;
+				line-height:1.4;padding:6px 0;border-top:1px solid #222">
+				Initializing neural network...
+			</div>
 			<button id="at-watch-btn" disabled
 				style="background:#1a1a1a;color:#00ff88;border:1px solid #00ff88;padding:10px;
 				cursor:pointer;font-family:inherit;font-size:13px;border-radius:4px;
@@ -88,6 +96,7 @@ export class AITheaterPanel {
 		this.bestScoreEl = this.panel.querySelector("#at-best")!;
 		this.currentScoreEl = this.panel.querySelector("#at-current")!;
 		this.epsilonEl = this.panel.querySelector("#at-epsilon")!;
+		this.narrationEl = this.panel.querySelector("#at-narration")!;
 		this.statusEl = this.panel.querySelector("#at-status")!;
 		this.watchBtn = this.panel.querySelector("#at-watch-btn")!;
 
@@ -108,6 +117,8 @@ export class AITheaterPanel {
 		this.panel.remove();
 		this.rewardHistory = [];
 		this.bestReward = -Infinity;
+		this.bestLanded = false;
+		this.firstCrash = false;
 	}
 
 	setWatchBestHandler(handler: () => void): void {
@@ -120,10 +131,21 @@ export class AITheaterPanel {
 			this.rewardHistory.shift();
 		}
 
-		if (stats.totalReward > this.bestReward) {
+		const isNewBest = stats.totalReward > this.bestReward;
+		if (isNewBest) {
 			this.bestReward = stats.totalReward;
 		}
+		const isFirstLanding = stats.landed && !this.bestLanded;
+		if (stats.landed) this.bestLanded = true;
+		const isFirstCrash = !stats.landed && !this.firstCrash;
+		if (!stats.landed && stats.episode === 1) this.firstCrash = true;
 
+		this.narrationEl.textContent = this.getNarration(
+			stats,
+			isNewBest,
+			isFirstLanding,
+			isFirstCrash,
+		);
 		this.episodeEl.textContent = String(stats.episode);
 		this.bestScoreEl.textContent = this.bestReward.toFixed(0);
 		this.currentScoreEl.textContent = stats.totalReward.toFixed(0);
@@ -136,6 +158,40 @@ export class AITheaterPanel {
 		}
 
 		this.drawChart();
+	}
+
+	private getNarration(
+		stats: TrainingStats,
+		isNewBest: boolean,
+		isFirstLanding: boolean,
+		isFirstCrash: boolean,
+	): string {
+		if (isFirstLanding) {
+			return `First successful landing on episode ${stats.episode}! The AI discovered that gentle thrust near the pad works.`;
+		}
+		if (isFirstCrash && stats.episode === 1) {
+			return "First attempt: crashed. The AI starts with random actions and learns from each failure.";
+		}
+		if (isNewBest && stats.landed) {
+			return `New best! The AI is refining its approach. Exploration at ${(stats.epsilon * 100).toFixed(0)}% means it's balancing known strategies with new ones.`;
+		}
+		if (stats.epsilon < 0.1) {
+			return stats.landed
+				? "Exploitation phase: the AI mostly uses its learned policy now, with rare exploration."
+				: "The AI is confident in its strategy but still crashes sometimes. Edge cases are hard.";
+		}
+		if (stats.epsilon < 0.3) {
+			return stats.landed
+				? "The AI lands reliably now. It's fine-tuning thrust timing and approach angles."
+				: "Getting closer. The AI is reducing random exploration and relying more on learned behavior.";
+		}
+		if (stats.episode % 10 === 0) {
+			return `Episode ${stats.episode}: exploring at ${(stats.epsilon * 100).toFixed(0)}%. Each crash teaches the AI which actions lead to negative rewards.`;
+		}
+		if (stats.landed) {
+			return "Landed! Positive reward reinforces this sequence of actions in the neural network.";
+		}
+		return "Training... the AI tries different thrust and rotation sequences, learning from each outcome.";
 	}
 
 	private drawChart(): void {
