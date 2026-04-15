@@ -221,43 +221,53 @@ export class RLAgent {
 		this.memoryIndex++;
 	}
 
+	private training = false;
+
 	/** Train on a batch from replay memory */
 	async trainBatch(): Promise<void> {
 		if (!this.model || !this.targetModel) return;
 		if (this.memory.length < BATCH_SIZE) return;
+		if (this.training) return;
 
-		// Sample random batch
-		const batch: Experience[] = [];
-		for (let i = 0; i < BATCH_SIZE; i++) {
-			const idx = Math.floor(Math.random() * this.memory.length);
-			batch.push(this.memory[idx]);
-		}
-
-		await tf.tidy(() => {
-			const states = tf.tensor2d(batch.map((e) => e.state));
-			const nextStates = tf.tensor2d(batch.map((e) => e.nextState));
-
-			// Current Q values
-			const currentQ = (
-				this.model!.predict(states) as tf.Tensor
-			).arraySync() as number[][];
-
-			// Target Q values from target network
-			const nextQ = (
-				this.targetModel!.predict(nextStates) as tf.Tensor
-			).arraySync() as number[][];
-
-			// Update Q values with Bellman equation
+		this.training = true;
+		try {
+			const batch: Experience[] = [];
 			for (let i = 0; i < BATCH_SIZE; i++) {
-				const target = batch[i].done
-					? batch[i].reward
-					: batch[i].reward + GAMMA * Math.max(...nextQ[i]);
-				currentQ[i][batch[i].action] = target;
+				const idx = Math.floor(Math.random() * this.memory.length);
+				batch.push(this.memory[idx]);
 			}
 
-			const targetTensor = tf.tensor2d(currentQ);
-			this.model!.fit(states, targetTensor, { epochs: 1, verbose: 0 });
-		});
+			const { states, targets } = tf.tidy(() => {
+				const s = tf.tensor2d(batch.map((e) => e.state));
+				const ns = tf.tensor2d(batch.map((e) => e.nextState));
+
+				const currentQ = (
+					this.model!.predict(s) as tf.Tensor
+				).arraySync() as number[][];
+
+				const nextQ = (
+					this.targetModel!.predict(ns) as tf.Tensor
+				).arraySync() as number[][];
+
+				for (let i = 0; i < BATCH_SIZE; i++) {
+					const target = batch[i].done
+						? batch[i].reward
+						: batch[i].reward + GAMMA * Math.max(...nextQ[i]);
+					currentQ[i][batch[i].action] = target;
+				}
+
+				return {
+					states: tf.tensor2d(batch.map((e) => e.state)),
+					targets: tf.tensor2d(currentQ),
+				};
+			});
+
+			await this.model.fit(states, targets, { epochs: 1, verbose: 0 });
+			states.dispose();
+			targets.dispose();
+		} finally {
+			this.training = false;
+		}
 
 		// Periodically sync target network
 		this.stepsSinceTargetUpdate++;
