@@ -28,7 +28,11 @@ export function handleCollisionResult(
 		game.audio.playSuccess();
 		game.audio.soundtrack.onLanded();
 		game.ghostRecorder.save(game.score);
-		game.lastRank = addScore(game.seed, game.score);
+		game.lastRank = addScore(
+			game.seed,
+			game.score,
+			game.telemetry.getDuration(),
+		);
 		game.llm.scanNearbyArtifact(game, game.artifacts, game.lander.x);
 		game.llm.fetchCommentary(game, game.lander, game.score, true);
 		if (game.gameMode === "campaign" && game.activeMission) {

@@ -9,7 +9,7 @@ import type { TrainingLoop } from "../ai/TrainingLoop";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
-import { getBestScore } from "../systems/Leaderboard";
+import { getBestScore, getBestTime } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
 import type { Artifact } from "./Artifacts";
@@ -133,6 +133,10 @@ export class GameRenderer {
 		const stormLabel = state.gravityStorm
 			? getGravityStormLabel(state.gravityStorm)
 			: null;
+		const elapsed =
+			state.status === "playing" || state.status === "landed"
+				? state.telemetry.getDuration()
+				: null;
 		this.renderer.drawHUD(
 			state.lander,
 			state.score,
@@ -142,6 +146,8 @@ export class GameRenderer {
 			state.adaptiveLabel,
 			alienLabel,
 			stormLabel,
+			elapsed,
+			getBestTime(state.seed) ?? null,
 		);
 
 		// Touch controls overlay

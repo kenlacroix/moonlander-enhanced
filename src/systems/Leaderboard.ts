@@ -4,6 +4,7 @@ const MAX_ENTRIES_PER_SEED = 5;
 export interface LeaderboardEntry {
 	score: number;
 	date: string; // ISO date string
+	time?: number; // seconds from spawn to landing (successful runs only)
 }
 
 type LeaderboardData = Record<string, LeaderboardEntry[]>;
@@ -27,7 +28,11 @@ function save(data: LeaderboardData): void {
 }
 
 /** Add a score for a seed. Returns the rank (1-based) or null if it didn't make the board. */
-export function addScore(seed: number, score: number): number | null {
+export function addScore(
+	seed: number,
+	score: number,
+	time?: number,
+): number | null {
 	if (score <= 0) return null;
 
 	const data = load();
@@ -37,6 +42,7 @@ export function addScore(seed: number, score: number): number | null {
 	const entry: LeaderboardEntry = {
 		score,
 		date: new Date().toISOString().slice(0, 10),
+		...(time !== undefined ? { time } : {}),
 	};
 
 	entries.push(entry);
@@ -46,6 +52,18 @@ export function addScore(seed: number, score: number): number | null {
 
 	const rank = data[key].findIndex((e) => e === entry);
 	return rank >= 0 ? rank + 1 : null;
+}
+
+/** Get the best (fastest) successful landing time for a seed, in seconds. */
+export function getBestTime(seed: number): number | undefined {
+	const entries = getScores(seed);
+	let best: number | undefined;
+	for (const e of entries) {
+		if (e.time !== undefined && (best === undefined || e.time < best)) {
+			best = e.time;
+		}
+	}
+	return best;
 }
 
 /** Get top scores for a seed */
