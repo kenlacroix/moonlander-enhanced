@@ -2,6 +2,39 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.3.0] - 2026-04-15
+
+### Added
+- Speedrun timer: live flight time in top-right HUD (MM:SS.SS). Tracks best landing time per seed (stored with leaderboard entries). Timer flashes green while beating the current best for that seed.
+
+## [0.5.2.0] - 2026-04-15 (PR #14)
+
+### Added
+- Daily Challenge: new title-screen option using today's UTC date (`YYYYMMDD`) as the terrain seed — everyone plays the same map each day. Reuses the existing seed-keyed leaderboard so daily scores bucket by date automatically. No backend required.
+- Post-crash flight analysis: "FLIGHT ANALYSIS" panel after crashes with one specific, actionable tip citing actual telemetry numbers (impact speed vs limit, angle, fuel). Uses the configured LLM when available; falls back to a deterministic rule-based analysis so the feature works offline.
+- ESC-to-menu discoverability: surfaced `ESC MENU` in the in-flight controls line.
+
+## [0.5.1.0] - 2026-04-15
+
+### Fixed
+- Stabilize DQN training loop and auto-enter agent replay after training completes.
+- Prevent concurrent `TF.js fit()` calls during RL training (data races on shared model state).
+- Gate "Watch AI's best run" button behind minimum 20 episodes so viewers don't watch a random-policy agent.
+- Rebalance RL reward function to prevent declining learning curve.
+
+### Added
+- Persist RL model weights across sessions via IndexedDB.
+- Wind and fuel-leak hazard unit tests.
+
+## [0.5.0.0] - 2026-04-14 (Sprint 1 + Sprint 2)
+
+### Added
+- AI Theater MVP (Sprint 2): split-screen player-vs-AI training view on the same terrain seed. Live reward curve, episode counter, "Watch AI's best run" button, post-landing human-vs-AI comparison card, optional AI narration of autopilot decisions via LLM.
+
+### Changed
+- Decompose `Game.ts` into focused modules (Sprint 1): `GameLoop`, `GameState`, `CollisionHandler`, `StateHandlers`, `PhysicsManager`, `GameRenderer`, `LLMIntegration`. `Game.ts` now an orchestrator under 400 lines.
+- Extract reusable `HeadlessGame` class from `TrainingLoop` so training and gameplay share the same simulation code.
+
 ## [0.4.7.0] - 2026-04-13
 
 ### Added

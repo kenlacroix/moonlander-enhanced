@@ -20,6 +20,8 @@ export class HUD {
 		adaptiveLabel: string | null = null,
 		alienEffect: string | null = null,
 		gravityStormLabel: string | null = null,
+		elapsedTime: number | null = null,
+		bestTime: number | null = null,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -120,6 +122,29 @@ export class HUD {
 			ctx.fillText(`SCORE: ${score}`, CANVAS_WIDTH - 20, 20);
 		}
 
+		// Timer (top right, below score). Flashes green when under best time.
+		if (elapsedTime !== null) {
+			const beatingBest = bestTime !== null && elapsedTime < bestTime;
+			ctx.fillStyle = beatingBest ? "#00ff88" : "rgba(255, 255, 255, 0.7)";
+			ctx.font = '14px "Courier New", monospace';
+			ctx.textAlign = "right";
+			const timerY = score > 0 ? 46 : 20;
+			ctx.fillText(
+				`TIME  ${formatTime(elapsedTime)}`,
+				CANVAS_WIDTH - 20,
+				timerY,
+			);
+			if (bestTime !== null) {
+				ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+				ctx.font = '11px "Courier New", monospace';
+				ctx.fillText(
+					`BEST  ${formatTime(bestTime)}`,
+					CANVAS_WIDTH - 20,
+					timerY + 16,
+				);
+			}
+		}
+
 		// Adaptive difficulty label (top right, below score)
 		if (adaptiveLabel && adaptiveLabel !== "NORMAL") {
 			const labelColor =
@@ -161,4 +186,10 @@ export class HUD {
 		ctx.fillStyle = warn ? COLOR_HUD_WARNING : COLOR_HUD;
 		ctx.fillText(value, x + 60, y);
 	}
+}
+
+function formatTime(seconds: number): string {
+	const mins = Math.floor(seconds / 60);
+	const secs = seconds - mins * 60;
+	return `${mins}:${secs.toFixed(2).padStart(5, "0")}`;
 }

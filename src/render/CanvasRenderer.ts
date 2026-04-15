@@ -416,6 +416,8 @@ export class CanvasRenderer {
 		adaptiveLabel: string | null = null,
 		alienEffect: string | null = null,
 		gravityStormLabel: string | null = null,
+		elapsedTime: number | null = null,
+		bestTime: number | null = null,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -427,6 +429,8 @@ export class CanvasRenderer {
 			adaptiveLabel,
 			alienEffect,
 			gravityStormLabel,
+			elapsedTime,
+			bestTime,
 		);
 	}
 

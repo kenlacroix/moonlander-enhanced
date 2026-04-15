@@ -40,13 +40,10 @@ Verify service worker network-first cache handles WebGL asset transition correct
 
 ## P1 — Deferred Cherry-Picks (post-v1.0)
 
-### Daily Challenge
-One shared seed per day, 24-hour leaderboard reset at midnight UTC.
-- **Why:** Makes the game a daily ritual, not a one-time visit. High shareability.
-- **Effort:** M (human: ~1 week / CC: ~30 min)
-- **Requires:** Serverless backend (Cloudflare Workers or Vercel Edge). API for daily seed + score submission + leaderboard fetch.
-- **Game-side:** ~200 LOC. Seed fetched from API on title screen. Leaderboard view for daily scores. No accounts, just player name.
-- **Blocked by:** Need to choose hosting provider and set up backend. No backend exists today.
+### Daily Challenge — client-side shipped, backend open
+Client-side version shipped 2026-04-15 (PR #14): UTC date (`YYYYMMDD`) as the seed, same terrain for everyone each day, scores bucket into the existing seed-keyed leaderboard automatically.
+
+**Remaining (backend sync):** Shared cross-player leaderboard per day, name entry, and 24-hour reset visualization. Needs serverless backend (Cloudflare Workers or Vercel Edge) — blocked by hosting provider choice.
 
 ### Split-Screen Local Multiplayer
 Two players, same terrain, side by side on one screen.

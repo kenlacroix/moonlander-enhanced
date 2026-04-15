@@ -119,7 +119,7 @@
 **Theme:** You vs the world.
 
 - [ ] Global leaderboard via serverless API (Cloudflare Workers or Vercel Edge). Score + seed + ghost hash. No accounts, just a player name.
-- [ ] Daily challenge: one shared seed, everyone gets the same terrain, 24-hour leaderboard reset at midnight UTC.
+- [x] Daily challenge (client-side): today's UTC date as seed, shared terrain across all players, per-day leaderboard bucket via existing seed-keyed storage. Backend sync remains open.
 - [ ] Ghost download from the leaderboard. Watch the #1 player's run before you try.
 - [ ] Seed-of-the-week community picks. Curated by LLM based on terrain interestingness (roughness variance, pad difficulty score).
 - [ ] Achievement badges (localStorage): "First Landing", "No Thrust Landing", "Full Campaign", "Beat the AI", "Survive the Aliens".
