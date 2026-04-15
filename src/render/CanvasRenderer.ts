@@ -453,24 +453,31 @@ export class CanvasRenderer {
 		);
 
 		// Mode options
-		const options = ["FREE PLAY", "CAMPAIGN", "AI TRAINING", "EDITOR"];
+		const options = [
+			"FREE PLAY",
+			"CAMPAIGN",
+			"AI TRAINING",
+			"AI THEATER",
+			"EDITOR",
+		];
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
 			"Watch an AI learn to land from scratch.",
+			"Play while the AI trains on your terrain.",
 			"Draw custom terrain. Share with a link.",
 		];
 
 		for (let i = 0; i < options.length; i++) {
-			const y = CANVAS_HEIGHT / 2 + i * 60;
+			const y = CANVAS_HEIGHT / 2 - 20 + i * 52;
 			const isSelected = i === selection;
 
 			if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 18, 400, 50);
+				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 16, 400, 44);
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 18, 400, 50);
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 16, 400, 44);
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
@@ -955,6 +962,67 @@ export class CanvasRenderer {
 			}
 		}
 		if (line) ctx.fillText(line, CANVAS_WIDTH / 2, y);
+		ctx.restore();
+	}
+
+	drawComparisonCard(
+		playerScore: number,
+		playerLanded: boolean,
+		aiBestReward: number,
+		aiEpisodes: number,
+		aiLanded: boolean,
+	): void {
+		const ctx = this.ctx;
+		ctx.save();
+		const cardW = 400;
+		const cardH = 140;
+		const cx = CANVAS_WIDTH / 2;
+		const cy = CANVAS_HEIGHT / 2 + 200;
+
+		ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+		ctx.strokeStyle = "#00ff88";
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.roundRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 8);
+		ctx.fill();
+		ctx.stroke();
+
+		ctx.font = 'bold 14px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillStyle = "#00ff88";
+		ctx.fillText("HUMAN vs AI", cx, cy - cardH / 2 + 24);
+
+		ctx.font = '13px "Courier New", monospace';
+		const col1 = cx - 90;
+		const col2 = cx + 90;
+		let y = cy - cardH / 2 + 50;
+
+		ctx.fillStyle = "#888";
+		ctx.fillText("YOU", col1, y);
+		ctx.fillText(`AI (${aiEpisodes} eps)`, col2, y);
+		y += 24;
+
+		ctx.fillStyle = playerLanded ? "#00ff88" : "#ff4444";
+		ctx.fillText(playerLanded ? `LANDED ${playerScore}` : "CRASHED", col1, y);
+		ctx.fillStyle = aiLanded ? "#00ff88" : "#ff4444";
+		ctx.fillText(
+			aiLanded ? `BEST ${aiBestReward.toFixed(0)}` : "LEARNING...",
+			col2,
+			y,
+		);
+		y += 24;
+
+		ctx.fillStyle = "#ffaa00";
+		ctx.font = 'bold 13px "Courier New", monospace';
+		if (playerLanded && aiLanded) {
+			const winner = playerScore > aiBestReward ? "YOU WIN!" : "AI WINS!";
+			ctx.fillText(winner, cx, y);
+		} else if (playerLanded) {
+			ctx.fillText("YOU WIN — AI still learning", cx, y);
+		} else {
+			ctx.fillText("Both need more practice...", cx, y);
+		}
+
 		ctx.restore();
 	}
 

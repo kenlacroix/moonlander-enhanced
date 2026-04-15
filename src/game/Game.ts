@@ -25,6 +25,7 @@ import {
 } from "../ui/TerrainEditor";
 import { WORLD_WIDTH } from "../utils/constants";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
+import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
 import type { Artifact } from "./Artifacts";
 import { placeArtifacts } from "./Artifacts";
@@ -71,7 +72,7 @@ export class Game {
 	private seed_: number;
 	selectedMission = 0;
 	lastRank: number | null = null;
-	gameMode: "freeplay" | "campaign" = "freeplay";
+	gameMode: "freeplay" | "campaign" | "ai-theater" = "freeplay";
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
 	titleSelection = 0;
@@ -95,6 +96,8 @@ export class Game {
 	relay: RelayState | null = null;
 	artifacts: Artifact[] = [];
 	private retroSkin = new RetroVectorSkin();
+	aiTheater = new AITheater();
+	aiTheaterComparison: AITheaterComparison | null = null;
 	editorState: EditorState | null = null;
 	achievements = loadAchievements();
 	achievementToast: Achievement | null = null;
