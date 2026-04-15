@@ -62,7 +62,7 @@ export interface GameRenderState {
 	readonly flightElapsed: number;
 	readonly titleSelection: number;
 	readonly selectedMission: number;
-	readonly gameMode: "freeplay" | "campaign";
+	readonly gameMode: "freeplay" | "campaign" | "ai-theater";
 	readonly campaignCompleted: Set<number>;
 	readonly input: Input;
 	readonly latestTrainingStats: TrainingStats | null;
@@ -72,6 +72,13 @@ export interface GameRenderState {
 	readonly achievementToast: { name: string; description: string } | null;
 	readonly achievementToastTimer: number;
 	readonly gravityPreset: { name: string; gravity: number; color: string };
+	readonly aiTheaterComparison: {
+		playerScore: number;
+		playerLanded: boolean;
+		aiBestReward: number;
+		aiEpisodes: number;
+		aiLanded: boolean;
+	} | null;
 }
 
 export class GameRenderer {
@@ -195,6 +202,21 @@ export class GameRenderer {
 					: "R mission select  |  F report";
 				this.renderer.drawMessage("CRASH", crashHint);
 			}
+		}
+
+		// AI Theater comparison card
+		if (
+			state.aiTheaterComparison &&
+			(state.status === "landed" || state.status === "crashed")
+		) {
+			const c = state.aiTheaterComparison;
+			this.renderer.drawComparisonCard(
+				c.playerScore,
+				c.playerLanded,
+				c.aiBestReward,
+				c.aiEpisodes,
+				c.aiLanded,
+			);
 		}
 
 		// LLM commentary (streams in word by word)

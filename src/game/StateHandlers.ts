@@ -23,13 +23,22 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { createRelayState } from "./RelayMode";
 
+const TITLE_OPTION_COUNT = 5;
+
 export function updateTitle(game: Game, input: InputState): void {
-	if (input.menuUp) game.titleSelection = (game.titleSelection - 1 + 4) % 4;
-	if (input.menuDown) game.titleSelection = (game.titleSelection + 1) % 4;
+	if (input.menuUp)
+		game.titleSelection =
+			(game.titleSelection - 1 + TITLE_OPTION_COUNT) % TITLE_OPTION_COUNT;
+	if (input.menuDown)
+		game.titleSelection = (game.titleSelection + 1) % TITLE_OPTION_COUNT;
 	if (input.menuSelect) {
 		if (game.titleSelection === 2) {
 			game.startTraining();
 		} else if (game.titleSelection === 3) {
+			game.gameMode = "ai-theater";
+			game.selectedMission = 0;
+			game.status = "menu";
+		} else if (game.titleSelection === 4) {
 			startEditor(game);
 		} else {
 			game.gameMode = game.titleSelection === 0 ? "freeplay" : "campaign";
@@ -144,6 +153,8 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 	if (input.menuBack && game.status === "playing") {
 		game.audio.setThruster(false);
 		game.audio.soundtrack.stop();
+		if (game.aiTheater.isActive) game.aiTheater.stop();
+		game.aiTheaterComparison = null;
 		game.status = "menu";
 		return;
 	}
@@ -199,6 +210,12 @@ function selectMission(game: Game, mission: Mission): void {
 	game.reset();
 	game.llm.fetchBriefing(game, mission);
 	updateURL(mission.seed);
+	if (game.gameMode === "ai-theater") {
+		game.aiTheater.start(mission.seed);
+		game.aiTheater.setWatchBestHandler(() => {
+			startAgentReplay(game, mission.seed);
+		});
+	}
 }
 
 function handleRestart(game: Game): void {
@@ -220,6 +237,8 @@ function handleRestart(game: Game): void {
 			return;
 		}
 	}
+	if (game.aiTheater.isActive) game.aiTheater.stop();
+	game.aiTheaterComparison = null;
 	game.status = "menu";
 }
 

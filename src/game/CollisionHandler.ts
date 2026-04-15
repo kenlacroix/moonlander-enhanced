@@ -1,17 +1,17 @@
 import {
-	checkLandingAchievements,
 	type Achievement,
+	checkLandingAchievements,
 } from "../systems/Achievements";
 import { addScore } from "../systems/Leaderboard";
 import { STARTING_FUEL } from "../utils/constants";
+import type { Game } from "./Game";
+import { CAMPAIGN, saveCampaignProgress } from "./Missions";
 import { normAngle } from "./Physics";
 import {
 	advanceRelayLander,
 	isRelayComplete,
 	recordRelayLander,
 } from "./RelayMode";
-import type { Game } from "./Game";
-import { CAMPAIGN, saveCampaignProgress } from "./Missions";
 
 export function handleCollisionResult(
 	game: Game,
@@ -46,6 +46,9 @@ export function handleCollisionResult(
 		game.llm.fetchCommentary(game, game.lander, game.score, false);
 	}
 	handleRelayAfterCollision(game);
+	if (game.aiTheater.isActive) {
+		game.aiTheaterComparison = game.aiTheater.getComparison(game.score, landed);
+	}
 }
 
 function checkAchievements(game: Game): void {

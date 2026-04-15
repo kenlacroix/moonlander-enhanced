@@ -183,21 +183,23 @@ export class RLAgent {
 
 		let reward = 0;
 
-		// Reward being close to pad horizontally
 		const dx = Math.abs(lander.x - padCenterX);
-		reward += Math.max(0, 1 - dx / 1000) * 0.5;
+		const proximity = Math.max(0, 1 - dx / 1000);
+		reward += proximity * 0.3;
 
-		// Reward controlled descent (small positive vy is good)
+		const normalizedAlt = Math.min(altitude / 500, 1);
+		reward += (1 - normalizedAlt) * proximity * 0.3;
+
 		if (lander.vy > 0 && lander.vy < MAX_LANDING_SPEED * 2) {
-			reward += 0.3;
+			reward += 0.2;
+		} else if (lander.vy > MAX_LANDING_SPEED * 3) {
+			reward -= 0.2;
 		}
 
-		// Penalize being tilted
 		const anglePenalty = Math.abs(normAngle(lander.angle)) / 180;
-		reward -= anglePenalty * 0.5;
+		reward -= anglePenalty * 0.3;
 
-		// Small time penalty to encourage efficiency
-		reward -= 0.1;
+		reward -= 0.01;
 
 		return reward;
 	}
@@ -283,6 +285,46 @@ export class RLAgent {
 		const recent = this.rewardHistory.slice(-window);
 		if (recent.length === 0) return 0;
 		return recent.reduce((a, b) => a + b, 0) / recent.length;
+	}
+
+	async saveWeights(key: string): Promise<boolean> {
+		if (!this.model) return false;
+		try {
+			await this.model.save(`indexeddb://moonlander-agent-${key}`);
+			localStorage.setItem(
+				`moonlander-agent-meta-${key}`,
+				JSON.stringify({
+					epsilon: this.epsilon,
+					episodeCount: this.episodeCount,
+					rewardHistory: this.rewardHistory.slice(-200),
+				}),
+			);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	async loadWeights(key: string): Promise<boolean> {
+		try {
+			const loaded = (await tf.loadLayersModel(
+				`indexeddb://moonlander-agent-${key}`,
+			)) as tf.Sequential;
+			this.model = loaded;
+			this.targetModel = this.buildModel();
+			this.syncTargetModel();
+			this.ready = true;
+			const meta = localStorage.getItem(`moonlander-agent-meta-${key}`);
+			if (meta) {
+				const parsed = JSON.parse(meta);
+				this.epsilon = parsed.epsilon ?? EPSILON_START;
+				this.episodeCount = parsed.episodeCount ?? 0;
+				this.rewardHistory = parsed.rewardHistory ?? [];
+			}
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	private findNearestPad(
