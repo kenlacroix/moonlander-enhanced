@@ -37,6 +37,7 @@ const NULL_INPUT: InputState = {
 	flightReport: false,
 	toggleRelay: false,
 	toggleAnnotations: false,
+	forkTakeover: false,
 };
 
 export type AutopilotMode =
@@ -205,6 +206,7 @@ export class Autopilot {
 			flightReport: false,
 			toggleRelay: false,
 			toggleAnnotations: false,
+			forkTakeover: false,
 		};
 	}
 

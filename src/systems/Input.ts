@@ -15,6 +15,7 @@ export interface InputState {
 	flightReport: boolean;
 	toggleRelay: boolean;
 	toggleAnnotations: boolean;
+	forkTakeover: boolean;
 }
 
 /** Touch zone identifiers */
@@ -35,6 +36,7 @@ export class Input {
 	private _flightReport = false;
 	private _relayToggled = false;
 	private _annotationsToggled = false;
+	private _forkPressed = false;
 
 	// Touch state
 	private touchActive = new Map<number, TouchZone>();
@@ -86,6 +88,9 @@ export class Input {
 			}
 			if (e.code === "KeyA") {
 				this._annotationsToggled = true;
+			}
+			if (e.code === "KeyT") {
+				this._forkPressed = true;
 			}
 			// Prevent scrolling with arrow keys / space
 			if (
@@ -199,6 +204,7 @@ export class Input {
 			flightReport: this._flightReport,
 			toggleRelay: this._relayToggled,
 			toggleAnnotations: this._annotationsToggled,
+			forkTakeover: this._forkPressed,
 		};
 		this._restartPressed = false;
 		this._menuUpPressed = false;
@@ -213,6 +219,7 @@ export class Input {
 		this._flightReport = false;
 		this._relayToggled = false;
 		this._annotationsToggled = false;
+		this._forkPressed = false;
 		this._touchRestart = false;
 		this._touchMenuSelect = false;
 		return state;

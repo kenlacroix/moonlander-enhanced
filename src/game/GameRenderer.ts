@@ -4,6 +4,7 @@
  */
 
 import type { Autopilot } from "../ai/Autopilot";
+import type { GhostPose } from "../ai/EpisodeRecorder";
 import type { TrainingStats } from "../ai/RLAgent";
 import type { TrainingLoop } from "../ai/TrainingLoop";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
@@ -86,6 +87,18 @@ export interface GameRenderState {
 		aiEpisodes: number;
 		aiLanded: boolean;
 	} | null;
+	readonly forkReplay: {
+		readonly episode: {
+			readonly episode: number;
+			readonly totalReward: number;
+			readonly landed: boolean;
+			readonly positions: GhostPose[];
+			readonly inputs: number[];
+		};
+		readonly frame: number;
+		readonly forked: boolean;
+		readonly forkFrame: number | null;
+	} | null;
 }
 
 export class GameRenderer {
@@ -93,6 +106,68 @@ export class GameRenderer {
 
 	setRetroSkin(skin: Parameters<CanvasRenderer["setRetroSkin"]>[0]): void {
 		this.renderer.setRetroSkin(skin);
+	}
+
+	private drawAIGhostTrail(
+		fork: NonNullable<GameRenderState["forkReplay"]>,
+		offset: { x: number; y: number },
+	): void {
+		const start = fork.forkFrame ?? 0;
+		const positions = fork.episode.positions.slice(start);
+		if (positions.length < 2) return;
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		ctx.translate(offset.x, offset.y);
+		ctx.strokeStyle = "#00aaff";
+		ctx.globalAlpha = 0.55;
+		ctx.lineWidth = 2;
+		ctx.setLineDash([4, 4]);
+		ctx.beginPath();
+		ctx.moveTo(positions[0].x, positions[0].y);
+		for (let i = 1; i < positions.length; i++) {
+			ctx.lineTo(positions[i].x, positions[i].y);
+		}
+		ctx.stroke();
+		ctx.setLineDash([]);
+
+		const end = positions[positions.length - 1];
+		ctx.globalAlpha = 0.8;
+		ctx.fillStyle = "#00aaff";
+		ctx.beginPath();
+		ctx.arc(end.x, end.y, 5, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.restore();
+		ctx.globalAlpha = 1;
+	}
+
+	private drawForkCaption(
+		fork: NonNullable<GameRenderState["forkReplay"]>,
+	): void {
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		ctx.font = "14px 'Courier New', monospace";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "top";
+		const text = fork.forked
+			? `YOU FORKED AT FRAME ${fork.forkFrame ?? 0} · AI FINISHED AT ${fork.episode.totalReward.toFixed(0)} REWARD`
+			: `AI REPLAY · FRAME ${fork.frame}/${fork.episode.inputs.length} · PRESS T TO TAKE OVER`;
+		const padX = 14;
+		const padY = 6;
+		const metrics = ctx.measureText(text);
+		const w = metrics.width + padX * 2;
+		const h = 22;
+		const x = 1280 / 2 - w / 2;
+		const y = 52;
+		ctx.fillStyle = fork.forked ? "rgba(0,170,255,0.15)" : "rgba(0,0,0,0.55)";
+		ctx.strokeStyle = "#00aaff";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.fill();
+		ctx.stroke();
+		ctx.fillStyle = "#00aaff";
+		ctx.fillText(text, 1280 / 2, y + padY - 1);
+		ctx.restore();
 	}
 
 	render(state: GameRenderState): void {
@@ -121,6 +196,10 @@ export class GameRenderer {
 			);
 		}
 		this.renderer.drawLander(state.lander, offset);
+
+		if (state.forkReplay?.forked) {
+			this.drawAIGhostTrail(state.forkReplay, offset);
+		}
 
 		// Autopilot annotations (force vectors, target, decision labels)
 		if (
@@ -160,6 +239,10 @@ export class GameRenderer {
 		// Touch controls overlay
 		if (state.input.isTouchDevice) {
 			this.renderer.drawTouchControls();
+		}
+
+		if (state.forkReplay) {
+			this.drawForkCaption(state.forkReplay);
 		}
 
 		// Post-flight telemetry chart

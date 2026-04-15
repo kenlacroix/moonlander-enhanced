@@ -2,6 +2,12 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.5.0] - 2026-04-15 (Sprint 3 Part A)
+
+### Added
+- Mission Replay Archaeology (Part A): AI Theater records the DQN's last 10 episodes (inputs + trajectory). Click any point on the DQN reward curve to pick an episode, then hit "REPLAY & FORK" to launch it in the live game with the AI driving. Press **T** at any moment to take over controls. The AI's remaining trajectory renders as a blue dashed ghost trail after the fork, so you can see where the AI would have gone versus where you take the run.
+- Hazard-faithful forks (alien/storm/wind state sync + frame-level scrubber) tracked as Sprint 3 Part B in backlog — current implementation disables hazards during replay so the AI's canned inputs reproduce its training-sim trajectory.
+
 ## [0.5.4.0] - 2026-04-15 (Sprint 2.5)
 
 ### Added

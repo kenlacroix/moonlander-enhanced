@@ -1,4 +1,5 @@
 import type { Agent, AgentStats } from "../ai/Agent";
+import { EpisodeRecorder, type RecordedEpisode } from "../ai/EpisodeRecorder";
 import { PolicyGradientAgent } from "../ai/PolicyGradientAgent";
 import { RandomAgent } from "../ai/RandomAgent";
 import { RLAgent } from "../ai/RLAgent";
@@ -33,6 +34,8 @@ export class AITheater {
 	private totalEpisodes = 0;
 	private currentSeed: number | null = null;
 	private currentSlotIdx = 0;
+	private recorder = new EpisodeRecorder(10);
+	private forkHandler: ((episode: RecordedEpisode) => void) | null = null;
 
 	constructor() {
 		this.panel = new AITheaterPanel();
@@ -53,8 +56,11 @@ export class AITheater {
 		this.totalEpisodes = 0;
 		this.abortRequested = false;
 		this.currentSlotIdx = 0;
+		this.recorder.clear();
 
 		this.panel.mount();
+		this.panel.setEpisodesProvider(() => this.recorder.getEpisodes());
+		this.panel.setForkRequestHandler((ep) => this.forkHandler?.(ep));
 		this.adjustGameLayout(true);
 
 		for (const slot of this.slots) {
@@ -105,6 +111,14 @@ export class AITheater {
 		this.panel.setWatchBestHandler(handler);
 	}
 
+	setForkHandler(handler: (episode: RecordedEpisode) => void): void {
+		this.forkHandler = handler;
+	}
+
+	getRecordedEpisodes(): RecordedEpisode[] {
+		return this.recorder.getEpisodes();
+	}
+
 	getAgent(): RLAgent {
 		return this.dqn;
 	}
@@ -128,6 +142,8 @@ export class AITheater {
 
 	private async runEpisode(slot: AgentSlot): Promise<AgentStats> {
 		const { agent, game } = slot;
+		const record = agent === this.dqn;
+		if (record) this.recorder.abortCurrent();
 		game.reset();
 		let totalReward = 0;
 		let steps = 0;
@@ -138,6 +154,8 @@ export class AITheater {
 			const state = agent.getState(game.lander, game.terrain);
 			const action = agent.chooseAction(state);
 			const input = agent.actionToInput(action);
+
+			if (record) this.recorder.onStep(action, game.lander);
 
 			const result = game.step(input, FIXED_TIMESTEP);
 			landed = result.landed;
@@ -166,6 +184,17 @@ export class AITheater {
 		}
 
 		await agent.endEpisode(totalReward);
+
+		if (record && this.currentSeed !== null) {
+			const recorded = this.recorder.onEpisodeEnd(
+				agent.episodeCount,
+				this.currentSeed,
+				totalReward,
+				landed,
+				steps,
+			);
+			if (recorded) this.panel.onEpisodeRecorded(recorded);
+		}
 
 		const epsilon = agent instanceof RLAgent ? agent.epsilon : undefined;
 		return {
