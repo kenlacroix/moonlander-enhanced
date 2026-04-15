@@ -13,7 +13,16 @@ import {
 import { HeadlessGame } from "./HeadlessGame";
 
 const MAX_STEPS_PER_EPISODE = 1500;
-const STEPS_PER_TICK = 50;
+// Yield to the browser event loop this often during an episode. Lower =
+// smoother UI, higher = faster training. 15 keeps the UI responsive while
+// 3-4 agents train concurrently on the main thread with the main game loop
+// still running.
+const STEPS_PER_TICK = 15;
+// DQN fit() frequency. Every 12 steps strikes a balance between
+// sample-efficient learning and not saturating the main thread with TF.js
+// kernel launches. Previously 4 = ~375 fit calls per episode, which
+// starved the UI while the player was also flying the lander.
+const DQN_TRAIN_EVERY = 12;
 
 export interface AITheaterComparison {
 	playerScore: number;
@@ -213,7 +222,8 @@ export class AITheater {
 			stepsThisTick++;
 
 			if (result.done) break;
-			if (agent.trainBatch && steps % 4 === 0) await agent.trainBatch();
+			if (agent.trainBatch && steps % DQN_TRAIN_EVERY === 0)
+				await agent.trainBatch();
 
 			if (stepsThisTick >= STEPS_PER_TICK) {
 				stepsThisTick = 0;

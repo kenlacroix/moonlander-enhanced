@@ -123,9 +123,13 @@ export class PolicyGradientAgent implements Agent {
 				"int32",
 			);
 			const w = tf.tensor1d(normReturns);
+			// Mini-batch the episode trajectory so TF.js yields to the event
+			// loop between batches. A 1500-step trajectory in a single fit
+			// call blocked the main thread for ~200ms, freezing the UI.
 			await this.model.fit(xs, ys, {
 				epochs: 1,
 				verbose: 0,
+				batchSize: 64,
 				sampleWeight: w,
 			});
 			xs.dispose();
