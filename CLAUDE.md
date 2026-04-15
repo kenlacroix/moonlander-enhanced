@@ -347,12 +347,17 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 4 — Multi-World Transfer Learning — M (~3hr CC)
-- [ ] Extend GravityPresets.ts with Europa (1.315), Titan (1.352), asteroid belt (0.1-0.5)
+### Sprint 4 — Multi-World Transfer Learning — split into A (MVP) + B (polish)
+
+**Part A — Extra worlds + transfer visualization ✅ COMPLETE**
+- [x] Extend GravityPresets.ts with Europa (1.315), Titan (1.352), Asteroid (0.25)
+- [x] Train AI on Moon, drop it on other worlds, watch it adapt (or fail)
+- [x] Transfer learning visualization: overlay Moon-trained vs fresh policy curves in AI Theater
+- [x] Zero-G already present as existing opt-in preset
+
+**Part B — Deferred (see backlog):**
 - [ ] Per-world terrain generation parameters (roughness, color palette, pad style)
-- [ ] Train AI on Moon, drop it on Mars/Jupiter, watch it adapt (or fail)
-- [ ] Transfer learning visualization: overlay Moon-trained vs fresh policy curves
-- [ ] Zero-G as opt-in toggle ("watch the AI break when assumptions fail")
+- [ ] Per-world background tint / sky colors to make worlds visually distinct
 - [ ] Procedural audio per world (Mars hiss, Europa ice creak, Jupiter radio noise)
 
 **Exit question:** Does watching the AI panic on Jupiter teach you about distribution shift?
