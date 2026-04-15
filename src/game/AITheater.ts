@@ -88,12 +88,17 @@ export class AITheater {
 		for (const slot of this.slots) {
 			if (!slot.agent.ready) await slot.agent.init();
 		}
-		await this.dqn.loadWeights(String(seed));
+		// Scope checkpoint keys by preset so a Jupiter run on seed N doesn't
+		// resume from the Moon-trained weights (and vice-versa). The transfer
+		// agent is the only thing that should cross worlds, and it explicitly
+		// loads the Moon-keyed baseline below.
+		await this.dqn.loadWeights(this.checkpointKey(seed, this.currentPreset));
 		if (this.transferDqn) {
-			// Load canonical Moon baseline weights so transfer starts with
-			// whatever the player trained on Moon. If no Moon baseline yet,
-			// the transfer agent falls back to its fresh-init weights.
-			await this.transferDqn.loadWeights(String(MOON_BASELINE_SEED));
+			// Load the canonical Moon baseline. Explicit "moon" suffix so this
+			// key is stable even if the user is currently running on Jupiter.
+			await this.transferDqn.loadWeights(
+				`${MOON_BASELINE_SEED}-moon`,
+			);
 			// Keep some exploration so it can adapt; don't collapse to greedy.
 			this.transferDqn.epsilon = Math.max(this.transferDqn.epsilon, 0.2);
 		}
@@ -109,7 +114,9 @@ export class AITheater {
 		this.training = false;
 		this.abortRequested = true;
 		if (this.currentSeed !== null) {
-			await this.dqn.saveWeights(String(this.currentSeed));
+			await this.dqn.saveWeights(
+				this.checkpointKey(this.currentSeed, this.currentPreset),
+			);
 		}
 		for (const slot of this.slots) {
 			if (slot.agent !== this.dqn) slot.agent.dispose();
@@ -236,6 +243,16 @@ export class AITheater {
 			steps,
 			...(epsilon !== undefined ? { epsilon } : {}),
 		} as AgentStats;
+	}
+
+	/**
+	 * Compose a checkpoint key from seed + preset name. Keeps per-world DQN
+	 * weights separate in IndexedDB so switching gravity doesn't contaminate
+	 * the fresh policy curve. The canonical Moon baseline lives at
+	 * `${MOON_BASELINE_SEED}-moon`.
+	 */
+	private checkpointKey(seed: number, preset: GravityPreset): string {
+		return `${seed}-${preset.name.toLowerCase()}`;
 	}
 
 	private adjustGameLayout(split: boolean): void {
