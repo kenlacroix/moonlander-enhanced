@@ -6,6 +6,11 @@ import { getLanderType } from "./LanderTypes";
 import { checkCollision } from "./Physics";
 import { generateTerrain } from "./Terrain";
 
+const AUTO_RESTART_DELAY = 2.0;
+
+let restartTimer = 0;
+let replaySeed = 1969;
+
 function getAgent(game: Game): RLAgent | null {
 	if (game.aiTheater.isActive) return game.aiTheater.getAgent();
 	return game.trainingLoop?.agent ?? null;
@@ -14,7 +19,7 @@ function getAgent(game: Game): RLAgent | null {
 export function startAgentReplay(game: Game, seed?: number): void {
 	const agent = getAgent(game);
 	if (!agent) return;
-	const replaySeed = seed ?? game.seed ?? 1969;
+	replaySeed = seed ?? game.seed ?? 1969;
 	game.setSeed(replaySeed);
 	game.activeMission = null;
 	game.terrain = generateTerrain(game.seed);
@@ -23,6 +28,7 @@ export function startAgentReplay(game: Game, seed?: number): void {
 	game.resetCamera();
 	game.resetLoop();
 	agent.epsilon = 0;
+	restartTimer = 0;
 	game.status = "agent-replay";
 }
 
@@ -47,6 +53,7 @@ export function stepAgentReplay(game: Game, dt: number): void {
 			game.camera.shake(15);
 			game.audio.playCrash();
 		}
+		restartTimer = 0;
 	}
 }
 
@@ -67,9 +74,14 @@ export function updateAgentReplayFrame(game: Game, dt: number): void {
 		game.status = "title";
 		return;
 	}
-	if (input.restart && game.lander.status !== "flying") {
-		startAgentReplay(game);
-		return;
+
+	if (game.lander.status !== "flying") {
+		restartTimer += dt;
+		if (restartTimer >= AUTO_RESTART_DELAY) {
+			startAgentReplay(game, replaySeed);
+			return;
+		}
 	}
+
 	game.renderAgentReplay();
 }

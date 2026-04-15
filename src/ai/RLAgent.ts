@@ -31,13 +31,15 @@ import {
 
 const STATE_SIZE = 8;
 const ACTION_COUNT = 4;
-const MEMORY_SIZE = 10000;
+const MEMORY_SIZE = 20000;
 const BATCH_SIZE = 64;
 const GAMMA = 0.99;
-const LEARNING_RATE = 0.001;
+const LEARNING_RATE = 0.0005;
 const EPSILON_START = 1.0;
 const EPSILON_END = 0.05;
-const EPSILON_DECAY = 0.998;
+const EPSILON_DECAY = 0.995;
+const TARGET_UPDATE_INTERVAL = 500;
+const TAU = 0.005;
 
 interface Experience {
 	state: number[];
@@ -63,7 +65,6 @@ export class RLAgent {
 	epsilon = EPSILON_START;
 	episodeCount = 0;
 	private rewardHistory: number[] = [];
-	private updateTargetEvery = 100;
 	private stepsSinceTargetUpdate = 0;
 	ready = false;
 
@@ -103,10 +104,19 @@ export class RLAgent {
 		return model;
 	}
 
-	private syncTargetModel(): void {
+	private syncTargetModel(soft = false): void {
 		if (!this.model || !this.targetModel) return;
-		const weights = this.model.getWeights();
-		this.targetModel.setWeights(weights.map((w) => w.clone()));
+		const modelWeights = this.model.getWeights();
+		if (soft) {
+			const targetWeights = this.targetModel.getWeights();
+			this.targetModel.setWeights(
+				modelWeights.map((w, i) =>
+					w.mul(TAU).add(targetWeights[i].mul(1 - TAU)),
+				),
+			);
+		} else {
+			this.targetModel.setWeights(modelWeights.map((w) => w.clone()));
+		}
 	}
 
 	/** Extract normalized state vector from game state */
@@ -265,15 +275,14 @@ export class RLAgent {
 			await this.model.fit(states, targets, { epochs: 1, verbose: 0 });
 			states.dispose();
 			targets.dispose();
+
+			this.stepsSinceTargetUpdate++;
+			if (this.stepsSinceTargetUpdate >= TARGET_UPDATE_INTERVAL) {
+				this.syncTargetModel(true);
+				this.stepsSinceTargetUpdate = 0;
+			}
 		} finally {
 			this.training = false;
-		}
-
-		// Periodically sync target network
-		this.stepsSinceTargetUpdate++;
-		if (this.stepsSinceTargetUpdate >= this.updateTargetEvery) {
-			this.syncTargetModel();
-			this.stepsSinceTargetUpdate = 0;
 		}
 	}
 
