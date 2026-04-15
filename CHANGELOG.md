@@ -2,6 +2,15 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.6.1] - 2026-04-15
+
+### Fixed
+- AI Theater UI no longer freezes during training. Three fixes: yields to the browser 3x more often per episode (`STEPS_PER_TICK` 50→15), DQN now fits every 12 steps instead of every 4 so TF.js doesn't saturate the main thread, and the training loop is wrapped in try/catch so a single episode failure doesn't silently halt the round-robin.
+- Policy Gradient agent was silently failing every episode since 0.5.4.0 with "sample weight is not supported yet." TF.js `Sequential.fit()` doesn't accept the `sampleWeight` option. Rewrote PG to use `optimizer.minimize(lossFn)` with a manual REINFORCE loss (`-mean(advantage * log π(a|s))`). Now the policy gradient curve in AI Theater actually moves.
+- AI Theater's DQN checkpoints are now scoped by gravity preset (`${seed}-${preset}`). Previously, training seed N on Moon then on Jupiter resumed Jupiter from Moon weights. Worse, running AI Theater on Jupiter with seed 1969 was overwriting the canonical Moon baseline the transfer agent depends on.
+- Fork replay now locks to Moon gravity + bypasses adaptive difficulty modifiers so the canned AI inputs actually reproduce the recorded trajectory (previously diverged on EASY/HARD/EXPERT seeds or after the player picked a non-Moon preset).
+- Chart click rejects out-of-buffer episode selections instead of silently picking the closest buffered episode, so "REPLAY & FORK" launches the run you actually clicked.
+
 ## [0.5.6.0] - 2026-04-15 (Sprint 4 Part A)
 
 ### Added

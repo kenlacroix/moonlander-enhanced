@@ -36,15 +36,21 @@ Verify service worker network-first cache handles WebGL asset transition correct
 
 ---
 
-## P1 — Apollo Missions Campaign (post cherry-picks)
+## P1 — Historic Missions (Sprint 5, CEO+Eng reviewed 2026-04-15)
 
-### Apollo Missions Campaign
-6 playable missions recreating the real Apollo landings (11, 12, 14, 15, 16, 17).
-- **Why:** The strongest differentiator. Science buffs share this with their space-nerd friends. No other lunar lander game does this.
-- **Effort:** L (human: ~2 weeks / CC: ~2-3 hours)
-- **Includes:** Real terrain profiles from NASA LOLA data, accurate mission constraints, historical briefings (hardcoded + LLM), historically-placed artifacts, post-landing factoids.
-- **Depends on:** Existing LLM integration, archaeology system, campaign infrastructure. All in place.
-- **Target audience:** Nostalgic science buffs, space enthusiasts, educators.
+### Sprint 5 Part A — Historic Missions foundations + Apollo + Artemis
+Active plan at `.plans/sprint-5-apollo.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-5-apollo.md`.
+- **Scope:** Apollo 11/15/17 + Artemis III + mission chatter + "margin vs Armstrong" share card. Single PR.
+- **Effort:** ~5h human / ~45-60 min CC.
+- **Status:** Plan approved in SCOPE EXPANSION mode. Architecture decisions locked (discriminated union, orthogonal missionMode, Achievement-scoped moments, streamingLLM extract). Ready to implement.
+
+### Sprint 5 Part B — Specialized mission types
+Follow-up PR after Part A ships.
+- **Scope:** Apollo 13 "Survive" (non-landing loop-around) + Luna 9 auto-landing.
+- **Effort:** ~7h human / ~55 min CC.
+
+### Deferred historic missions (post-Sprint 5)
+Apollo 12, 14, 16; Luna 16 (sample return); Chang'e 3/4/5; SLIM 2024; Chandrayaan-3. Enable the "playable lunar museum" theme once the HistoricMission subsystem is battle-tested by Sprint 5.
 
 ---
 

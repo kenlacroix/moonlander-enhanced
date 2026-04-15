@@ -364,11 +364,35 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 5 — Apollo Recreations — L (~3-4hr CC)
-- [ ] 3 iconic missions first (Apollo 11, 15, 17), remaining 3 as follow-up
-- [ ] Approximate terrain profiles from mission descriptions
-- [ ] Real mission constraints (fuel, thrust-to-weight, descent trajectory)
-- [ ] LLM-powered historical briefings per mission
+### Sprint 5 — Historic Missions — split into A (foundations + landings) + B (specialized types)
+
+*CEO-reviewed 2026-04-15 in SCOPE EXPANSION mode. Plan at `.plans/sprint-5-apollo.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-5-apollo.md`. Reframed from "Apollo Recreations" to "a playable museum of lunar exploration" spanning 1966 (Luna 9) through 2028 (Artemis III).*
+
+**Part A — Foundations + Apollo landings + Artemis + chatter + share card (~5h human / ~45-60 min CC):**
+- [ ] `HistoricMission` discriminated union type on `kind: "landing" | "survive" | "auto-landing"`
+- [ ] Fact-sheet data files: `apolloMissions.ts`, `artemisMissions.ts` (hybrid LLM+fact source of truth; offline fallback renders facts directly)
+- [ ] 3 Apollo landings (11, 15, 17) + Artemis III projection, each with DifficultyConfig + fact sheet
+- [ ] Apollo LM + Artemis LM lander types (one shared Apollo LM, per-mission fuel/altitude constraints do the work)
+- [ ] Terrain `specialFeature` hook: rille (Apollo 15 / Hadley) and valley (Apollo 17 / Taurus-Littrow)
+- [ ] Title screen HISTORIC MISSIONS row + mission select grouped by era
+- [ ] `Game.missionMode` orthogonal to `lander.status`, defaults to `"landing"`
+- [ ] MissionBriefing extended with `historicalContext` parameter
+- [ ] Moment-markers as mission-scoped Achievement IDs (Armstrong's 22-second margin, Hadley rille touchdown, Shackleton rim, etc.)
+- [ ] Shareable "margin vs historic reference" scorecard (extends FlightRecorder canvas-card)
+- [ ] `src/api/streamingLLM.ts` — shared pipe for briefings + chatter
+- [ ] `MissionChatter.ts` — event-triggered radio callouts during descent (altitude 1000m/200m, fuel 15%/5%, landing, crash); rule-based offline fallback
+- [ ] Regression test pinning non-historic terrain determinism (specialFeature hook touches load-bearing `generateTerrain`)
+
+**Part B — Specialized mission types (~7h human / ~55 min CC, follow-up PR):**
+- [ ] Apollo 13 "Survive" — non-landing loop-around mission, simplified 2D return-trajectory scoring via `missionMode === "survive"` branch, with `MAX_FLIGHT_DURATION` timeout
+- [ ] Luna 9 (1966 Soviet first soft landing) — `missionMode === "auto-landing"`, autopilot-driven, player spectates
+- [ ] Luna-9 lander type entry
+
+**Deferred (backlog):**
+- [ ] Apollo 12, 14, 16; Luna 16 (sample return); Chang'e 3/4/5; SLIM 2024; Chandrayaan-3
+- [ ] Satellite-accurate terrain from LROC heightmaps
+- [ ] Real-trajectory overlay vs player flight path
+- [ ] Polish bundle: NASA crew photos, historical landing quotes, Apollo DSKY HUD skin, era-appropriate audio tint, lunar-contact beep
 
 **Exit question:** Would a space nerd share this with every space nerd they know?
 
