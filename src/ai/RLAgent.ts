@@ -58,7 +58,7 @@ export interface TrainingStats {
 }
 
 export class RLAgent implements Agent {
-	readonly kind = "dqn" as const;
+	readonly kind: "dqn" | "dqn-transfer";
 	private model: tf.Sequential | null = null;
 	private targetModel: tf.Sequential | null = null;
 	private memory: Experience[] = [];
@@ -68,6 +68,10 @@ export class RLAgent implements Agent {
 	private rewardHistory: number[] = [];
 	private stepsSinceTargetUpdate = 0;
 	ready = false;
+
+	constructor(kind: "dqn" | "dqn-transfer" = "dqn") {
+		this.kind = kind;
+	}
 
 	/** Initialize the neural network. Call once before training. */
 	async init(): Promise<void> {

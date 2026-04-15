@@ -15,6 +15,24 @@ export interface GravityPreset {
 const SCALE = 60;
 
 export const GRAVITY_PRESETS: GravityPreset[] = [
+	{
+		name: "Asteroid",
+		gravity: 0.25,
+		gameGravity: 0.25 * SCALE,
+		color: "#bbbbbb",
+	},
+	{
+		name: "Europa",
+		gravity: 1.315,
+		gameGravity: 1.315 * SCALE,
+		color: "#88ddff",
+	},
+	{
+		name: "Titan",
+		gravity: 1.352,
+		gameGravity: 1.352 * SCALE,
+		color: "#ffcc66",
+	},
 	{ name: "Moon", gravity: 1.62, gameGravity: 1.62 * SCALE, color: "#00ff88" },
 	{ name: "Mars", gravity: 3.72, gameGravity: 3.72 * SCALE, color: "#ff6644" },
 	{
@@ -32,6 +50,11 @@ export const GRAVITY_PRESETS: GravityPreset[] = [
 	{ name: "Zero-G", gravity: 0, gameGravity: 0, color: "#aa44ff" },
 ];
 
+/** Canonical Moon seed used for transfer-learning baseline. AI trained on
+ * this seed+preset becomes the "Moon policy" that transfer experiments
+ * bootstrap from. */
+export const MOON_BASELINE_SEED = 1969;
+
 /** Get a preset by name (case-insensitive) */
 export function getGravityPreset(name: string): GravityPreset | undefined {
 	return GRAVITY_PRESETS.find(
@@ -41,7 +64,7 @@ export function getGravityPreset(name: string): GravityPreset | undefined {
 
 /** Get the default preset (Moon) */
 export function getDefaultPreset(): GravityPreset {
-	return GRAVITY_PRESETS[0];
+	return GRAVITY_PRESETS.find((p) => p.name === "Moon") ?? GRAVITY_PRESETS[0];
 }
 
 /** Cycle to the next preset */

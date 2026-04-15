@@ -5,6 +5,11 @@ import { RandomAgent } from "../ai/RandomAgent";
 import { RLAgent } from "../ai/RLAgent";
 import { AITheaterPanel } from "../ui/AITheaterPanel";
 import { FIXED_TIMESTEP } from "../utils/constants";
+import {
+	type GravityPreset,
+	getDefaultPreset,
+	MOON_BASELINE_SEED,
+} from "./GravityPresets";
 import { HeadlessGame } from "./HeadlessGame";
 
 const MAX_STEPS_PER_EPISODE = 1500;
@@ -26,6 +31,7 @@ interface AgentSlot {
 export class AITheater {
 	private panel: AITheaterPanel;
 	private dqn: RLAgent;
+	private transferDqn: RLAgent | null = null;
 	private slots: AgentSlot[] = [];
 	private training = false;
 	private abortRequested = false;
@@ -33,30 +39,46 @@ export class AITheater {
 	private bestLanded = false;
 	private totalEpisodes = 0;
 	private currentSeed: number | null = null;
+	private currentPreset: GravityPreset = getDefaultPreset();
 	private currentSlotIdx = 0;
 	private recorder = new EpisodeRecorder(10);
 	private forkHandler: ((episode: RecordedEpisode) => void) | null = null;
 
 	constructor() {
 		this.panel = new AITheaterPanel();
-		this.dqn = new RLAgent();
+		this.dqn = new RLAgent("dqn");
 	}
 
-	async start(seed: number): Promise<void> {
+	async start(seed: number, preset?: GravityPreset): Promise<void> {
 		this.currentSeed = seed;
+		this.currentPreset = preset ?? getDefaultPreset();
+		const isMoon = this.currentPreset.name === "Moon";
+		const gravity = this.currentPreset.gameGravity;
 		const pg = new PolicyGradientAgent();
 		const random = new RandomAgent();
 		this.slots = [
-			{ agent: this.dqn, game: new HeadlessGame(seed) },
-			{ agent: pg, game: new HeadlessGame(seed) },
-			{ agent: random, game: new HeadlessGame(seed) },
+			{ agent: this.dqn, game: new HeadlessGame(seed, { gravity }) },
+			{ agent: pg, game: new HeadlessGame(seed, { gravity }) },
+			{ agent: random, game: new HeadlessGame(seed, { gravity }) },
 		];
+		// Transfer learning: when the world isn't Moon, spin up a second DQN
+		// initialized from the Moon baseline weights and watch it adapt.
+		this.transferDqn = null;
+		if (!isMoon) {
+			const transfer = new RLAgent("dqn-transfer");
+			this.transferDqn = transfer;
+			this.slots.push({
+				agent: transfer,
+				game: new HeadlessGame(seed, { gravity }),
+			});
+		}
 		this.bestReward = -Infinity;
 		this.bestLanded = false;
 		this.totalEpisodes = 0;
 		this.abortRequested = false;
 		this.currentSlotIdx = 0;
 		this.recorder.clear();
+		this.panel.setPreset(this.currentPreset);
 
 		this.panel.mount();
 		this.panel.setEpisodesProvider(() => this.recorder.getEpisodes());
@@ -66,7 +88,20 @@ export class AITheater {
 		for (const slot of this.slots) {
 			if (!slot.agent.ready) await slot.agent.init();
 		}
-		await this.dqn.loadWeights(String(seed));
+		// Scope checkpoint keys by preset so a Jupiter run on seed N doesn't
+		// resume from the Moon-trained weights (and vice-versa). The transfer
+		// agent is the only thing that should cross worlds, and it explicitly
+		// loads the Moon-keyed baseline below.
+		await this.dqn.loadWeights(this.checkpointKey(seed, this.currentPreset));
+		if (this.transferDqn) {
+			// Load the canonical Moon baseline. Explicit "moon" suffix so this
+			// key is stable even if the user is currently running on Jupiter.
+			await this.transferDqn.loadWeights(
+				`${MOON_BASELINE_SEED}-moon`,
+			);
+			// Keep some exploration so it can adapt; don't collapse to greedy.
+			this.transferDqn.epsilon = Math.max(this.transferDqn.epsilon, 0.2);
+		}
 
 		this.bestReward = -Infinity;
 		this.totalEpisodes = this.dqn.episodeCount;
@@ -79,11 +114,14 @@ export class AITheater {
 		this.training = false;
 		this.abortRequested = true;
 		if (this.currentSeed !== null) {
-			await this.dqn.saveWeights(String(this.currentSeed));
+			await this.dqn.saveWeights(
+				this.checkpointKey(this.currentSeed, this.currentPreset),
+			);
 		}
 		for (const slot of this.slots) {
 			if (slot.agent !== this.dqn) slot.agent.dispose();
 		}
+		this.transferDqn = null;
 		this.slots = [];
 		this.panel.unmount();
 		this.adjustGameLayout(false);
@@ -205,6 +243,16 @@ export class AITheater {
 			steps,
 			...(epsilon !== undefined ? { epsilon } : {}),
 		} as AgentStats;
+	}
+
+	/**
+	 * Compose a checkpoint key from seed + preset name. Keeps per-world DQN
+	 * weights separate in IndexedDB so switching gravity doesn't contaminate
+	 * the fresh policy curve. The canonical Moon baseline lives at
+	 * `${MOON_BASELINE_SEED}-moon`.
+	 */
+	private checkpointKey(seed: number, preset: GravityPreset): string {
+		return `${seed}-${preset.name.toLowerCase()}`;
 	}
 
 	private adjustGameLayout(split: boolean): void {
