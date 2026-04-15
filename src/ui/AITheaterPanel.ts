@@ -83,8 +83,11 @@ export class AITheaterPanel {
 				style="background:#1a1a1a;color:#00ff88;border:1px solid #00ff88;padding:10px;
 				cursor:pointer;font-family:inherit;font-size:13px;border-radius:4px;
 				letter-spacing:1px;transition:background 0.2s">
-				WATCH AI'S BEST RUN
+				WATCH AI PLAY NOW
 			</button>
+			<div id="at-watch-hint" style="color:#555;font-size:11px;text-align:center">
+				Needs 20+ episodes for decent performance
+			</div>
 			<div style="color:#555;font-size:11px;text-align:center;margin-top:auto">
 				AI trains on your terrain at 50x speed
 			</div>
@@ -153,8 +156,12 @@ export class AITheaterPanel {
 		this.statusEl.textContent = stats.landed ? "LANDED!" : "TRAINING...";
 		this.statusEl.style.color = stats.landed ? "#00ff88" : "#ffaa00";
 
-		if (stats.episode > 0) {
+		const hintEl = this.panel.querySelector("#at-watch-hint") as HTMLDivElement;
+		if (stats.episode >= 20) {
 			this.watchBtn.disabled = false;
+			if (hintEl) hintEl.textContent = "Watch the AI attempt your terrain";
+		} else if (hintEl) {
+			hintEl.textContent = `Training... ${20 - stats.episode} episodes until ready`;
 		}
 
 		this.drawChart();
