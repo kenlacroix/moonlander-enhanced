@@ -5,6 +5,7 @@ import {
 	type AgentStats,
 } from "../ai/Agent";
 import type { RecordedEpisode } from "../ai/EpisodeRecorder";
+import type { GravityPreset } from "../game/GravityPresets";
 
 const PANEL_WIDTH = 360;
 const CHART_HEIGHT = 160;
@@ -18,7 +19,7 @@ interface Track {
 	episodes: number;
 }
 
-const AGENT_ORDER: AgentKind[] = ["dqn", "pg", "random"];
+const AGENT_ORDER: AgentKind[] = ["dqn", "dqn-transfer", "pg", "random"];
 
 export class AITheaterPanel {
 	private panel: HTMLDivElement;
@@ -74,6 +75,9 @@ export class AITheaterPanel {
 		this.panel.innerHTML = `
 			<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
 				AI THEATER
+			</div>
+			<div id="at-world-label" style="color:#aaa;font-size:11px;text-align:center;margin-top:-8px">
+				WORLD: MOON · g=1.62
 			</div>
 			<div style="border-bottom:1px solid #333;padding-bottom:8px">
 				<div style="color:#888;font-size:11px;margin-bottom:4px">DQN STATUS</div>
@@ -170,7 +174,12 @@ export class AITheaterPanel {
 			lastReward: 0,
 			episodes: 0,
 		});
-		return { dqn: make(), pg: make(), random: make() };
+		return {
+			dqn: make(),
+			"dqn-transfer": make(),
+			pg: make(),
+			random: make(),
+		};
 	}
 
 	mount(): void {
@@ -196,6 +205,16 @@ export class AITheaterPanel {
 
 	setEpisodesProvider(provider: () => RecordedEpisode[]): void {
 		this.episodesProvider = provider;
+	}
+
+	setPreset(preset: GravityPreset): void {
+		const label = this.panel.querySelector(
+			"#at-world-label",
+		) as HTMLDivElement | null;
+		if (label) {
+			label.textContent = `WORLD: ${preset.name.toUpperCase()} · g=${preset.gravity}`;
+			label.style.color = preset.color;
+		}
 	}
 
 	onEpisodeRecorded(_ep: RecordedEpisode): void {

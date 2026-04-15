@@ -2,7 +2,7 @@ import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
 import type { InputState } from "../systems/Input";
 
-export type AgentKind = "dqn" | "pg" | "random";
+export type AgentKind = "dqn" | "dqn-transfer" | "pg" | "random";
 
 export interface AgentStats {
 	kind: AgentKind;
@@ -42,12 +42,14 @@ export interface Agent {
 
 export const AGENT_COLORS: Record<AgentKind, string> = {
 	dqn: "#00ff88",
+	"dqn-transfer": "#ff88cc",
 	pg: "#00aaff",
 	random: "#888888",
 };
 
 export const AGENT_LABELS: Record<AgentKind, string> = {
-	dqn: "DQN",
+	dqn: "DQN (fresh)",
+	"dqn-transfer": "DQN (Moon→here)",
 	pg: "Policy Gradient",
 	random: "Random",
 };

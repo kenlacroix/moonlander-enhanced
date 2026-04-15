@@ -2,6 +2,16 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.6.0] - 2026-04-15 (Sprint 4 Part A)
+
+### Added
+- Multi-world transfer learning (Part A): three new gravity presets — Asteroid (0.25 m/s²), Europa (1.315), Titan (1.352) — alongside the existing Moon / Mars / Earth / Jupiter / Zero-G. AI Theater now passes the selected preset into its headless simulations, so the agents actually train under the current world's gravity.
+- Transfer-learning slot in AI Theater: when you launch AI Theater on any non-Moon world, a fourth DQN joins the round-robin — it loads the Moon-baseline weights (seed 1969) and keeps a floor exploration rate, then tries to adapt. The panel draws its curve in pink alongside the fresh DQN / PG / Random lines so the "Moon strategy crashes on Jupiter, then adapts" moment is visible.
+- World label header in the AI Theater panel (e.g. `WORLD: EUROPA · g=1.315`), colored by preset.
+
+### Changed
+- `getDefaultPreset()` still returns Moon, but by name lookup now that it's no longer the first entry in the preset list.
+
 ## [0.5.5.0] - 2026-04-15 (Sprint 3 Part A)
 
 ### Added

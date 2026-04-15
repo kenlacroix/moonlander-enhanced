@@ -215,7 +215,7 @@ function selectMission(game: Game, mission: Mission): void {
 	game.llm.fetchBriefing(game, mission);
 	updateURL(mission.seed);
 	if (game.gameMode === "ai-theater") {
-		game.aiTheater.start(mission.seed);
+		game.aiTheater.start(mission.seed, game.gravityPreset);
 		game.aiTheater.setWatchBestHandler(() => {
 			startAgentReplay(game, mission.seed);
 		});
