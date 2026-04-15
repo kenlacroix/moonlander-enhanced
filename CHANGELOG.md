@@ -2,6 +2,12 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.4.0] - 2026-04-15 (Sprint 2.5)
+
+### Added
+- RL algorithm comparison: AI Theater now runs three agents round-robin on the same terrain — DQN, Policy Gradient (REINFORCE), and a random baseline. Three colored learning curves on the same chart make the algorithmic differences visible at a glance.
+- Shared `Agent` interface + `AgentEnv` module so new algorithms drop in without changing the training loop.
+
 ## [0.5.3.0] - 2026-04-15
 
 ### Added

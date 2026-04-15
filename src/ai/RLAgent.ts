@@ -1,13 +1,15 @@
 import * as tf from "@tensorflow/tfjs";
 import type { LanderState } from "../game/Lander";
-import { getTerrainHeightAt, normAngle } from "../game/Physics";
-import type { LandingPad, TerrainData } from "../game/Terrain";
+import type { TerrainData } from "../game/Terrain";
 import type { InputState } from "../systems/Input";
+import type { Agent } from "./Agent";
 import {
-	LANDER_HEIGHT,
-	MAX_LANDING_SPEED,
-	STARTING_FUEL,
-} from "../utils/constants";
+	ACTION_COUNT,
+	actionToInput,
+	calculateReward,
+	getState,
+	STATE_SIZE,
+} from "./AgentEnv";
 
 /**
  * Deep Q-Network (DQN) agent that learns to land through trial and error.
@@ -29,8 +31,6 @@ import {
  *   3: rotate right
  */
 
-const STATE_SIZE = 8;
-const ACTION_COUNT = 4;
 const MEMORY_SIZE = 20000;
 const BATCH_SIZE = 64;
 const GAMMA = 0.99;
@@ -57,7 +57,8 @@ export interface TrainingStats {
 	steps: number;
 }
 
-export class RLAgent {
+export class RLAgent implements Agent {
+	readonly kind = "dqn" as const;
 	private model: tf.Sequential | null = null;
 	private targetModel: tf.Sequential | null = null;
 	private memory: Experience[] = [];
@@ -121,22 +122,7 @@ export class RLAgent {
 
 	/** Extract normalized state vector from game state */
 	getState(lander: LanderState, terrain: TerrainData): number[] {
-		const pad = this.findNearestPad(lander, terrain);
-		const padCenterX = pad ? pad.x + pad.width / 2 : lander.x;
-		const padWidth = pad?.width ?? 100;
-		const terrainY = getTerrainHeightAt(lander.x, terrain.points);
-		const altitude = terrainY - (lander.y + LANDER_HEIGHT / 2);
-
-		return [
-			(padCenterX - lander.x) / 2000, // dx to pad (normalized)
-			Math.min(altitude / 500, 1), // altitude (capped)
-			lander.vx / 300, // horizontal velocity
-			lander.vy / 300, // vertical velocity
-			normAngle(lander.angle) / 180, // angle (-1..1)
-			0, // angular velocity (unused for now)
-			lander.fuel / STARTING_FUEL, // fuel fraction
-			pad ? Math.abs(lander.x - padCenterX) / padWidth : 1, // distance to pad center ratio
-		];
+		return getState(lander, terrain);
 	}
 
 	/** Choose an action using epsilon-greedy policy */
@@ -154,24 +140,7 @@ export class RLAgent {
 
 	/** Convert action index to InputState */
 	actionToInput(action: number): InputState {
-		return {
-			thrustUp: action === 1,
-			rotateLeft: action === 2,
-			rotateRight: action === 3,
-			restart: false,
-			menuUp: false,
-			menuDown: false,
-			menuSelect: false,
-			menuBack: false,
-			toggleAutopilot: false,
-			openSettings: false,
-			toggleRetroSkin: false,
-			exportGhost: false,
-			importGhost: false,
-			flightReport: false,
-			toggleRelay: false,
-			toggleAnnotations: false,
-		};
+		return actionToInput(action);
 	}
 
 	/** Calculate reward for a transition */
@@ -181,37 +150,7 @@ export class RLAgent {
 		landed: boolean,
 		crashed: boolean,
 	): number {
-		if (landed) return 100;
-		if (crashed) return -100;
-
-		const pad = this.findNearestPad(lander, terrain);
-		if (!pad) return -1;
-
-		const padCenterX = pad.x + pad.width / 2;
-		const terrainY = getTerrainHeightAt(lander.x, terrain.points);
-		const altitude = terrainY - (lander.y + LANDER_HEIGHT / 2);
-
-		let reward = 0;
-
-		const dx = Math.abs(lander.x - padCenterX);
-		const proximity = Math.max(0, 1 - dx / 1000);
-		reward += proximity * 0.3;
-
-		const normalizedAlt = Math.min(altitude / 500, 1);
-		reward += (1 - normalizedAlt) * proximity * 0.3;
-
-		if (lander.vy > 0 && lander.vy < MAX_LANDING_SPEED * 2) {
-			reward += 0.2;
-		} else if (lander.vy > MAX_LANDING_SPEED * 3) {
-			reward -= 0.2;
-		}
-
-		const anglePenalty = Math.abs(normAngle(lander.angle)) / 180;
-		reward -= anglePenalty * 0.3;
-
-		reward -= 0.01;
-
-		return reward;
+		return calculateReward(lander, terrain, landed, crashed);
 	}
 
 	/** Store experience in replay buffer */
@@ -344,23 +283,6 @@ export class RLAgent {
 		} catch {
 			return false;
 		}
-	}
-
-	private findNearestPad(
-		lander: LanderState,
-		terrain: TerrainData,
-	): LandingPad | null {
-		if (terrain.pads.length === 0) return null;
-		let best = terrain.pads[0];
-		let bestDist = Math.abs(lander.x - (best.x + best.width / 2));
-		for (const pad of terrain.pads) {
-			const dist = Math.abs(lander.x - (pad.x + pad.width / 2));
-			if (dist < bestDist) {
-				best = pad;
-				bestDist = dist;
-			}
-		}
-		return best;
 	}
 
 	/** Clean up TensorFlow resources */

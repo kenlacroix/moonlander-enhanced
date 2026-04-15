@@ -1,9 +1,11 @@
-import { RLAgent, type TrainingStats } from "../ai/RLAgent";
+import type { Agent, AgentStats } from "../ai/Agent";
+import { PolicyGradientAgent } from "../ai/PolicyGradientAgent";
+import { RandomAgent } from "../ai/RandomAgent";
+import { RLAgent } from "../ai/RLAgent";
 import { AITheaterPanel } from "../ui/AITheaterPanel";
 import { FIXED_TIMESTEP } from "../utils/constants";
 import { HeadlessGame } from "./HeadlessGame";
 
-const EPISODES_PER_BATCH = 5;
 const MAX_STEPS_PER_EPISODE = 1500;
 const STEPS_PER_TICK = 50;
 
@@ -15,38 +17,53 @@ export interface AITheaterComparison {
 	aiLanded: boolean;
 }
 
+interface AgentSlot {
+	agent: Agent;
+	game: HeadlessGame;
+}
+
 export class AITheater {
 	private panel: AITheaterPanel;
-	private agent: RLAgent;
-	private game: HeadlessGame | null = null;
+	private dqn: RLAgent;
+	private slots: AgentSlot[] = [];
 	private training = false;
 	private abortRequested = false;
 	private bestReward = -Infinity;
 	private bestLanded = false;
 	private totalEpisodes = 0;
 	private currentSeed: number | null = null;
+	private currentSlotIdx = 0;
 
 	constructor() {
 		this.panel = new AITheaterPanel();
-		this.agent = new RLAgent();
+		this.dqn = new RLAgent();
 	}
 
 	async start(seed: number): Promise<void> {
 		this.currentSeed = seed;
-		this.game = new HeadlessGame(seed);
+		const pg = new PolicyGradientAgent();
+		const random = new RandomAgent();
+		this.slots = [
+			{ agent: this.dqn, game: new HeadlessGame(seed) },
+			{ agent: pg, game: new HeadlessGame(seed) },
+			{ agent: random, game: new HeadlessGame(seed) },
+		];
 		this.bestReward = -Infinity;
 		this.bestLanded = false;
 		this.totalEpisodes = 0;
 		this.abortRequested = false;
+		this.currentSlotIdx = 0;
 
 		this.panel.mount();
 		this.adjustGameLayout(true);
 
-		if (!this.agent.ready) await this.agent.init();
-		await this.agent.loadWeights(String(seed));
+		for (const slot of this.slots) {
+			if (!slot.agent.ready) await slot.agent.init();
+		}
+		await this.dqn.loadWeights(String(seed));
 
 		this.bestReward = -Infinity;
-		this.totalEpisodes = this.agent.episodeCount;
+		this.totalEpisodes = this.dqn.episodeCount;
 
 		this.training = true;
 		this.runTrainingLoop();
@@ -56,11 +73,14 @@ export class AITheater {
 		this.training = false;
 		this.abortRequested = true;
 		if (this.currentSeed !== null) {
-			await this.agent.saveWeights(String(this.currentSeed));
+			await this.dqn.saveWeights(String(this.currentSeed));
 		}
+		for (const slot of this.slots) {
+			if (slot.agent !== this.dqn) slot.agent.dispose();
+		}
+		this.slots = [];
 		this.panel.unmount();
 		this.adjustGameLayout(false);
-		this.game = null;
 		this.currentSeed = null;
 	}
 
@@ -86,60 +106,58 @@ export class AITheater {
 	}
 
 	getAgent(): RLAgent {
-		return this.agent;
+		return this.dqn;
 	}
 
 	private async runTrainingLoop(): Promise<void> {
 		while (this.training && !this.abortRequested) {
-			for (let i = 0; i < EPISODES_PER_BATCH; i++) {
-				if (this.abortRequested) return;
-				const stats = await this.runEpisode();
+			const slot = this.slots[this.currentSlotIdx];
+			const stats = await this.runEpisode(slot);
+			if (slot.agent === this.dqn) {
 				this.totalEpisodes = stats.episode;
 				if (stats.totalReward > this.bestReward) {
 					this.bestReward = stats.totalReward;
 				}
 				if (stats.landed) this.bestLanded = true;
-				this.panel.updateStats(stats);
 			}
+			this.panel.updateStats(stats);
+			this.currentSlotIdx = (this.currentSlotIdx + 1) % this.slots.length;
 			await new Promise((resolve) => setTimeout(resolve, 0));
 		}
 	}
 
-	private async runEpisode(): Promise<TrainingStats> {
-		if (!this.game) throw new Error("No game initialized");
-		this.game.reset();
+	private async runEpisode(slot: AgentSlot): Promise<AgentStats> {
+		const { agent, game } = slot;
+		game.reset();
 		let totalReward = 0;
 		let steps = 0;
 		let landed = false;
 		let stepsThisTick = 0;
 
 		while (steps < MAX_STEPS_PER_EPISODE) {
-			const state = this.agent.getState(this.game.lander, this.game.terrain);
-			const action = this.agent.chooseAction(state);
-			const input = this.agent.actionToInput(action);
+			const state = agent.getState(game.lander, game.terrain);
+			const action = agent.chooseAction(state);
+			const input = agent.actionToInput(action);
 
-			const result = this.game.step(input, FIXED_TIMESTEP);
+			const result = game.step(input, FIXED_TIMESTEP);
 			landed = result.landed;
 
-			const reward = this.agent.calculateReward(
-				this.game.lander,
-				this.game.terrain,
+			const reward = agent.calculateReward(
+				game.lander,
+				game.terrain,
 				landed,
 				result.crashed,
 			);
 
-			const nextState = this.agent.getState(
-				this.game.lander,
-				this.game.terrain,
-			);
-			this.agent.remember(state, action, reward, nextState, result.done);
+			const nextState = agent.getState(game.lander, game.terrain);
+			agent.remember(state, action, reward, nextState, result.done);
 
 			totalReward += reward;
 			steps++;
 			stepsThisTick++;
 
 			if (result.done) break;
-			if (steps % 4 === 0) await this.agent.trainBatch();
+			if (agent.trainBatch && steps % 4 === 0) await agent.trainBatch();
 
 			if (stepsThisTick >= STEPS_PER_TICK) {
 				stepsThisTick = 0;
@@ -147,15 +165,17 @@ export class AITheater {
 			}
 		}
 
-		this.agent.endEpisode(totalReward);
+		await agent.endEpisode(totalReward);
 
+		const epsilon = agent instanceof RLAgent ? agent.epsilon : undefined;
 		return {
-			episode: this.agent.episodeCount,
+			kind: agent.kind,
+			episode: agent.episodeCount,
 			totalReward,
-			epsilon: this.agent.epsilon,
 			landed,
 			steps,
-		};
+			...(epsilon !== undefined ? { epsilon } : {}),
+		} as AgentStats;
 	}
 
 	private adjustGameLayout(split: boolean): void {
