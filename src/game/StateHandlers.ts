@@ -212,6 +212,9 @@ function selectMission(game: Game, mission: Mission): void {
 	updateURL(mission.seed);
 	if (game.gameMode === "ai-theater") {
 		game.aiTheater.start(mission.seed);
+		game.aiTheater.setWatchBestHandler(() => {
+			startAgentReplay(game, mission.seed);
+		});
 	}
 }
 
