@@ -16,6 +16,7 @@ import type { Game } from "./Game";
 import { nextPreset, prevPreset } from "./GravityPresets";
 import {
 	CAMPAIGN,
+	getDailyMission,
 	isMissionUnlocked,
 	MISSIONS,
 	type Mission,
@@ -23,7 +24,7 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { createRelayState } from "./RelayMode";
 
-const TITLE_OPTION_COUNT = 5;
+const TITLE_OPTION_COUNT = 6;
 
 export function updateTitle(game: Game, input: InputState): void {
 	if (input.menuUp)
@@ -40,6 +41,9 @@ export function updateTitle(game: Game, input: InputState): void {
 			game.status = "menu";
 		} else if (game.titleSelection === 4) {
 			startEditor(game);
+		} else if (game.titleSelection === 5) {
+			game.gameMode = "freeplay";
+			selectMission(game, getDailyMission());
 		} else {
 			game.gameMode = game.titleSelection === 0 ? "freeplay" : "campaign";
 			game.selectedMission = 0;

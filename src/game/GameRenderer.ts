@@ -16,7 +16,13 @@ import type { Artifact } from "./Artifacts";
 import type { Camera } from "./Camera";
 import { type GravityStormState, getGravityStormLabel } from "./GravityStorm";
 import type { LanderState } from "./Lander";
-import { CAMPAIGN, MISSIONS, type Mission } from "./Missions";
+import {
+	CAMPAIGN,
+	getDailyDateLabel,
+	getDailySeed,
+	MISSIONS,
+	type Mission,
+} from "./Missions";
 import type { ParticleSystem } from "./Particles";
 import {
 	getRelayLabel,
@@ -59,6 +65,7 @@ export interface GameRenderState {
 	readonly lastRank: number | null;
 	readonly llmText: string;
 	readonly artifactText: string;
+	readonly crashAnalysis: string;
 	readonly flightElapsed: number;
 	readonly titleSelection: number;
 	readonly selectedMission: number;
@@ -229,6 +236,11 @@ export class GameRenderer {
 			this.renderer.drawArtifactFact(state.artifactText);
 		}
 
+		// Post-crash flight analysis (coaching)
+		if (state.crashAnalysis && state.status === "crashed") {
+			this.renderer.drawCrashAnalysis(state.crashAnalysis);
+		}
+
 		// Mission briefing (shown during first seconds of flight)
 		if (
 			state.llmText &&
@@ -254,6 +266,8 @@ export class GameRenderer {
 			state.titleSelection,
 			state.campaignCompleted.size,
 			CAMPAIGN.length,
+			getDailyDateLabel(),
+			getBestScore(getDailySeed()),
 		);
 	}
 

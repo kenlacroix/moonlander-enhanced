@@ -3,9 +3,15 @@
  * Extracted from Game.ts to isolate async LLM operations from game logic.
  */
 
+import {
+	extractCrashFacts,
+	getCrashExplanation,
+	offlineCrashAnalysis,
+} from "../api/CrashExplainer";
 import type { LLMConfig } from "../api/LLMProvider";
 import { getMissionBriefing } from "../api/MissionBriefing";
 import { getMissionControlCommentary } from "../api/MissionControl";
+import type { TelemetryFrame } from "../systems/Telemetry";
 import {
 	type Artifact,
 	type ArtifactType,
@@ -20,6 +26,7 @@ export interface LLMStateHandle {
 	llmText: string;
 	llmLoading: boolean;
 	artifactText: string;
+	crashAnalysis: string;
 }
 
 export class LLMIntegration {
@@ -66,6 +73,27 @@ export class LLMIntegration {
 			.finally(() => {
 				state.llmLoading = false;
 			});
+	}
+
+	/** Post-crash coaching. Always produces text — LLM if configured, rules otherwise. */
+	fetchCrashAnalysis(
+		state: LLMStateHandle,
+		lander: LanderState,
+		frames: TelemetryFrame[],
+		startingFuel: number,
+	): void {
+		const facts = extractCrashFacts(lander, frames, startingFuel);
+		const config = this.getConfig();
+		if (!config) {
+			state.crashAnalysis = offlineCrashAnalysis(facts);
+			return;
+		}
+		state.crashAnalysis = "";
+		getCrashExplanation(config, facts, (chunk) => {
+			state.crashAnalysis += chunk;
+		}).catch(() => {
+			state.crashAnalysis = offlineCrashAnalysis(facts);
+		});
 	}
 
 	scanNearbyArtifact(

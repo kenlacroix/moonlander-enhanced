@@ -139,7 +139,7 @@ export class HUD {
 		ctx.font = '12px "Courier New", monospace';
 		ctx.textAlign = "center";
 		ctx.fillText(
-			"↑ THRUST   ← → ROTATE   P AUTOPILOT   R RESTART",
+			"↑ THRUST   ← → ROTATE   P AUTOPILOT   R RESTART   ESC MENU",
 			CANVAS_WIDTH / 2,
 			CANVAS_HEIGHT - 20,
 		);
