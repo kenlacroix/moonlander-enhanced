@@ -36,6 +36,12 @@ export interface DifficultyConfig {
 	aliensEnabled?: boolean; // force alien spawn (campaign)
 	gravityStormsEnabled?: boolean; // force gravity storms (campaign)
 	crevices?: number; // number of sharp crevices to carve (0 = none)
+	/**
+	 * Optional post-pass terrain feature for historic missions.
+	 * - "rille": narrow V-trench carved between pads (Apollo 15 / Hadley Rille flavor)
+	 * - "valley": tall walls raised at world edges, central plain preserved (Apollo 17 / Taurus-Littrow flavor)
+	 */
+	specialFeature?: "rille" | "valley";
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */
@@ -97,7 +103,88 @@ export function generateTerrain(
 	// Place landing pads
 	const pads = placeLandingPads(points, rng, difficulty);
 
+	// Optional historic-mission flavor pass. Runs after pads so it can
+	// avoid touching pad zones. Gated on specialFeature being set so
+	// terrain output is byte-identical to pre-Sprint-5 behavior when
+	// the feature isn't requested (regression test pins this).
+	if (difficulty?.specialFeature) {
+		applySpecialFeature(points, pads, rng, difficulty.specialFeature);
+	}
+
 	return { points, pads, seed };
+}
+
+/**
+ * Apply a historic-mission terrain flavor pass.
+ *
+ * Both features preserve pad heights — they only modify points outside
+ * pad zones. Without this guarantee we'd silently make landings
+ * impossible by tilting the pad surface.
+ */
+function applySpecialFeature(
+	points: Vec2[],
+	pads: LandingPad[],
+	rng: () => number,
+	feature: "rille" | "valley",
+): void {
+	const isOnPad = (x: number): boolean =>
+		pads.some((p) => x >= p.x - 4 && x <= p.x + p.width + 4);
+
+	if (feature === "rille") {
+		// Hadley Rille: narrow V-trench between pads. Center it in the
+		// largest pad-free gap so it never bisects a landing zone.
+		const gaps: { center: number; width: number }[] = [];
+		const sorted = [...pads].sort((a, b) => a.x - b.x);
+		let prev = 0;
+		for (const p of sorted) {
+			if (p.x > prev) {
+				gaps.push({ center: (prev + p.x) / 2, width: p.x - prev });
+			}
+			prev = p.x + p.width;
+		}
+		if (prev < WORLD_WIDTH) {
+			gaps.push({
+				center: (prev + WORLD_WIDTH) / 2,
+				width: WORLD_WIDTH - prev,
+			});
+		}
+		const target = gaps.reduce(
+			(best, g) => (g.width > best.width ? g : best),
+			gaps[0] ?? { center: WORLD_WIDTH / 2, width: WORLD_WIDTH },
+		);
+
+		const trenchHalf = Math.min(80, target.width * 0.25);
+		const depth = 90 + rng() * 40; // 90-130 deep
+		for (const p of points) {
+			const dx = p.x - target.center;
+			if (Math.abs(dx) > trenchHalf) continue;
+			if (isOnPad(p.x)) continue;
+			const t = 1 - Math.abs(dx) / trenchHalf;
+			p.y += depth * t * t; // V-shape via quadratic falloff
+		}
+		return;
+	}
+
+	if (feature === "valley") {
+		// Taurus-Littrow: raise mountain walls at the world edges, leave
+		// a central plain intact. Falloff is cosine-shaped so the walls
+		// blend naturally into the existing terrain.
+		const wallSpan = WORLD_WIDTH * 0.18;
+		const peak = 120 + rng() * 40; // 120-160 high
+		for (const p of points) {
+			if (isOnPad(p.x)) continue;
+			let t = 0;
+			if (p.x < wallSpan) {
+				t = 1 - p.x / wallSpan;
+			} else if (p.x > WORLD_WIDTH - wallSpan) {
+				t = 1 - (WORLD_WIDTH - p.x) / wallSpan;
+			} else {
+				continue;
+			}
+			// y axis points down on screen, so subtract to raise terrain
+			p.y -= peak * t * t;
+		}
+	}
 }
 
 function placeLandingPads(

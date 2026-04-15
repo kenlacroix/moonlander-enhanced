@@ -1,4 +1,9 @@
-import { generateFlightReport } from "../systems/FlightRecorder";
+import { APOLLO_MISSIONS } from "../data/apolloMissions";
+import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
+import {
+	computeHistoricYourValue,
+	generateFlightReport,
+} from "../systems/FlightRecorder";
 import { downloadGhost, uploadGhost } from "../systems/GhostReplay";
 import type { InputState } from "../systems/Input";
 import {
@@ -14,6 +19,7 @@ import { LANDER_HEIGHT, STARTING_FUEL } from "../utils/constants";
 import { startAgentReplay } from "./AgentReplay";
 import type { Game } from "./Game";
 import { nextPreset, prevPreset } from "./GravityPresets";
+import { type HistoricMission, isHistoricMission } from "./HistoricMission";
 import {
 	CAMPAIGN,
 	getDailyMission,
@@ -24,7 +30,16 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { createRelayState } from "./RelayMode";
 
-const TITLE_OPTION_COUNT = 6;
+const TITLE_OPTION_COUNT = 7;
+
+/**
+ * Historic missions, grouped by era for the mission-select grouping.
+ * Order matters: this array order is what the menu cycles through.
+ */
+export const HISTORIC_MISSIONS: HistoricMission[] = [
+	...APOLLO_MISSIONS,
+	...ARTEMIS_MISSIONS,
+];
 
 export function updateTitle(game: Game, input: InputState): void {
 	if (input.menuUp)
@@ -44,6 +59,10 @@ export function updateTitle(game: Game, input: InputState): void {
 		} else if (game.titleSelection === 5) {
 			game.gameMode = "freeplay";
 			selectMission(game, getDailyMission());
+		} else if (game.titleSelection === 6) {
+			game.gameMode = "historic";
+			game.selectedMission = 0;
+			game.status = "menu";
 		} else {
 			game.gameMode = game.titleSelection === 0 ? "freeplay" : "campaign";
 			game.selectedMission = 0;
@@ -97,7 +116,7 @@ export function updateEditor(game: Game, input: InputState): void {
 }
 
 export function updateMenu(game: Game, input: InputState): void {
-	const missions = game.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
+	const missions = getMenuMissions(game.gameMode);
 	if (input.menuUp)
 		game.selectedMission =
 			(game.selectedMission - 1 + missions.length) % missions.length;
@@ -124,7 +143,7 @@ export function updateMenu(game: Game, input: InputState): void {
 	if (input.importGhost) {
 		uploadGhost().then((run) => {
 			if (run) {
-				const m = game.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
+				const m = getMenuMissions(game.gameMode);
 				const idx = m.findIndex((mi) => mi.seed === run.seed);
 				if (idx >= 0) game.selectedMission = idx;
 			}
@@ -140,6 +159,12 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		input.flightReport &&
 		(game.status === "landed" || game.status === "crashed")
 	) {
+		const historicRef =
+			game.activeMission &&
+			isHistoricMission(game.activeMission) &&
+			game.activeMission.kind === "landing"
+				? buildHistoricReference(game)
+				: undefined;
 		generateFlightReport(
 			game.lander,
 			game.terrain,
@@ -148,6 +173,7 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 			game.seed,
 			game.score,
 			game.status === "landed",
+			historicRef,
 		);
 	}
 	if (input.restart && game.status !== "playing") {
@@ -183,7 +209,20 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 			game.lander.fuel,
 		);
 		game.audio.updateSoundtrack(Math.max(0, Math.min(1, 1 - altitude / 500)));
+		if (
+			game.activeMission &&
+			isHistoricMission(game.activeMission) &&
+			game.activeMission.kind === "landing"
+		) {
+			game.missionChatter.update({
+				lander: game.lander,
+				altitude,
+				startingFuel:
+					game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL,
+			});
+		}
 	}
+	game.missionChatter.tick(dt);
 	game.particles.update(dt);
 	game.audio.setThruster(game.lander.thrusting && game.status === "playing");
 	if (
@@ -208,12 +247,32 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 	}
 }
 
+/**
+ * Returns the mission list shown on the mission-select screen for the
+ * active gameMode. Centralizing this means updateMenu, ghost-import, and
+ * any future mission-list consumer share one source of truth.
+ */
+export function getMenuMissions(
+	mode: "freeplay" | "campaign" | "ai-theater" | "historic",
+): readonly Mission[] {
+	if (mode === "campaign") return CAMPAIGN;
+	if (mode === "historic") return HISTORIC_MISSIONS;
+	return MISSIONS;
+}
+
 function selectMission(game: Game, mission: Mission): void {
 	game.activeMission = mission;
 	game.setSeed(mission.seed);
+	// Default to "landing" for everything; historic missions opt into
+	// "survive" or "auto-landing" via their `kind` discriminator. This
+	// must be set before reset() so the physics path branches correctly.
+	game.missionMode = isHistoricMission(mission) ? mission.kind : "landing";
 	game.reset();
 	game.llm.fetchBriefing(game, mission);
 	updateURL(mission.seed);
+	if (isHistoricMission(mission) && mission.kind === "landing") {
+		game.missionChatter.start(mission.facts, game.getLLMConfig());
+	}
 	if (game.gameMode === "ai-theater") {
 		game.aiTheater.start(mission.seed, game.gravityPreset);
 		game.aiTheater.setWatchBestHandler(() => {
@@ -287,4 +346,44 @@ function updateURL(seed: number | null): void {
 	if (seed !== null) url.searchParams.set("seed", String(seed));
 	else url.searchParams.delete("seed");
 	window.history.replaceState(null, "", url.toString());
+}
+
+/**
+ * Build the "your value vs theirs" reference for the share card on a
+ * historic-landing mission. Caller has already confirmed activeMission
+ * is a HistoricMission with kind === "landing".
+ */
+function buildHistoricReference(game: Game):
+	| {
+			label: string;
+			yourValue: number;
+			theirValue: number;
+			unit: string;
+	  }
+	| undefined {
+	const m = game.activeMission;
+	if (!m || !isHistoricMission(m) || m.kind !== "landing") return undefined;
+	const facts = m.facts;
+	// Estimate fuel burn rate from FUEL_BURN_RATE constant pattern: each
+	// thrusting frame consumes a fixed amount. Approximate as
+	// `(starting - remaining) / duration` so the rate is observed, not
+	// assumed.
+	const startingFuel = m.difficulty?.startingFuel ?? STARTING_FUEL;
+	const used = Math.max(0, startingFuel - game.lander.fuel);
+	const dur = Math.max(0.1, game.telemetry.getDuration());
+	const burnRate = used / dur;
+	const yourValue = computeHistoricYourValue({
+		label: facts.historicalReferenceLabel,
+		theirValue: facts.historicalReferenceValue,
+		unit: facts.historicalReferenceUnit,
+		fuelRemaining: game.lander.fuel,
+		fuelBurnRatePerSec: burnRate,
+		flightDurationSec: dur,
+	});
+	return {
+		label: facts.historicalReferenceLabel,
+		yourValue,
+		theirValue: facts.historicalReferenceValue,
+		unit: facts.historicalReferenceUnit,
+	};
 }

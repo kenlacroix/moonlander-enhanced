@@ -32,6 +32,41 @@ interface FlightReport {
 	fuelStarted: number;
 	frames: TelemetryFrame[];
 	terrainPoints: { x: number; y: number }[];
+	historicReference?: {
+		label: string; // e.g. "Armstrong fuel margin"
+		yourValue: number; // computed at landing
+		theirValue: number; // historical reference
+		unit: string; // "seconds", "m drift", etc.
+	};
+}
+
+/**
+ * Compute the player's "your value" for a historic mission's reference
+ * metric. The interpretation depends on the metric label, so we keep
+ * this simple: fuel margin = remaining-fuel-as-seconds-of-thrust;
+ * everything else just reuses the played duration as a placeholder.
+ * Part B can replace these with proper per-mission computations.
+ */
+export interface HistoricComparisonInput {
+	label: string;
+	theirValue: number;
+	unit: string;
+	fuelRemaining: number;
+	fuelBurnRatePerSec: number;
+	flightDurationSec: number;
+}
+
+export function computeHistoricYourValue(
+	input: HistoricComparisonInput,
+): number {
+	const labelLower = input.label.toLowerCase();
+	if (labelLower.includes("fuel") || labelLower.includes("margin")) {
+		// Convert remaining fuel to seconds of thrust based on burn rate.
+		const safeRate = Math.max(0.0001, input.fuelBurnRatePerSec);
+		return Math.round((input.fuelRemaining / safeRate) * 10) / 10;
+	}
+	// Default: the player's flight duration.
+	return Math.round(input.flightDurationSec * 10) / 10;
 }
 
 function getFuelGrade(pctRemaining: number): { letter: string; color: string } {
@@ -63,6 +98,7 @@ export function generateFlightReport(
 	seed: number,
 	score: number,
 	landed: boolean,
+	historicReference?: FlightReport["historicReference"],
 ): void {
 	const report: FlightReport = {
 		missionName,
@@ -77,6 +113,7 @@ export function generateFlightReport(
 		fuelStarted: STARTING_FUEL * lander.landerType.fuelMultiplier,
 		frames,
 		terrainPoints: terrain.points,
+		historicReference,
 	};
 
 	const canvas = document.createElement("canvas");
@@ -315,6 +352,22 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 	}
 
 	// Footer
+	// Historic mission "your value vs theirs" comparison line. Only
+	// renders when the caller passed historicReference (i.e. this is a
+	// HistoricMission). Sits above the footer.
+	if (r.historicReference) {
+		const ref = r.historicReference;
+		const yourBeat = ref.yourValue < ref.theirValue;
+		ctx.textAlign = "center";
+		ctx.font = 'bold 14px "Courier New", monospace';
+		ctx.fillStyle = yourBeat ? "#00ff88" : "#ffaa00";
+		ctx.fillText(
+			`${ref.label.toUpperCase()}: YOU ${ref.yourValue} ${ref.unit} · REF ${ref.theirValue} ${ref.unit}`,
+			CARD_WIDTH / 2,
+			CARD_HEIGHT - 40,
+		);
+	}
+
 	ctx.fillStyle = "#333333";
 	ctx.font = '11px "Courier New", monospace';
 	ctx.textAlign = "center";

@@ -38,6 +38,24 @@ export const LANDER_TYPES: Record<string, LanderType> = {
 		color: "#44ffaa",
 		description: "Light and nimble. Low fuel, low thrust.",
 	},
+	"apollo-lm": {
+		name: "APOLLO LM",
+		thrustMultiplier: 1.1,
+		fuelMultiplier: 0.85,
+		massMultiplier: 1.2,
+		rotationMultiplier: 0.9,
+		color: "#d4d4c8",
+		description: "Lunar Module. Authentic descent stage.",
+	},
+	"artemis-lm": {
+		name: "ARTEMIS LM",
+		thrustMultiplier: 1.3,
+		fuelMultiplier: 1.1,
+		massMultiplier: 1.35,
+		rotationMultiplier: 0.85,
+		color: "#e8b878",
+		description: "Modern Human Landing System. Heavier, more capable.",
+	},
 };
 
 export function getLanderType(name?: string): LanderType {

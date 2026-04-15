@@ -50,6 +50,37 @@ const ACHIEVEMENTS: Achievement[] = [
 		name: "ARCHAEOLOGIST",
 		description: "Scan all artifacts on a terrain with 2 artifacts",
 	},
+	// Sprint 5 historic-mission "moments". Each unlocks only on its
+	// specific mission (mission-scoped via checkLandingAchievements'
+	// missionMoments parameter). Achievement IDs must match
+	// MissionMoment.achievementId in the mission data files.
+	{
+		id: "apollo-11-margin",
+		name: "ARMSTRONG MARGIN",
+		description:
+			"Apollo 11: land with under 3% fuel remaining (~22 sec margin)",
+	},
+	{
+		id: "apollo-11-clean",
+		name: "EAGLE TOUCHDOWN",
+		description:
+			"Apollo 11: land near-vertical with under 1 m/s vertical speed",
+	},
+	{
+		id: "hadley-rille",
+		name: "HADLEY RILLE",
+		description: "Apollo 15: land in the Hadley Rille canyon",
+	},
+	{
+		id: "taurus-littrow",
+		name: "VALLEY OF THE LAST",
+		description: "Apollo 17: land in the Taurus-Littrow valley",
+	},
+	{
+		id: "shackleton-rim",
+		name: "SOUTH POLE",
+		description: "Artemis III: land on the Shackleton crater rim",
+	},
 ];
 
 const STORAGE_KEY = "moonlander-achievements";
@@ -97,6 +128,25 @@ export function getAllAchievements(
 	}));
 }
 
+/**
+ * Predicate used by mission-scoped "moment" achievements. Mission data
+ * files declare these alongside an achievementId; checkLandingAchievements
+ * runs them only when the corresponding mission is active.
+ */
+export interface MissionMomentCheck {
+	achievementId: string;
+	check: (state: {
+		landed: boolean;
+		fuelRemaining: number;
+		startingFuel: number;
+		flightDurationSec: number;
+		finalVerticalSpeed: number;
+		finalHorizontalSpeed: number;
+		finalAngleDeg: number;
+		landedOnPad: boolean;
+	}) => boolean;
+}
+
 /** Check landing conditions and return any newly unlocked achievements */
 export function checkLandingAchievements(
 	unlocked: Set<string>,
@@ -110,6 +160,19 @@ export function checkLandingAchievements(
 		campaignComplete: boolean;
 		artifactsScanned: number;
 		artifactsTotal: number;
+	},
+	missionMoments?: {
+		moments: MissionMomentCheck[];
+		state: {
+			landed: boolean;
+			fuelRemaining: number;
+			startingFuel: number;
+			flightDurationSec: number;
+			finalVerticalSpeed: number;
+			finalHorizontalSpeed: number;
+			finalAngleDeg: number;
+			landedOnPad: boolean;
+		};
 	},
 ): Achievement[] {
 	const newlyUnlocked: Achievement[] = [];
@@ -157,6 +220,18 @@ export function checkLandingAchievements(
 	) {
 		const arch = unlockAchievement(unlocked, "archaeologist");
 		if (arch) newlyUnlocked.push(arch);
+	}
+
+	// Mission-scoped moments: only fire when the active mission declares
+	// them. This is what stops "apollo-11-margin" from accidentally
+	// unlocking on a free-play mission that happens to land tight on fuel.
+	if (missionMoments) {
+		for (const moment of missionMoments.moments) {
+			if (moment.check(missionMoments.state)) {
+				const unlocked_ = unlockAchievement(unlocked, moment.achievementId);
+				if (unlocked_) newlyUnlocked.push(unlocked_);
+			}
+		}
 	}
 
 	return newlyUnlocked;
