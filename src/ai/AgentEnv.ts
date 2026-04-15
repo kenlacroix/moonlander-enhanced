@@ -65,6 +65,7 @@ export function actionToInput(action: number): InputState {
 		flightReport: false,
 		toggleRelay: false,
 		toggleAnnotations: false,
+		forkTakeover: false,
 	};
 }
 

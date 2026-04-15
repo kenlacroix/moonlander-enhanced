@@ -33,6 +33,7 @@ function unpackInput(frame: InputFrame): InputState {
 		flightReport: false,
 		toggleRelay: false,
 		toggleAnnotations: false,
+		forkTakeover: false,
 	};
 }
 

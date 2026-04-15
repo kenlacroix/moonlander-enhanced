@@ -1,8 +1,10 @@
+import { actionToInput } from "../ai/AgentEnv";
 import { Autopilot } from "../ai/Autopilot";
 import {
 	applyAdaptiveModifiers,
 	getAdaptiveModifiers,
 } from "../ai/DifficultyAdapter";
+import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
@@ -99,6 +101,12 @@ export class Game {
 	private retroSkin = new RetroVectorSkin();
 	aiTheater = new AITheater();
 	aiTheaterComparison: AITheaterComparison | null = null;
+	forkReplay: {
+		episode: RecordedEpisode;
+		frame: number;
+		forked: boolean;
+		forkFrame: number | null;
+	} | null = null;
 	editorState: EditorState | null = null;
 	achievements = loadAchievements();
 	achievementToast: Achievement | null = null;
@@ -163,6 +171,7 @@ export class Game {
 			(dt) => this.onFixedUpdate(dt),
 			(dt) => this.onAfterFrame(dt),
 		);
+		this.aiTheater.setForkHandler((ep) => this.startForkReplay(ep));
 		this.reset();
 
 		if (customTerrain) {
@@ -241,6 +250,40 @@ export class Game {
 		this.audio.soundtrack.start();
 	}
 
+	async startForkReplay(episode: RecordedEpisode): Promise<void> {
+		await this.aiTheater.stop();
+		this.setSeed(episode.seed);
+		this.gameMode = "freeplay";
+		// Lock the physics environment to match what HeadlessGame used when
+		// the AI recorded this episode: Moon gravity and no adaptive modifiers.
+		// An explicit empty `difficulty` object short-circuits the adaptive
+		// path in reset() so terrain is generated identically to the AI's sim.
+		// Without these locks the canned inputs diverge from the recorded
+		// trajectory on seeds that resolve to EASY/HARD/EXPERT, or whenever
+		// the player last picked a non-Moon preset.
+		this.gravityPreset = getDefaultPreset();
+		this.activeMission = {
+			id: 0,
+			name: `AI REPLAY · EP ${episode.episode}`,
+			seed: episode.seed,
+			description: "Replaying AI's run — press T to take over",
+			difficulty: {},
+		};
+		this.reset();
+		// Hazards null'd because AI trained in a clean headless sim without
+		// them — keeping them active would immediately desync from the
+		// recorded trajectory. Hazard-faithful fork is Sprint 3 Part B.
+		this.wind = null;
+		this.alien = null;
+		this.gravityStorm = null;
+		this.forkReplay = {
+			episode,
+			frame: 0,
+			forked: false,
+			forkFrame: null,
+		};
+	}
+
 	async startTraining(): Promise<void> {
 		this.status = "training";
 		if (!this.trainingLoop) this.trainingLoop = new TrainingLoop();
@@ -289,6 +332,7 @@ export class Game {
 	}
 
 	reset(): void {
+		this.forkReplay = null;
 		let diff = this.activeMission?.difficulty;
 		if (this.gameMode === "freeplay" && !diff) {
 			const modifiers = getAdaptiveModifiers(this.seed_);
@@ -352,13 +396,32 @@ export class Game {
 		if (this.status !== "playing") return;
 
 		this.ghostPlayer?.step();
-		const physicsInput = this.autopilot.enabled
+		let physicsInput = this.autopilot.enabled
 			? this.autopilot.computeInput(
 					this.lander,
 					this.terrain,
 					this.gravityPreset.gameGravity,
 				)
 			: this.currentInput;
+
+		if (this.forkReplay) {
+			const fr = this.forkReplay;
+			if (!fr.forked && this.currentInput.forkTakeover) {
+				fr.forked = true;
+				fr.forkFrame = fr.frame;
+			}
+			if (!fr.forked) {
+				const action = fr.episode.inputs[fr.frame] ?? 0;
+				physicsInput = actionToInput(action);
+			}
+			fr.frame++;
+			if (!fr.forked && fr.frame >= fr.episode.inputs.length) {
+				// AI run ended without player taking over — auto-fork so the
+				// player can finish the landing from here.
+				fr.forked = true;
+				fr.forkFrame = fr.episode.inputs.length;
+			}
+		}
 
 		const result = this.physics.step(
 			dt,

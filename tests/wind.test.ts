@@ -40,9 +40,7 @@ describe("updateWind", () => {
 		const wind = createWind(42, 1.0);
 		for (let t = 0; t < 100; t += 0.5) {
 			updateWind(wind, t);
-			expect(Math.abs(wind.speed)).toBeLessThanOrEqual(
-				wind.maxSpeed * 1.5,
-			);
+			expect(Math.abs(wind.speed)).toBeLessThanOrEqual(wind.maxSpeed * 1.5);
 		}
 	});
 });

@@ -11,7 +11,18 @@ describe("fuel leak trigger", () => {
 		const input = noInput();
 
 		for (let i = 0; i < 400; i++) {
-			pm.step(0.016, lander, terrain, input, 1.62, null, null, null, 7, () => {});
+			pm.step(
+				0.016,
+				lander,
+				terrain,
+				input,
+				1.62,
+				null,
+				null,
+				null,
+				7,
+				() => {},
+			);
 		}
 		expect(pm.fuelLeakActive).toBe(true);
 	});
@@ -23,7 +34,18 @@ describe("fuel leak trigger", () => {
 		const input = noInput();
 
 		for (let i = 0; i < 400; i++) {
-			pm.step(0.016, lander, terrain, input, 1.62, null, null, null, 42, () => {});
+			pm.step(
+				0.016,
+				lander,
+				terrain,
+				input,
+				1.62,
+				null,
+				null,
+				null,
+				42,
+				() => {},
+			);
 		}
 		expect(pm.fuelLeakActive).toBe(false);
 	});
@@ -35,7 +57,18 @@ describe("fuel leak trigger", () => {
 		const input = noInput();
 
 		for (let i = 0; i < 400; i++) {
-			pm.step(0.016, lander, terrain, input, 1.62, null, null, null, 7, () => {});
+			pm.step(
+				0.016,
+				lander,
+				terrain,
+				input,
+				1.62,
+				null,
+				null,
+				null,
+				7,
+				() => {},
+			);
 		}
 		expect(pm.fuelLeakActive).toBe(true);
 		const fuelBefore = lander.fuel;
@@ -50,7 +83,18 @@ describe("fuel leak trigger", () => {
 		const input = noInput();
 
 		for (let i = 0; i < 400; i++) {
-			pm.step(0.016, lander, terrain, input, 1.62, null, null, null, 7, () => {});
+			pm.step(
+				0.016,
+				lander,
+				terrain,
+				input,
+				1.62,
+				null,
+				null,
+				null,
+				7,
+				() => {},
+			);
 		}
 		expect(pm.fuelLeakActive).toBe(true);
 		pm.reset();
@@ -109,5 +153,6 @@ function noInput() {
 		flightReport: false,
 		toggleRelay: false,
 		openSettings: false,
+		forkTakeover: false,
 	};
 }

@@ -4,6 +4,7 @@ import {
 	type AgentKind,
 	type AgentStats,
 } from "../ai/Agent";
+import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 
 const PANEL_WIDTH = 360;
 const CHART_HEIGHT = 160;
@@ -32,7 +33,12 @@ export class AITheaterPanel {
 	private narrationEl: HTMLDivElement = null!;
 	private firstCrash = false;
 	private onWatchBest: (() => void) | null = null;
+	private onForkRequested: ((ep: RecordedEpisode) => void) | null = null;
+	private episodesProvider: (() => RecordedEpisode[]) | null = null;
+	private selectedEpisodeId: number | null = null;
 	private tracks: Record<AgentKind, Track> = this.makeTracks();
+	private forkInfoEl!: HTMLDivElement;
+	private forkBtn!: HTMLButtonElement;
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -97,6 +103,18 @@ export class AITheaterPanel {
 					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
 				<div style="display:flex;justify-content:space-around;margin-top:6px">${legendHtml}</div>
 			</div>
+			<div style="border-top:1px solid #222;padding-top:8px">
+				<div style="color:#888;font-size:11px;margin-bottom:4px">MISSION REPLAY</div>
+				<div id="at-fork-info" style="color:#888;font-size:11px;line-height:1.4">
+					Click any point on the DQN curve to pick an episode.
+				</div>
+				<button id="at-fork-btn" disabled
+					style="margin-top:6px;width:100%;background:#1a1a1a;color:#00aaff;
+					border:1px solid #00aaff;padding:8px;cursor:pointer;font-family:inherit;
+					font-size:12px;border-radius:4px;letter-spacing:1px;opacity:0.5">
+					REPLAY & FORK (press T to take over)
+				</button>
+			</div>
 			<div id="at-narration"
 				style="color:#aaa;font-size:12px;font-style:italic;min-height:36px;
 				line-height:1.4;padding:6px 0;border-top:1px solid #222">
@@ -125,6 +143,15 @@ export class AITheaterPanel {
 		this.narrationEl = this.panel.querySelector("#at-narration")!;
 		this.statusEl = this.panel.querySelector("#at-status")!;
 		this.watchBtn = this.panel.querySelector("#at-watch-btn")!;
+		this.forkInfoEl = this.panel.querySelector(
+			"#at-fork-info",
+		) as HTMLDivElement;
+		this.forkBtn = this.panel.querySelector(
+			"#at-fork-btn",
+		) as HTMLButtonElement;
+
+		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
+		this.forkBtn.addEventListener("click", () => this.triggerFork());
 
 		this.watchBtn.addEventListener("click", () => this.onWatchBest?.());
 		this.watchBtn.addEventListener("mouseenter", () => {
@@ -154,10 +181,97 @@ export class AITheaterPanel {
 		this.panel.remove();
 		this.tracks = this.makeTracks();
 		this.firstCrash = false;
+		this.selectedEpisodeId = null;
+		this.onForkRequested = null;
+		this.episodesProvider = null;
 	}
 
 	setWatchBestHandler(handler: () => void): void {
 		this.onWatchBest = handler;
+	}
+
+	setForkRequestHandler(handler: (ep: RecordedEpisode) => void): void {
+		this.onForkRequested = handler;
+	}
+
+	setEpisodesProvider(provider: () => RecordedEpisode[]): void {
+		this.episodesProvider = provider;
+	}
+
+	onEpisodeRecorded(_ep: RecordedEpisode): void {
+		this.refreshForkInfo();
+	}
+
+	private getEpisodes(): RecordedEpisode[] {
+		return this.episodesProvider?.() ?? [];
+	}
+
+	private handleChartClick(e: MouseEvent): void {
+		const episodes = this.getEpisodes();
+		if (episodes.length === 0) return;
+		const rect = this.chartCanvas.getBoundingClientRect();
+		const clickX = e.clientX - rect.left;
+		const rel = Math.max(0, Math.min(1, clickX / rect.width));
+		const dqnHistory = this.tracks.dqn.rewardHistory;
+		if (dqnHistory.length < 2) return;
+		const idxInHistory = Math.round(rel * (dqnHistory.length - 1));
+		const episodeNum =
+			this.tracks.dqn.episodes - (dqnHistory.length - 1 - idxInHistory);
+		// Reject clicks on episodes that have rolled out of the recorder buffer.
+		// The reward chart can show up to MAX_CHART_POINTS, but the recorder
+		// only keeps the last N (= 10) episode trajectories. Silently picking
+		// the closest buffered episode would launch a different run than the
+		// user clicked.
+		const minBuffered = episodes.reduce(
+			(m, ep) => Math.min(m, ep.episode),
+			episodes[0].episode,
+		);
+		if (episodeNum < minBuffered) {
+			this.selectedEpisodeId = null;
+			this.forkInfoEl.textContent = `Episode ${episodeNum} rolled out of the buffer. Click a more recent point (ep ${minBuffered}+).`;
+			this.forkBtn.disabled = true;
+			this.forkBtn.style.opacity = "0.5";
+			this.drawChart();
+			return;
+		}
+		const exact = episodes.find((ep) => ep.episode === episodeNum);
+		this.selectedEpisodeId = (exact ?? episodes[episodes.length - 1]).id;
+		this.refreshForkInfo();
+		this.drawChart();
+	}
+
+	private refreshForkInfo(): void {
+		const episodes = this.getEpisodes();
+		if (episodes.length === 0) {
+			this.forkInfoEl.textContent =
+				"Click any point on the DQN curve to pick an episode.";
+			this.forkBtn.disabled = true;
+			this.forkBtn.style.opacity = "0.5";
+			return;
+		}
+		const selected =
+			episodes.find((ep) => ep.id === this.selectedEpisodeId) ?? null;
+		if (!selected) {
+			this.forkInfoEl.textContent = `${episodes.length} episode${episodes.length === 1 ? "" : "s"} buffered. Click the curve to pick one.`;
+			this.forkBtn.disabled = true;
+			this.forkBtn.style.opacity = "0.5";
+			return;
+		}
+		const result = selected.landed ? "LANDED" : "CRASHED";
+		this.forkInfoEl.innerHTML = `
+			<div style="color:#00ff88">Episode ${selected.episode} · ${result}</div>
+			<div style="color:#aaa">reward ${selected.totalReward.toFixed(0)} · ${selected.steps} frames</div>
+		`;
+		this.forkBtn.disabled = false;
+		this.forkBtn.style.opacity = "1";
+	}
+
+	private triggerFork(): void {
+		const episodes = this.getEpisodes();
+		const selected =
+			episodes.find((ep) => ep.id === this.selectedEpisodeId) ?? null;
+		if (!selected || !this.onForkRequested) return;
+		this.onForkRequested(selected);
 	}
 
 	updateStats(stats: AgentStats): void {
@@ -208,6 +322,7 @@ export class AITheaterPanel {
 		}
 
 		this.drawChart();
+		if (stats.kind === "dqn") this.refreshForkInfo();
 	}
 
 	private getNarration(
@@ -308,5 +423,30 @@ export class AITheaterPanel {
 			ctx.stroke();
 		}
 		ctx.globalAlpha = 1;
+
+		// Selected-episode marker on the DQN curve
+		if (this.selectedEpisodeId !== null) {
+			const episodes = this.getEpisodes();
+			const selected = episodes.find((ep) => ep.id === this.selectedEpisodeId);
+			const dqnHistory = this.tracks.dqn.rewardHistory;
+			if (selected && dqnHistory.length >= 1) {
+				const dqnEpisodes = this.tracks.dqn.episodes;
+				const idxInHistory =
+					dqnHistory.length - 1 - (dqnEpisodes - selected.episode);
+				if (idxInHistory >= 0 && idxInHistory < dqnHistory.length) {
+					const x =
+						padding +
+						(idxInHistory / Math.max(1, dqnHistory.length - 1)) * plotW;
+					ctx.strokeStyle = "#00aaff";
+					ctx.setLineDash([3, 3]);
+					ctx.lineWidth = 1;
+					ctx.beginPath();
+					ctx.moveTo(x, padding);
+					ctx.lineTo(x, padding + plotH);
+					ctx.stroke();
+					ctx.setLineDash([]);
+				}
+			}
+		}
 	}
 }

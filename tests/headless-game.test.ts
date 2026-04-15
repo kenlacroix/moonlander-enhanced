@@ -20,6 +20,7 @@ const NO_INPUT: InputState = {
 	flightReport: false,
 	toggleRelay: false,
 	openSettings: false,
+	forkTakeover: false,
 };
 
 describe("HeadlessGame", () => {

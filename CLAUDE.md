@@ -328,12 +328,20 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 3 — Mission Replay Archaeology — M (~2hr CC)
-- [ ] Timeline scrubber on AI reward curve from AI Theater
-- [ ] Click any point to restore game state (keyframe every 60 frames + input replay between)
-- [ ] Take over controls from the AI's exact position
-- [ ] AI ghost trajectory stays visible during player's divergent path
-- [ ] Score comparison from fork point
+### Sprint 3 — Mission Replay Archaeology — split into A (MVP) + B (hazard-faithful)
+
+**Part A — Replay + fork-on-keypress ✅ COMPLETE**
+- [x] AI Theater records DQN episode inputs + trajectory positions (rolling buffer of last 10)
+- [x] Click an episode on the reward chart to select it
+- [x] "REPLAY & FORK" button launches the episode in the live game, AI driving the lander
+- [x] Press T during replay to take over controls from that exact frame
+- [x] AI's remaining trajectory renders as ghost trail after fork
+- [ ] Post-landing score comparison (deferred to Part B — AI reward / player score axes aren't directly comparable; needs design)
+
+**Part B — Hazard-faithful fork + frame scrubber (deferred, see backlog):**
+- [ ] Serialize Alien / GravityStorm / Wind / Physics timer state so forked runs recreate the AI's exact world
+- [ ] Frame-level scrubber on episode timeline for arbitrary fork point (not just "press TAB during playback")
+- [ ] Keyframe system (every 60 frames) so scrubbing is instant rather than a full replay
 
 **Exit question:** Is "can I beat the AI from here?" a compelling loop?
 
