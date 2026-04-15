@@ -318,11 +318,11 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 2.5 — RL Algorithm Comparison — M (~2hr CC)
-- [ ] Implement simple policy gradient agent (~50 lines) alongside existing DQN
-- [ ] Run DQN vs policy gradient vs random agent side-by-side in AI Theater
-- [ ] Three learning curves on the same chart
-- [ ] Educational labels explaining why algorithms differ
+### Sprint 2.5 — RL Algorithm Comparison ✅ COMPLETE
+- [x] Implement simple policy gradient agent (REINFORCE) alongside existing DQN
+- [x] Run DQN vs policy gradient vs random agent side-by-side in AI Theater (round-robin)
+- [x] Three learning curves on the same chart (smoothed, color-coded, with legend)
+- [x] Educational labels explaining why algorithms differ
 
 **Exit question:** Can a non-ML person understand why DQN wins by watching the curves?
 

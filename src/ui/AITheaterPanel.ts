@@ -1,8 +1,23 @@
-import type { TrainingStats } from "../ai/RLAgent";
+import {
+	AGENT_COLORS,
+	AGENT_LABELS,
+	type AgentKind,
+	type AgentStats,
+} from "../ai/Agent";
 
 const PANEL_WIDTH = 360;
-const CHART_HEIGHT = 140;
+const CHART_HEIGHT = 160;
 const MAX_CHART_POINTS = 200;
+
+interface Track {
+	rewardHistory: number[];
+	bestReward: number;
+	bestLanded: boolean;
+	lastReward: number;
+	episodes: number;
+}
+
+const AGENT_ORDER: AgentKind[] = ["dqn", "pg", "random"];
 
 export class AITheaterPanel {
 	private panel: HTMLDivElement;
@@ -15,11 +30,9 @@ export class AITheaterPanel {
 	private statusEl: HTMLSpanElement;
 	private watchBtn: HTMLButtonElement;
 	private narrationEl: HTMLDivElement = null!;
-	private rewardHistory: number[] = [];
-	private bestReward = -Infinity;
-	private bestLanded = false;
 	private firstCrash = false;
 	private onWatchBest: (() => void) | null = null;
+	private tracks: Record<AgentKind, Track> = this.makeTracks();
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -43,17 +56,26 @@ export class AITheaterPanel {
 			overflowY: "auto",
 		});
 
+		const legendHtml = AGENT_ORDER.map(
+			(k) => `
+				<div style="display:flex;align-items:center;gap:6px">
+					<span style="display:inline-block;width:14px;height:3px;background:${AGENT_COLORS[k]}"></span>
+					<span style="color:#aaa;font-size:11px">${AGENT_LABELS[k]}</span>
+				</div>
+			`,
+		).join("");
+
 		this.panel.innerHTML = `
 			<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
 				AI THEATER
 			</div>
 			<div style="border-bottom:1px solid #333;padding-bottom:8px">
-				<div style="color:#888;font-size:11px;margin-bottom:4px">STATUS</div>
+				<div style="color:#888;font-size:11px;margin-bottom:4px">DQN STATUS</div>
 				<span id="at-status" style="color:#ffaa00">INITIALIZING...</span>
 			</div>
 			<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
 				<div>
-					<div style="color:#888;font-size:11px">EPISODES</div>
+					<div style="color:#888;font-size:11px">DQN EPISODES</div>
 					<span id="at-episodes" style="color:#fff;font-size:18px">0</span>
 				</div>
 				<div>
@@ -61,35 +83,36 @@ export class AITheaterPanel {
 					<span id="at-epsilon" style="color:#fff;font-size:18px">100%</span>
 				</div>
 				<div>
-					<div style="color:#888;font-size:11px">BEST REWARD</div>
+					<div style="color:#888;font-size:11px">DQN BEST</div>
 					<span id="at-best" style="color:#00ff88;font-size:18px">—</span>
 				</div>
 				<div>
-					<div style="color:#888;font-size:11px">LAST REWARD</div>
+					<div style="color:#888;font-size:11px">DQN LAST</div>
 					<span id="at-current" style="color:#fff;font-size:18px">—</span>
 				</div>
 			</div>
 			<div>
-				<div style="color:#888;font-size:11px;margin-bottom:4px">REWARD CURVE</div>
+				<div style="color:#888;font-size:11px;margin-bottom:4px">REWARD CURVES (smoothed)</div>
 				<canvas id="at-chart" width="${PANEL_WIDTH - 32}" height="${CHART_HEIGHT}"
 					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
+				<div style="display:flex;justify-content:space-around;margin-top:6px">${legendHtml}</div>
 			</div>
 			<div id="at-narration"
 				style="color:#aaa;font-size:12px;font-style:italic;min-height:36px;
 				line-height:1.4;padding:6px 0;border-top:1px solid #222">
-				Initializing neural network...
+				Initializing three agents: DQN, Policy Gradient, Random baseline...
 			</div>
 			<button id="at-watch-btn" disabled
 				style="background:#1a1a1a;color:#00ff88;border:1px solid #00ff88;padding:10px;
 				cursor:pointer;font-family:inherit;font-size:13px;border-radius:4px;
 				letter-spacing:1px;transition:background 0.2s">
-				WATCH AI PLAY NOW
+				WATCH DQN PLAY NOW
 			</button>
 			<div id="at-watch-hint" style="color:#555;font-size:11px;text-align:center">
-				Needs 20+ episodes for decent performance
+				Needs 20+ DQN episodes for decent performance
 			</div>
 			<div style="color:#555;font-size:11px;text-align:center;margin-top:auto">
-				AI trains on your terrain at 50x speed
+				3 agents round-robin, same terrain, 50x speed
 			</div>
 		`;
 
@@ -112,15 +135,24 @@ export class AITheaterPanel {
 		});
 	}
 
+	private makeTracks(): Record<AgentKind, Track> {
+		const make = (): Track => ({
+			rewardHistory: [],
+			bestReward: -Infinity,
+			bestLanded: false,
+			lastReward: 0,
+			episodes: 0,
+		});
+		return { dqn: make(), pg: make(), random: make() };
+	}
+
 	mount(): void {
 		document.body.appendChild(this.panel);
 	}
 
 	unmount(): void {
 		this.panel.remove();
-		this.rewardHistory = [];
-		this.bestReward = -Infinity;
-		this.bestLanded = false;
+		this.tracks = this.makeTracks();
 		this.firstCrash = false;
 	}
 
@@ -128,97 +160,104 @@ export class AITheaterPanel {
 		this.onWatchBest = handler;
 	}
 
-	updateStats(stats: TrainingStats): void {
-		this.rewardHistory.push(stats.totalReward);
-		if (this.rewardHistory.length > MAX_CHART_POINTS) {
-			this.rewardHistory.shift();
+	updateStats(stats: AgentStats): void {
+		const track = this.tracks[stats.kind];
+		track.rewardHistory.push(stats.totalReward);
+		if (track.rewardHistory.length > MAX_CHART_POINTS) {
+			track.rewardHistory.shift();
 		}
+		track.lastReward = stats.totalReward;
+		track.episodes = stats.episode;
 
-		const isNewBest = stats.totalReward > this.bestReward;
-		if (isNewBest) {
-			this.bestReward = stats.totalReward;
-		}
-		const isFirstLanding = stats.landed && !this.bestLanded;
-		if (stats.landed) this.bestLanded = true;
+		const isNewBest = stats.totalReward > track.bestReward;
+		if (isNewBest) track.bestReward = stats.totalReward;
+		const isFirstLanding = stats.landed && !track.bestLanded;
+		if (stats.landed) track.bestLanded = true;
 		const isFirstCrash = !stats.landed && !this.firstCrash;
-		if (!stats.landed && stats.episode === 1) this.firstCrash = true;
+		if (!stats.landed && stats.episode === 1 && stats.kind === "dqn") {
+			this.firstCrash = true;
+		}
 
-		this.narrationEl.textContent = this.getNarration(
-			stats,
-			isNewBest,
-			isFirstLanding,
-			isFirstCrash,
-		);
-		this.episodeEl.textContent = String(stats.episode);
-		this.bestScoreEl.textContent = this.bestReward.toFixed(0);
-		this.currentScoreEl.textContent = stats.totalReward.toFixed(0);
-		this.epsilonEl.textContent = `${(stats.epsilon * 100).toFixed(0)}%`;
-		this.statusEl.textContent = stats.landed ? "LANDED!" : "TRAINING...";
-		this.statusEl.style.color = stats.landed ? "#00ff88" : "#ffaa00";
+		if (stats.kind === "dqn") {
+			this.narrationEl.textContent = this.getNarration(
+				stats,
+				isNewBest,
+				isFirstLanding,
+				isFirstCrash,
+			);
+			this.episodeEl.textContent = String(stats.episode);
+			this.bestScoreEl.textContent = track.bestReward.toFixed(0);
+			this.currentScoreEl.textContent = stats.totalReward.toFixed(0);
+			if (stats.epsilon !== undefined) {
+				this.epsilonEl.textContent = `${(stats.epsilon * 100).toFixed(0)}%`;
+			}
+			this.statusEl.textContent = stats.landed ? "LANDED!" : "TRAINING...";
+			this.statusEl.style.color = stats.landed ? "#00ff88" : "#ffaa00";
 
-		const hintEl = this.panel.querySelector("#at-watch-hint") as HTMLDivElement;
-		if (stats.episode >= 20) {
-			this.watchBtn.disabled = false;
-			if (hintEl) hintEl.textContent = "Watch the AI attempt your terrain";
-		} else if (hintEl) {
-			hintEl.textContent = `Training... ${20 - stats.episode} episodes until ready`;
+			const hintEl = this.panel.querySelector(
+				"#at-watch-hint",
+			) as HTMLDivElement;
+			if (stats.episode >= 20) {
+				this.watchBtn.disabled = false;
+				if (hintEl) hintEl.textContent = "Watch the DQN attempt your terrain";
+			} else if (hintEl) {
+				hintEl.textContent = `Training... ${20 - stats.episode} episodes until ready`;
+			}
+		} else if (isFirstLanding) {
+			this.narrationEl.textContent = `${AGENT_LABELS[stats.kind]} landed for the first time at episode ${stats.episode}.`;
 		}
 
 		this.drawChart();
 	}
 
 	private getNarration(
-		stats: TrainingStats,
+		stats: AgentStats,
 		isNewBest: boolean,
 		isFirstLanding: boolean,
 		isFirstCrash: boolean,
 	): string {
+		const eps = stats.epsilon ?? 0;
 		if (isFirstLanding) {
-			return `First successful landing on episode ${stats.episode}! The AI discovered that gentle thrust near the pad works.`;
+			return `First DQN landing on episode ${stats.episode}! Gentle thrust near the pad is paying off.`;
 		}
 		if (isFirstCrash && stats.episode === 1) {
-			return "First attempt: crashed. The AI starts with random actions and learns from each failure.";
+			return "First DQN attempt: crashed. It starts random and learns from failures. Policy gradient learns episode-by-episode. Random never learns.";
 		}
 		if (isNewBest && stats.landed) {
-			return `New best! The AI is refining its approach. Exploration at ${(stats.epsilon * 100).toFixed(0)}% means it's balancing known strategies with new ones.`;
+			return `New DQN best. Exploration at ${(eps * 100).toFixed(0)}% — balancing known strategies with new ones.`;
 		}
-		if (stats.epsilon < 0.1) {
+		if (eps < 0.1) {
 			return stats.landed
-				? "Exploitation phase: the AI mostly uses its learned policy now, with rare exploration."
-				: "The AI is confident in its strategy but still crashes sometimes. Edge cases are hard.";
-		}
-		if (stats.epsilon < 0.3) {
-			return stats.landed
-				? "The AI lands reliably now. It's fine-tuning thrust timing and approach angles."
-				: "Getting closer. The AI is reducing random exploration and relying more on learned behavior.";
+				? "DQN in exploitation phase. Compare its curve against policy gradient to see which algorithm climbs faster."
+				: "DQN confident but still crashes on edge cases. Watch how PG's curve wiggles — higher variance on-policy.";
 		}
 		if (stats.episode % 10 === 0) {
-			return `Episode ${stats.episode}: exploring at ${(stats.epsilon * 100).toFixed(0)}%. Each crash teaches the AI which actions lead to negative rewards.`;
+			return `Episode ${stats.episode}. DQN uses a replay buffer; PG updates only at episode end; Random is the floor.`;
 		}
-		if (stats.landed) {
-			return "Landed! Positive reward reinforces this sequence of actions in the neural network.";
-		}
-		return "Training... the AI tries different thrust and rotation sequences, learning from each outcome.";
+		return stats.landed
+			? "Landed. DQN reinforces this trajectory via Q-targets."
+			: "Training... three algorithms, same terrain, different learning rules.";
 	}
 
 	private drawChart(): void {
 		const ctx = this.chartCtx;
 		const w = this.chartCanvas.width;
 		const h = this.chartCanvas.height;
-		const data = this.rewardHistory;
 
 		ctx.clearRect(0, 0, w, h);
 
-		if (data.length < 2) return;
-
-		const min = Math.min(...data);
-		const max = Math.max(...data);
-		const range = max - min || 1;
 		const padding = 4;
 		const plotH = h - padding * 2;
 		const plotW = w - padding * 2;
 
-		// Grid lines
+		const allData: number[] = [];
+		for (const k of AGENT_ORDER) allData.push(...this.tracks[k].rewardHistory);
+		if (allData.length < 2) return;
+
+		const min = Math.min(...allData);
+		const max = Math.max(...allData);
+		const range = max - min || 1;
+
 		ctx.strokeStyle = "#222";
 		ctx.lineWidth = 1;
 		for (let i = 0; i < 4; i++) {
@@ -229,7 +268,6 @@ export class AITheaterPanel {
 			ctx.stroke();
 		}
 
-		// Zero line if in range
 		if (min < 0 && max > 0) {
 			const zeroY = padding + plotH - ((0 - min) / range) * plotH;
 			ctx.strokeStyle = "#444";
@@ -241,29 +279,24 @@ export class AITheaterPanel {
 			ctx.setLineDash([]);
 		}
 
-		// Reward curve
-		ctx.strokeStyle = "#00ff88";
-		ctx.lineWidth = 1.5;
-		ctx.beginPath();
-		for (let i = 0; i < data.length; i++) {
-			const x = padding + (i / (data.length - 1)) * plotW;
-			const y = padding + plotH - ((data[i] - min) / range) * plotH;
-			if (i === 0) ctx.moveTo(x, y);
-			else ctx.lineTo(x, y);
-		}
-		ctx.stroke();
+		// Draw each agent's smoothed curve (moving average window 10)
+		for (const kind of AGENT_ORDER) {
+			const data = this.tracks[kind].rewardHistory;
+			if (data.length < 2) continue;
 
-		// Moving average (window of 10)
-		if (data.length >= 10) {
-			ctx.strokeStyle = "#ffaa00";
+			ctx.strokeStyle = AGENT_COLORS[kind];
 			ctx.lineWidth = 2;
+			ctx.globalAlpha = 0.95;
 			ctx.beginPath();
+
+			const windowSize = Math.min(10, data.length);
 			let started = false;
-			for (let i = 9; i < data.length; i++) {
+			for (let i = 0; i < data.length; i++) {
+				const start = Math.max(0, i - windowSize + 1);
 				let sum = 0;
-				for (let j = i - 9; j <= i; j++) sum += data[j];
-				const avg = sum / 10;
-				const x = padding + (i / (data.length - 1)) * plotW;
+				for (let j = start; j <= i; j++) sum += data[j];
+				const avg = sum / (i - start + 1);
+				const x = padding + (i / Math.max(1, data.length - 1)) * plotW;
 				const y = padding + plotH - ((avg - min) / range) * plotH;
 				if (!started) {
 					ctx.moveTo(x, y);
@@ -274,5 +307,6 @@ export class AITheaterPanel {
 			}
 			ctx.stroke();
 		}
+		ctx.globalAlpha = 1;
 	}
 }
