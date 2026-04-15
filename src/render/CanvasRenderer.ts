@@ -949,6 +949,65 @@ export class CanvasRenderer {
 		ctx.restore();
 	}
 
+	/** Draw post-crash flight analysis (positioned below commentary). */
+	drawCrashAnalysis(text: string): void {
+		const ctx = this.ctx;
+		ctx.save();
+
+		const boxW = 640;
+		const startY = CANVAS_HEIGHT / 2 + 130;
+		const paddingX = 20;
+		const paddingY = 14;
+		const lineHeight = 18;
+
+		// Wrap first so we can size the box
+		ctx.font = '13px "Courier New", monospace';
+		const maxTextW = boxW - paddingX * 2;
+		const words = text.split(" ");
+		const lines: string[] = [];
+		let line = "";
+		for (const word of words) {
+			const test = line ? `${line} ${word}` : word;
+			if (ctx.measureText(test).width > maxTextW) {
+				if (line) lines.push(line);
+				line = word;
+			} else {
+				line = test;
+			}
+		}
+		if (line) lines.push(line);
+
+		const headerH = 22;
+		const boxH = headerH + paddingY + lines.length * lineHeight + paddingY - 4;
+
+		ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+		ctx.strokeStyle = "rgba(255, 170, 0, 0.6)";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.roundRect(CANVAS_WIDTH / 2 - boxW / 2, startY, boxW, boxH, 6);
+		ctx.fill();
+		ctx.stroke();
+
+		ctx.fillStyle = "rgba(255, 170, 0, 0.9)";
+		ctx.font = 'bold 12px "Courier New", monospace';
+		ctx.textAlign = "left";
+		ctx.fillText(
+			"▸ FLIGHT ANALYSIS",
+			CANVAS_WIDTH / 2 - boxW / 2 + paddingX,
+			startY + paddingY + 4,
+		);
+
+		ctx.fillStyle = "rgba(255, 220, 180, 0.85)";
+		ctx.font = '13px "Courier New", monospace';
+		let y = startY + headerH + paddingY;
+		for (const l of lines) {
+			ctx.fillText(l, CANVAS_WIDTH / 2 - boxW / 2 + paddingX, y);
+			y += lineHeight;
+		}
+
+		ctx.restore();
+	}
+
 	/** Draw artifact scan fact (positioned below commentary) */
 	drawArtifactFact(text: string): void {
 		const ctx = this.ctx;

@@ -44,6 +44,12 @@ export function handleCollisionResult(
 		game.audio.playCrash();
 		game.audio.soundtrack.onCrashed();
 		game.llm.fetchCommentary(game, game.lander, game.score, false);
+		game.llm.fetchCrashAnalysis(
+			game,
+			game.lander,
+			game.telemetry.frames,
+			STARTING_FUEL,
+		);
 	}
 	handleRelayAfterCollision(game);
 	if (game.aiTheater.isActive) {

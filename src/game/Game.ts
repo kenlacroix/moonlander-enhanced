@@ -83,6 +83,7 @@ export class Game {
 	llmText = "";
 	llmLoading = false;
 	artifactText = "";
+	crashAnalysis = "";
 	private settingsOverlay = new SettingsOverlay();
 	private fuelWarningCooldown = 0;
 	private audioInitialized = false;
@@ -269,6 +270,7 @@ export class Game {
 		this.lander = createLander(WORLD_WIDTH / 2, 80, getLanderType());
 		this.status = "playing";
 		this.score = 0;
+		this.crashAnalysis = "";
 		this.particles_.clear();
 		this.camera_ = new Camera();
 		this.gameLoop.resetAccumulator();
@@ -304,6 +306,7 @@ export class Game {
 		if (diff?.startingFuel !== undefined) this.lander.fuel = diff.startingFuel;
 		this.status = "playing";
 		this.score = 0;
+		this.crashAnalysis = "";
 		this.particles_.clear();
 		this.camera_ = new Camera();
 		this.gameLoop.resetAccumulator();

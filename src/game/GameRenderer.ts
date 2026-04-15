@@ -65,6 +65,7 @@ export interface GameRenderState {
 	readonly lastRank: number | null;
 	readonly llmText: string;
 	readonly artifactText: string;
+	readonly crashAnalysis: string;
 	readonly flightElapsed: number;
 	readonly titleSelection: number;
 	readonly selectedMission: number;
@@ -233,6 +234,11 @@ export class GameRenderer {
 		// Artifact scan result (separate from commentary)
 		if (state.artifactText && state.status !== "playing") {
 			this.renderer.drawArtifactFact(state.artifactText);
+		}
+
+		// Post-crash flight analysis (coaching)
+		if (state.crashAnalysis && state.status === "crashed") {
+			this.renderer.drawCrashAnalysis(state.crashAnalysis);
 		}
 
 		// Mission briefing (shown during first seconds of flight)
