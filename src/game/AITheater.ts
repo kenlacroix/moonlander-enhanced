@@ -43,14 +43,21 @@ export class AITheater {
 		this.adjustGameLayout(true);
 
 		if (!this.agent.ready) await this.agent.init();
+		await this.agent.loadWeights(String(seed));
+
+		this.bestReward = -Infinity;
+		this.totalEpisodes = this.agent.episodeCount;
 
 		this.training = true;
 		this.runTrainingLoop();
 	}
 
-	stop(): void {
+	async stop(): Promise<void> {
 		this.training = false;
 		this.abortRequested = true;
+		if (this.currentSeed !== null) {
+			await this.agent.saveWeights(String(this.currentSeed));
+		}
 		this.panel.unmount();
 		this.adjustGameLayout(false);
 		this.game = null;

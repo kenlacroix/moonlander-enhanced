@@ -285,6 +285,46 @@ export class RLAgent {
 		return recent.reduce((a, b) => a + b, 0) / recent.length;
 	}
 
+	async saveWeights(key: string): Promise<boolean> {
+		if (!this.model) return false;
+		try {
+			await this.model.save(`indexeddb://moonlander-agent-${key}`);
+			localStorage.setItem(
+				`moonlander-agent-meta-${key}`,
+				JSON.stringify({
+					epsilon: this.epsilon,
+					episodeCount: this.episodeCount,
+					rewardHistory: this.rewardHistory.slice(-200),
+				}),
+			);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	async loadWeights(key: string): Promise<boolean> {
+		try {
+			const loaded = (await tf.loadLayersModel(
+				`indexeddb://moonlander-agent-${key}`,
+			)) as tf.Sequential;
+			this.model = loaded;
+			this.targetModel = this.buildModel();
+			this.syncTargetModel();
+			this.ready = true;
+			const meta = localStorage.getItem(`moonlander-agent-meta-${key}`);
+			if (meta) {
+				const parsed = JSON.parse(meta);
+				this.epsilon = parsed.epsilon ?? EPSILON_START;
+				this.episodeCount = parsed.episodeCount ?? 0;
+				this.rewardHistory = parsed.rewardHistory ?? [];
+			}
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	private findNearestPad(
 		lander: LanderState,
 		terrain: TerrainData,
