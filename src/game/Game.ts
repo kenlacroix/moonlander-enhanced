@@ -254,11 +254,20 @@ export class Game {
 		await this.aiTheater.stop();
 		this.setSeed(episode.seed);
 		this.gameMode = "freeplay";
+		// Lock the physics environment to match what HeadlessGame used when
+		// the AI recorded this episode: Moon gravity and no adaptive modifiers.
+		// An explicit empty `difficulty` object short-circuits the adaptive
+		// path in reset() so terrain is generated identically to the AI's sim.
+		// Without these locks the canned inputs diverge from the recorded
+		// trajectory on seeds that resolve to EASY/HARD/EXPERT, or whenever
+		// the player last picked a non-Moon preset.
+		this.gravityPreset = getDefaultPreset();
 		this.activeMission = {
 			id: 0,
 			name: `AI REPLAY · EP ${episode.episode}`,
 			seed: episode.seed,
 			description: "Replaying AI's run — press T to take over",
+			difficulty: {},
 		};
 		this.reset();
 		// Hazards null'd because AI trained in a clean headless sim without

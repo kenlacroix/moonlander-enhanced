@@ -212,25 +212,30 @@ export class AITheaterPanel {
 		const rect = this.chartCanvas.getBoundingClientRect();
 		const clickX = e.clientX - rect.left;
 		const rel = Math.max(0, Math.min(1, clickX / rect.width));
-		// Map click x to DQN episode in rewardHistory (which tracks last MAX_CHART_POINTS)
 		const dqnHistory = this.tracks.dqn.rewardHistory;
 		if (dqnHistory.length < 2) return;
 		const idxInHistory = Math.round(rel * (dqnHistory.length - 1));
-		// Episode number at that chart index: last N episodes. Map to the
-		// DQN episode N that produced dqnHistory[idxInHistory], then pick
-		// the recorded episode with the closest episode number.
 		const episodeNum =
 			this.tracks.dqn.episodes - (dqnHistory.length - 1 - idxInHistory);
-		let best = episodes[0];
-		let bestDist = Math.abs(best.episode - episodeNum);
-		for (const ep of episodes) {
-			const dist = Math.abs(ep.episode - episodeNum);
-			if (dist < bestDist) {
-				best = ep;
-				bestDist = dist;
-			}
+		// Reject clicks on episodes that have rolled out of the recorder buffer.
+		// The reward chart can show up to MAX_CHART_POINTS, but the recorder
+		// only keeps the last N (= 10) episode trajectories. Silently picking
+		// the closest buffered episode would launch a different run than the
+		// user clicked.
+		const minBuffered = episodes.reduce(
+			(m, ep) => Math.min(m, ep.episode),
+			episodes[0].episode,
+		);
+		if (episodeNum < minBuffered) {
+			this.selectedEpisodeId = null;
+			this.forkInfoEl.textContent = `Episode ${episodeNum} rolled out of the buffer. Click a more recent point (ep ${minBuffered}+).`;
+			this.forkBtn.disabled = true;
+			this.forkBtn.style.opacity = "0.5";
+			this.drawChart();
+			return;
 		}
-		this.selectedEpisodeId = best.id;
+		const exact = episodes.find((ep) => ep.episode === episodeNum);
+		this.selectedEpisodeId = (exact ?? episodes[episodes.length - 1]).id;
 		this.refreshForkInfo();
 		this.drawChart();
 	}
