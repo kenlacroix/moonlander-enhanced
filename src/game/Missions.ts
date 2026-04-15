@@ -176,6 +176,33 @@ export function saveCampaignProgress(completed: Set<number>): void {
 	}
 }
 
+/** UTC date (YYYYMMDD) as a numeric seed. Same value for everyone on the same UTC day. */
+export function getDailySeed(date: Date = new Date()): number {
+	const y = date.getUTCFullYear();
+	const m = date.getUTCMonth() + 1;
+	const d = date.getUTCDate();
+	return y * 10000 + m * 100 + d;
+}
+
+/** Format the daily seed's date as a short human-readable label (UTC). */
+export function getDailyDateLabel(date: Date = new Date()): string {
+	const y = date.getUTCFullYear();
+	const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+	const d = String(date.getUTCDate()).padStart(2, "0");
+	return `${y}-${m}-${d}`;
+}
+
+/** Synthesize today's daily-challenge mission. */
+export function getDailyMission(date: Date = new Date()): Mission {
+	const seed = getDailySeed(date);
+	return {
+		id: 0,
+		name: "DAILY CHALLENGE",
+		seed,
+		description: `UTC ${getDailyDateLabel(date)} — same terrain for everyone, today only.`,
+	};
+}
+
 /** Check if a campaign mission is unlocked (previous mission completed, or it's mission 1) */
 export function isMissionUnlocked(
 	missionId: number,

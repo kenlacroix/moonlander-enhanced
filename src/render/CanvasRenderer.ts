@@ -434,6 +434,8 @@ export class CanvasRenderer {
 		selection: number,
 		completedCount: number,
 		totalCampaign: number,
+		dailyDateLabel: string,
+		dailyBestScore: number | undefined,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -453,12 +455,14 @@ export class CanvasRenderer {
 		);
 
 		// Mode options
+		const dailyBestLabel = dailyBestScore ? `  Best: ${dailyBestScore}` : "";
 		const options = [
 			"FREE PLAY",
 			"CAMPAIGN",
 			"AI TRAINING",
 			"AI THEATER",
 			"EDITOR",
+			"DAILY CHALLENGE",
 		];
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
@@ -466,18 +470,22 @@ export class CanvasRenderer {
 			"Watch an AI learn to land from scratch.",
 			"Play while the AI trains on your terrain.",
 			"Draw custom terrain. Share with a link.",
+			`Today's seed: ${dailyDateLabel}.${dailyBestLabel}`,
 		];
 
+		const rowSpacing = 46;
+		const firstRowY =
+			CANVAS_HEIGHT / 2 - 20 - ((options.length - 5) * rowSpacing) / 2;
 		for (let i = 0; i < options.length; i++) {
-			const y = CANVAS_HEIGHT / 2 - 20 + i * 52;
+			const y = firstRowY + i * rowSpacing;
 			const isSelected = i === selection;
 
 			if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 16, 400, 44);
+				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 16, 400, 44);
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
