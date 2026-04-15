@@ -13,7 +13,16 @@ import {
 import { HeadlessGame } from "./HeadlessGame";
 
 const MAX_STEPS_PER_EPISODE = 1500;
-const STEPS_PER_TICK = 50;
+// Yield to the browser event loop this often during an episode. Lower =
+// smoother UI, higher = faster training. 15 keeps the UI responsive while
+// 3-4 agents train concurrently on the main thread with the main game loop
+// still running.
+const STEPS_PER_TICK = 15;
+// DQN fit() frequency. Every 12 steps strikes a balance between
+// sample-efficient learning and not saturating the main thread with TF.js
+// kernel launches. Previously 4 = ~375 fit calls per episode, which
+// starved the UI while the player was also flying the lander.
+const DQN_TRAIN_EVERY = 12;
 
 export interface AITheaterComparison {
 	playerScore: number;
@@ -164,15 +173,23 @@ export class AITheater {
 	private async runTrainingLoop(): Promise<void> {
 		while (this.training && !this.abortRequested) {
 			const slot = this.slots[this.currentSlotIdx];
-			const stats = await this.runEpisode(slot);
-			if (slot.agent === this.dqn) {
-				this.totalEpisodes = stats.episode;
-				if (stats.totalReward > this.bestReward) {
-					this.bestReward = stats.totalReward;
+			try {
+				const stats = await this.runEpisode(slot);
+				if (slot.agent === this.dqn) {
+					this.totalEpisodes = stats.episode;
+					if (stats.totalReward > this.bestReward) {
+						this.bestReward = stats.totalReward;
+					}
+					if (stats.landed) this.bestLanded = true;
 				}
-				if (stats.landed) this.bestLanded = true;
+				this.panel.updateStats(stats);
+			} catch (err) {
+				// Without this catch an agent throwing mid-train would silently
+				// kill the whole round-robin because runTrainingLoop is
+				// fire-and-forget from start(). Log + continue so one bad
+				// episode doesn't freeze the panel at 1 episode forever.
+				console.error(`AITheater ${slot.agent.kind} episode failed:`, err);
 			}
-			this.panel.updateStats(stats);
 			this.currentSlotIdx = (this.currentSlotIdx + 1) % this.slots.length;
 			await new Promise((resolve) => setTimeout(resolve, 0));
 		}
@@ -213,7 +230,8 @@ export class AITheater {
 			stepsThisTick++;
 
 			if (result.done) break;
-			if (agent.trainBatch && steps % 4 === 0) await agent.trainBatch();
+			if (agent.trainBatch && steps % DQN_TRAIN_EVERY === 0)
+				await agent.trainBatch();
 
 			if (stepsThisTick >= STEPS_PER_TICK) {
 				stepsThisTick = 0;

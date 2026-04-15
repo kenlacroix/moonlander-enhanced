@@ -156,7 +156,6 @@ export class AITheaterPanel {
 
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
-
 		this.watchBtn.addEventListener("click", () => this.onWatchBest?.());
 		this.watchBtn.addEventListener("mouseenter", () => {
 			if (!this.watchBtn.disabled) this.watchBtn.style.background = "#00ff8822";
