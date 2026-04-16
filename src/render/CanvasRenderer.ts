@@ -452,10 +452,16 @@ export class CanvasRenderer {
 
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
+		// Subtitle at CANVAS_HEIGHT/2 - 100 (not -80) so the FREE PLAY
+		// selection box at y = firstRowY-14 has 20px of breathing room.
+		// Previously, adding the 7th option (HISTORIC MISSIONS) pushed
+		// firstRowY to -66, putting the selection box top at -80 — exactly
+		// where the subtitle sat. Visible in the pre-fix screenshot as
+		// the subtitle text clipping into the top border of FREE PLAY.
 		ctx.fillText(
 			"A LUNAR DESCENT SIMULATOR",
 			CANVAS_WIDTH / 2,
-			CANVAS_HEIGHT / 2 - 80,
+			CANVAS_HEIGHT / 2 - 100,
 		);
 
 		// Mode options
