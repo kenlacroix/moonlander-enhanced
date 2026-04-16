@@ -364,21 +364,20 @@ function buildHistoricReference(game: Game):
 	const m = game.activeMission;
 	if (!m || !isHistoricMission(m) || m.kind !== "landing") return undefined;
 	const facts = m.facts;
-	// Estimate fuel burn rate from FUEL_BURN_RATE constant pattern: each
-	// thrusting frame consumes a fixed amount. Approximate as
-	// `(starting - remaining) / duration` so the rate is observed, not
-	// assumed.
-	const startingFuel = m.difficulty?.startingFuel ?? STARTING_FUEL;
-	const used = Math.max(0, startingFuel - game.lander.fuel);
+	// computeHistoricYourValue dispatches on the fact-sheet's unit string.
+	// We pass everything it might need; unused fields cost nothing.
+	// Drift = distance from nearest pad center at touchdown.
 	const dur = Math.max(0.1, game.telemetry.getDuration());
-	const burnRate = used / dur;
+	const drift = game.terrain.pads.reduce((best, p) => {
+		const d = Math.abs(game.lander.x - (p.x + p.width / 2));
+		return d < best ? d : best;
+	}, Infinity);
 	const yourValue = computeHistoricYourValue({
 		label: facts.historicalReferenceLabel,
-		theirValue: facts.historicalReferenceValue,
 		unit: facts.historicalReferenceUnit,
 		fuelRemaining: game.lander.fuel,
-		fuelBurnRatePerSec: burnRate,
 		flightDurationSec: dur,
+		driftFromPadCenterPx: Number.isFinite(drift) ? drift : 0,
 	});
 	return {
 		label: facts.historicalReferenceLabel,

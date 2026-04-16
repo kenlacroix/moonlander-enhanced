@@ -23,16 +23,22 @@ import {
 
 type ChatterTrigger =
 	| "flight-start"
-	| "altitude-1000"
-	| "altitude-200"
+	| "altitude-mid"
+	| "altitude-final"
 	| "fuel-15"
 	| "fuel-5"
 	| "drift"
 	| "landed"
 	| "crashed";
 
-const ALTITUDE_1000 = 1000;
-const ALTITUDE_200 = 200;
+// Altitude thresholds are GAME-SPACE PIXELS, not meters. The lander
+// spawns roughly 250-350 px above terrain depending on mission, so:
+//   ~150 px = mid-descent (the in-game equivalent of "altitude 1000m")
+//   ~50 px  = final approach (the in-game equivalent of "200 feet")
+// The radio-call wording stays in feet/meters for atmosphere; the
+// underlying trigger is the screen-space crossing.
+const ALTITUDE_MID_PX = 150;
+const ALTITUDE_FINAL_PX = 50;
 const FUEL_FRACTION_15 = 0.15;
 const FUEL_FRACTION_5 = 0.05;
 const DRIFT_HORIZONTAL_MS = 30;
@@ -77,8 +83,8 @@ export class MissionChatter {
 		if (!this.facts) return;
 		const fuelFrac = state.lander.fuel / Math.max(1, state.startingFuel);
 
-		if (state.altitude < ALTITUDE_1000) this.fire("altitude-1000");
-		if (state.altitude < ALTITUDE_200) this.fire("altitude-200");
+		if (state.altitude < ALTITUDE_MID_PX) this.fire("altitude-mid");
+		if (state.altitude < ALTITUDE_FINAL_PX) this.fire("altitude-final");
 		if (fuelFrac < FUEL_FRACTION_15) this.fire("fuel-15");
 		if (fuelFrac < FUEL_FRACTION_5) this.fire("fuel-5");
 		if (Math.abs(state.lander.vx) > DRIFT_HORIZONTAL_MS) this.fire("drift");
@@ -129,9 +135,9 @@ function ruleBasedChatter(
 	switch (trigger) {
 		case "flight-start":
 			return `${facts.craftName}, you are go for landing.`;
-		case "altitude-1000":
+		case "altitude-mid":
 			return "Altitude 1000.";
-		case "altitude-200":
+		case "altitude-final":
 			return "200 feet, looking good.";
 		case "fuel-15":
 			return "Quantity light.";
@@ -175,10 +181,10 @@ function describeTrigger(trigger: ChatterTrigger): string {
 	switch (trigger) {
 		case "flight-start":
 			return "Powered descent has begun. You are go for landing.";
-		case "altitude-1000":
-			return "Lander has descended below 1000 meters AGL.";
-		case "altitude-200":
-			return "Lander has descended below 200 meters. Final approach.";
+		case "altitude-mid":
+			return "Lander is at mid-descent. About halfway down.";
+		case "altitude-final":
+			return "Lander is on final approach. Very close to the surface.";
 		case "fuel-15":
 			return "Fuel is below 15%. Quantity warning.";
 		case "fuel-5":

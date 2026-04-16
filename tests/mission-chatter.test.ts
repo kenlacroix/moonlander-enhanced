@@ -44,23 +44,35 @@ describe("MissionChatter — offline rule-based fallback", () => {
 		expect(chatter.latestText).toContain(facts.craftName);
 	});
 
-	it("fires altitude-1000 once when crossing 1000m", () => {
+	it("fires mid-descent chatter when altitude crosses the mid threshold", () => {
 		chatter.start(facts, null);
 		chatter.tick(0.1); // decay flight-start a bit
-		chatter.update({ lander: baseLander(), altitude: 999, startingFuel: 800 });
-		expect(chatter.latestText).toMatch(/1000/);
+		// Threshold is 150 px; 100 is well below.
+		chatter.update({ lander: baseLander(), altitude: 100, startingFuel: 800 });
+		expect(chatter.latestText).toMatch(/1000|altitude/i);
 	});
 
-	it("does NOT refire altitude-1000 on a second crossing", () => {
+	it("does NOT refire altitude-mid on a second crossing", () => {
 		chatter.start(facts, null);
-		chatter.update({ lander: baseLander(), altitude: 999, startingFuel: 800 });
+		chatter.update({ lander: baseLander(), altitude: 100, startingFuel: 800 });
 		const first = chatter.latestText;
 		chatter.tick(5); // expire visibility
 		expect(chatter.latestText).toBe("");
-		// Re-cross 1000 — should not fire again.
-		chatter.update({ lander: baseLander(), altitude: 999, startingFuel: 800 });
+		// Re-cross — should not fire again.
+		chatter.update({ lander: baseLander(), altitude: 100, startingFuel: 800 });
 		expect(chatter.latestText).toBe("");
-		expect(first).toMatch(/1000/);
+		expect(first).toMatch(/1000|altitude/i);
+	});
+
+	it("does NOT fire mid-descent chatter at spawn altitude (~300 px)", () => {
+		chatter.start(facts, null);
+		chatter.tick(5); // clear flight-start
+		// Apollo missions spawn around y=80-110, terrain near 400-500,
+		// so altitude is ~300 px at start. The mid threshold (150) must
+		// NOT trigger from there. Codex P2 fix: previously the threshold
+		// was 1000, which was always true.
+		chatter.update({ lander: baseLander(), altitude: 280, startingFuel: 800 });
+		expect(chatter.latestText).toBe("");
 	});
 
 	it("fires the famous 30-seconds chatter at <5% fuel", () => {

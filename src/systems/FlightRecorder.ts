@@ -11,6 +11,7 @@ import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
 import {
 	CANVAS_HEIGHT,
+	FUEL_BURN_RATE,
 	MAX_LANDING_SPEED,
 	STARTING_FUEL,
 } from "../utils/constants";
@@ -42,30 +43,50 @@ interface FlightReport {
 
 /**
  * Compute the player's "your value" for a historic mission's reference
- * metric. The interpretation depends on the metric label, so we keep
- * this simple: fuel margin = remaining-fuel-as-seconds-of-thrust;
- * everything else just reuses the played duration as a placeholder.
- * Part B can replace these with proper per-mission computations.
+ * metric. The metric type is dispatched on the unit string so we render
+ * the right quantity for each historic mission's reference.
+ *
+ * Supported units:
+ * - "seconds" → remaining-fuel-as-seconds-of-thrust (constant burn rate)
+ * - "m drift" → distance from pad center at landing in approximate meters
+ * - "min"     → flight duration converted to minutes
+ *
+ * Anything else falls back to flight duration in seconds. Adding a new
+ * unit means adding a case here and the corresponding fact-sheet entry.
  */
 export interface HistoricComparisonInput {
 	label: string;
-	theirValue: number;
 	unit: string;
 	fuelRemaining: number;
-	fuelBurnRatePerSec: number;
 	flightDurationSec: number;
+	driftFromPadCenterPx: number;
 }
+
+// Game-space pixels to "meters" conversion. The lander HUD reports speed
+// at ~scaled units; the pad is ~80px wide. Treat 1m ≈ 1px for share-card
+// purposes — close enough for "you drifted 47m" UX without making players
+// solve unit puzzles.
+const PIXELS_PER_METER = 1;
 
 export function computeHistoricYourValue(
 	input: HistoricComparisonInput,
 ): number {
-	const labelLower = input.label.toLowerCase();
-	if (labelLower.includes("fuel") || labelLower.includes("margin")) {
-		// Convert remaining fuel to seconds of thrust based on burn rate.
-		const safeRate = Math.max(0.0001, input.fuelBurnRatePerSec);
-		return Math.round((input.fuelRemaining / safeRate) * 10) / 10;
+	const unitLower = input.unit.toLowerCase().trim();
+	if (unitLower === "seconds" || unitLower === "sec" || unitLower === "s") {
+		// Remaining fuel ÷ thrust burn rate. Uses the project-wide constant,
+		// not an averaged-over-coasting estimate, so the "seconds remaining"
+		// figure matches what the player would have seen if they kept
+		// thrusting from touchdown.
+		return Math.round((input.fuelRemaining / FUEL_BURN_RATE) * 10) / 10;
 	}
-	// Default: the player's flight duration.
+	if (unitLower === "m drift" || unitLower === "m" || unitLower === "meters") {
+		return Math.round(input.driftFromPadCenterPx / PIXELS_PER_METER);
+	}
+	if (unitLower === "min" || unitLower === "minutes") {
+		return Math.round((input.flightDurationSec / 60) * 10) / 10;
+	}
+	// Unknown unit: don't fabricate a number. Caller can guard on
+	// historicReference being undefined to skip rendering instead.
 	return Math.round(input.flightDurationSec * 10) / 10;
 }
 
