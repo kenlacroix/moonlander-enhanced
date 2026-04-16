@@ -64,6 +64,35 @@ Apollo 12, 14, 16; Luna 16 (sample return); Chang'e 3/4/5; SLIM 2024; Chandrayaa
 
 ---
 
+## P2 — Sprint 2.6 Explain Mode — deferred findings (from /review on PR #28, 2026-04-16)
+
+### Transfer DQN breakdown missing on non-Moon worlds
+On Europa/Jupiter/etc., the transfer-DQN slot (Moon-trained policy adapting to the new world) runs through the non-DQN reward path, so `lastDqnBreakdown` never reflects it. The reward chart shows both DQN curves but the EXPLAIN overlay only mirrors the fresh DQN. A user watching a Jupiter transfer run sees a breakdown that doesn't correspond to the policy they're watching adapt.
+- **Why:** Found by the adversarial subagent (confidence 6/10). Real gap, most visible when someone demos transfer learning.
+- **Effort:** S (CC: ~20 min — track breakdown for both `agent === this.dqn || agent === this.transferDqn` with separate `lastDqnBreakdown` / `lastTransferBreakdown` fields and a panel label indicating which agent the current breakdown belongs to)
+- **Natural home:** Sprint 2.6 Part C, since Part C is already touching the panel to add the first-run tutorial and `?` compact toggle.
+
+### REWARD_COMPONENT_KEYS single source of truth
+`RewardBreakdown` fields live in three places with no compile-time link: the TypeScript interface in `src/ai/AgentEnv.ts:141`, the per-step accumulator loop in `src/game/AITheater.ts:runEpisode`, and the `BREAKDOWN_ROWS` array in `src/ui/AITheaterPanel.ts:11`. Adding a new reward component to the interface won't trip the compiler at the other two sites — the overlay will silently skip it and the accumulator will drop it.
+- **Why:** Found by the maintainability specialist twice (confidence 9/10). Only matters when someone extends `RewardBreakdown`, which isn't planned before a potential Sprint 2.8.
+- **Fix sketch:** Export `const REWARD_COMPONENT_KEYS = [...] as const satisfies ReadonlyArray<Exclude<keyof RewardBreakdown, "total">>` from `AgentEnv.ts`. Drive the accumulator and `BREAKDOWN_ROWS` keys from it.
+- **Effort:** S (CC: ~15 min)
+
+### Color palette constants across AITheaterPanel
+`#00ff88`, `#ff8866`, `#888`, `#333`, `#0d0d0d` repeat as inline hex literals across the panel. Any future theme work (light mode, accessibility palette) has to hunt string literals.
+- **Why:** Flagged by the maintainability specialist (confidence 8/10). Out of Sprint 2.6 scope but good cleanup for a separate refactor.
+- **Effort:** S (CC: ~20 min — pull into a `THEATER_COLORS` constant at the top of `AITheaterPanel.ts`)
+
+### Codex second opinion on PR #28 (blocked by account usage limit)
+`/codex review --base feat/sprint-2.6-explain-mode-part-a` hit "You've hit your usage limit" on 2026-04-16 (reset 2026-04-20 21:35). Run after the limit resets to get an independent cross-model review covering:
+1. The claim that bypassing `agent.calculateReward` for DQN and calling `calculateRewardBreakdown` directly produces an identical training signal.
+2. EXPLAIN toggle + localStorage persistence edge cases.
+3. Drift between `RewardBreakdown` type and the 3 places it's referenced (ties into the `REWARD_COMPONENT_KEYS` item above).
+- **Why:** The three focus areas above were already flagged by the Claude adversarial subagent during /review, but Codex provides a genuinely independent second model opinion the Claude passes can't replace.
+- **Effort:** XS (CC: ~5 min once account resets)
+
+---
+
 ## P1 — Deferred Cherry-Picks (post-v1.0)
 
 ### Daily Challenge — client-side shipped, backend open
