@@ -8,6 +8,7 @@ import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
+import { MissionChatter } from "../api/MissionChatter";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { type Achievement, loadAchievements } from "../systems/Achievements";
@@ -74,7 +75,15 @@ export class Game {
 	private seed_: number;
 	selectedMission = 0;
 	lastRank: number | null = null;
-	gameMode: "freeplay" | "campaign" | "ai-theater" = "freeplay";
+	gameMode: "freeplay" | "campaign" | "ai-theater" | "historic" = "freeplay";
+	/**
+	 * Mission ruleset, orthogonal to lander.status. "landing" is the
+	 * normal lander-on-pad goal. Sprint 5 historic missions can declare
+	 * "survive" (Apollo 13 loop-around, Part B) or "auto-landing"
+	 * (Luna 9, Part B). Defaults to "landing" for everything except
+	 * historic missions that opt into another kind.
+	 */
+	missionMode: "landing" | "survive" | "auto-landing" = "landing";
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
 	titleSelection = 0;
@@ -82,6 +91,10 @@ export class Game {
 	latestTrainingStats: TrainingStats | null = null;
 	adaptiveLabel: string | null = null;
 	private llmConfig: LLMConfig | null = null;
+
+	getLLMConfig(): LLMConfig | null {
+		return this.llmConfig;
+	}
 	llmText = "";
 	llmLoading = false;
 	artifactText = "";
@@ -93,6 +106,7 @@ export class Game {
 	ghostPlayer: GhostPlayer | null = null;
 	telemetry = new TelemetryRecorder();
 	autopilot = new Autopilot();
+	missionChatter = new MissionChatter();
 	wind: WindState | null = null;
 	alien: ReturnType<typeof createAlien> | null = null;
 	gravityStorm: ReturnType<typeof createGravityStorm> | null = null;
@@ -129,6 +143,9 @@ export class Game {
 	}
 	get fuelLeakActive(): boolean {
 		return this.physics.fuelLeakActive;
+	}
+	get missionChatterText(): string {
+		return this.missionChatter.latestText;
 	}
 	get isEmbed(): boolean {
 		return this.embedMode;

@@ -2,6 +2,25 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.7.0] - 2026-04-15 (Sprint 5 Part A)
+
+### Added
+- **HISTORIC MISSIONS** title-screen row. Pick it to see Apollo 11 (Sea of Tranquility), Apollo 15 (Hadley Rille), Apollo 17 (Taurus-Littrow), and Artemis III (Shackleton crater rim) — each with verified facts, mission-tuned fuel/altitude, and an authentic LM lander variant.
+- Mission control radio chatter during descent on historic missions. Triggered by altitude crossings (1000m, 200m), fuel thresholds (the famous "30 seconds" callout at <5%), horizontal drift, landing, and crash. Streams via your configured LLM if you have one; falls back to authentic rule-based callouts so it works with no API key.
+- Briefings for historic missions are locked to the verified fact sheet — the LLM is told to use only the facts provided so it never hallucinates a date or crew member. With no API key, the briefing renders the fact sheet directly.
+- "Margin vs Armstrong" comparison on the shareable flight report card. Press F after a historic landing to download a card showing your fuel margin vs the historical reference (e.g. Armstrong's famous ~22-second margin on Apollo 11).
+- Mission-scoped achievements: ARMSTRONG MARGIN (land Apollo 11 with under 3% fuel), EAGLE TOUCHDOWN (clean Apollo 11 landing), HADLEY RILLE, VALLEY OF THE LAST, SOUTH POLE. Each fires only on its own mission — landing tight on free play won't unlock them.
+- Two new Apollo-flavor terrain features: rille (a narrow V-trench carved between pads, used by Apollo 15) and valley (raised mountain walls at world edges, used by Apollo 17). Both preserve pad heights so they never make landings impossible.
+- Apollo LM and Artemis LM lander variants (heavier, more authentic descent stages).
+
+### Changed
+- `DifficultyConfig` accepts an optional `specialFeature: "rille" | "valley"` post-pass. Existing seeds without it produce byte-identical terrain (regression-tested).
+- `Game.missionMode` is now an orthogonal field to `lander.status`, defaulting to "landing". Sprint 5 Part B (Apollo 13 "Survive", Luna 9 auto-landing) will use the other kinds.
+
+### Architecture
+- `HistoricMission` is a TypeScript discriminated union on `kind: "landing" | "survive" | "auto-landing"` so missing-field bugs surface at compile time.
+- New `MissionChatter` debounces each event so each fires at most once per flight, and caps concurrent in-flight LLM requests at 1 to keep the main thread responsive.
+
 ## [0.5.6.1] - 2026-04-15
 
 ### Fixed

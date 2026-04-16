@@ -9,7 +9,10 @@ import {
 	offlineCrashAnalysis,
 } from "../api/CrashExplainer";
 import type { LLMConfig } from "../api/LLMProvider";
-import { getMissionBriefing } from "../api/MissionBriefing";
+import {
+	getMissionBriefing,
+	renderFactSheetBriefing,
+} from "../api/MissionBriefing";
 import { getMissionControlCommentary } from "../api/MissionControl";
 import type { TelemetryFrame } from "../systems/Telemetry";
 import {
@@ -18,6 +21,7 @@ import {
 	checkArtifactScan,
 	getArtifactPrompt,
 } from "./Artifacts";
+import { isHistoricMission } from "./HistoricMission";
 import type { LanderState } from "./Lander";
 import type { Mission } from "./Missions";
 
@@ -34,17 +38,32 @@ export class LLMIntegration {
 
 	fetchBriefing(state: LLMStateHandle, mission: Mission): void {
 		const config = this.getConfig();
+		const historic = isHistoricMission(mission) ? mission.facts : undefined;
+		// Offline fallback: render the fact sheet directly so historic
+		// missions still get authentic flavor with no API key. Critical
+		// gap from the eng review — must work without an LLM.
 		if (!config) {
-			state.llmText = "";
+			state.llmText = historic
+				? renderFactSheetBriefing(mission, historic)
+				: "";
 			return;
 		}
 		state.llmText = "";
 		state.llmLoading = true;
-		getMissionBriefing(config, mission, (chunk) => {
-			state.llmText += chunk;
-		})
+		getMissionBriefing(
+			config,
+			mission,
+			(chunk) => {
+				state.llmText += chunk;
+			},
+			historic,
+		)
 			.catch(() => {
-				// API error — silent, game is playable without it
+				// API error — fall back to fact sheet for historic, blank
+				// for generic. Either way, game stays playable.
+				if (historic) {
+					state.llmText = renderFactSheetBriefing(mission, historic);
+				}
 			})
 			.finally(() => {
 				state.llmLoading = false;

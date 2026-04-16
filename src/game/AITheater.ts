@@ -105,9 +105,7 @@ export class AITheater {
 		if (this.transferDqn) {
 			// Load the canonical Moon baseline. Explicit "moon" suffix so this
 			// key is stable even if the user is currently running on Jupiter.
-			await this.transferDqn.loadWeights(
-				`${MOON_BASELINE_SEED}-moon`,
-			);
+			await this.transferDqn.loadWeights(`${MOON_BASELINE_SEED}-moon`);
 			// Keep some exploration so it can adapt; don't collapse to greedy.
 			this.transferDqn.epsilon = Math.max(this.transferDqn.epsilon, 0.2);
 		}

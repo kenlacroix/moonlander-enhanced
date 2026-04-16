@@ -125,17 +125,19 @@ describe("checkLandingAchievements", () => {
 });
 
 describe("getAllAchievements", () => {
-	it("returns all 8 achievements with earned status", () => {
+	it("returns all achievements with earned status", () => {
 		const unlocked = new Set(["first-landing"]);
 		const all = getAllAchievements(unlocked);
-		expect(all).toHaveLength(8);
-		expect(all.find((a) => a.id === "first-landing")!.earned).toBe(true);
-		expect(all.find((a) => a.id === "perfect-landing")!.earned).toBe(false);
+		// 8 base + 5 mission-scoped Sprint 5 moments = 13
+		expect(all).toHaveLength(13);
+		expect(all.find((a) => a.id === "first-landing")?.earned).toBe(true);
+		expect(all.find((a) => a.id === "perfect-landing")?.earned).toBe(false);
 	});
 });
 
 describe("getAchievementCount", () => {
-	it("returns 8", () => {
-		expect(getAchievementCount()).toBe(8);
+	it("returns the registry size", () => {
+		// 8 base + 5 Sprint 5 mission-scoped moments
+		expect(getAchievementCount()).toBe(13);
 	});
 });

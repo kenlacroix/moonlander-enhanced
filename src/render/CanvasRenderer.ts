@@ -467,6 +467,7 @@ export class CanvasRenderer {
 			"AI THEATER",
 			"EDITOR",
 			"DAILY CHALLENGE",
+			"HISTORIC MISSIONS",
 		];
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
@@ -475,6 +476,7 @@ export class CanvasRenderer {
 			"Play while the AI trains on your terrain.",
 			"Draw custom terrain. Share with a link.",
 			`Today's seed: ${dailyDateLabel}.${dailyBestLabel}`,
+			"Apollo, Artemis. Real missions. Real margins.",
 		];
 
 		const rowSpacing = 46;

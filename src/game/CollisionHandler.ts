@@ -5,6 +5,7 @@ import {
 import { addScore } from "../systems/Leaderboard";
 import { STARTING_FUEL } from "../utils/constants";
 import type { Game } from "./Game";
+import { isHistoricMission } from "./HistoricMission";
 import { CAMPAIGN, saveCampaignProgress } from "./Missions";
 import { normAngle } from "./Physics";
 import {
@@ -35,6 +36,7 @@ export function handleCollisionResult(
 		);
 		game.llm.scanNearbyArtifact(game, game.artifacts, game.lander.x);
 		game.llm.fetchCommentary(game, game.lander, game.score, true);
+		game.missionChatter.onLanded();
 		if (game.gameMode === "campaign" && game.activeMission) {
 			game.campaignCompleted.add(game.activeMission.id);
 			saveCampaignProgress(game.campaignCompleted);
@@ -54,6 +56,7 @@ export function handleCollisionResult(
 			game.telemetry.frames,
 			STARTING_FUEL,
 		);
+		game.missionChatter.onCrashed();
 	}
 	handleRelayAfterCollision(game);
 	if (game.aiTheater.isActive) {
@@ -64,17 +67,44 @@ export function handleCollisionResult(
 function checkAchievements(game: Game): void {
 	const thrustingLast3s = game.physics.thrustHistory.some((t) => t);
 	const scannedCount = game.artifacts.filter((a) => a.scanned).length;
-	const newBadges = checkLandingAchievements(game.achievements, {
-		landed: true,
-		hSpeed: game.lander.vx,
-		angle: normAngle(game.lander.angle),
-		fuelPercent: (game.lander.fuel / STARTING_FUEL) * 100,
-		thrustingLast3Seconds: thrustingLast3s,
-		aliensActive: game.alien !== null,
-		campaignComplete: game.campaignCompleted.size >= CAMPAIGN.length,
-		artifactsScanned: scannedCount,
-		artifactsTotal: game.artifacts.length,
-	});
+	const startingFuel =
+		game.activeMission?.difficulty?.startingFuel ?? STARTING_FUEL;
+	// Mission-scoped moments only fire when the active mission is a
+	// HistoricMission with declared moments. This is what stops
+	// "apollo-11-margin" from accidentally unlocking on a free-play run.
+	const missionMoments =
+		game.activeMission &&
+		isHistoricMission(game.activeMission) &&
+		game.activeMission.kind === "landing"
+			? {
+					moments: game.activeMission.moments,
+					state: {
+						landed: true,
+						fuelRemaining: game.lander.fuel,
+						startingFuel,
+						flightDurationSec: game.telemetry.getDuration(),
+						finalVerticalSpeed: game.lander.vy,
+						finalHorizontalSpeed: game.lander.vx,
+						finalAngleDeg: normAngle(game.lander.angle),
+						landedOnPad: game.lander.status === "landed",
+					},
+				}
+			: undefined;
+	const newBadges = checkLandingAchievements(
+		game.achievements,
+		{
+			landed: true,
+			hSpeed: game.lander.vx,
+			angle: normAngle(game.lander.angle),
+			fuelPercent: (game.lander.fuel / startingFuel) * 100,
+			thrustingLast3Seconds: thrustingLast3s,
+			aliensActive: game.alien !== null,
+			campaignComplete: game.campaignCompleted.size >= CAMPAIGN.length,
+			artifactsScanned: scannedCount,
+			artifactsTotal: game.artifacts.length,
+		},
+		missionMoments,
+	);
 	if (newBadges.length > 0) {
 		game.achievementToast = newBadges[0];
 		game.achievementToastTimer = 4;

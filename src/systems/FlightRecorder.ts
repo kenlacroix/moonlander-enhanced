@@ -11,6 +11,7 @@ import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
 import {
 	CANVAS_HEIGHT,
+	FUEL_BURN_RATE,
 	MAX_LANDING_SPEED,
 	STARTING_FUEL,
 } from "../utils/constants";
@@ -32,6 +33,61 @@ interface FlightReport {
 	fuelStarted: number;
 	frames: TelemetryFrame[];
 	terrainPoints: { x: number; y: number }[];
+	historicReference?: {
+		label: string; // e.g. "Armstrong fuel margin"
+		yourValue: number; // computed at landing
+		theirValue: number; // historical reference
+		unit: string; // "seconds", "m drift", etc.
+	};
+}
+
+/**
+ * Compute the player's "your value" for a historic mission's reference
+ * metric. The metric type is dispatched on the unit string so we render
+ * the right quantity for each historic mission's reference.
+ *
+ * Supported units:
+ * - "seconds" → remaining-fuel-as-seconds-of-thrust (constant burn rate)
+ * - "m drift" → distance from pad center at landing in approximate meters
+ * - "min"     → flight duration converted to minutes
+ *
+ * Anything else falls back to flight duration in seconds. Adding a new
+ * unit means adding a case here and the corresponding fact-sheet entry.
+ */
+export interface HistoricComparisonInput {
+	label: string;
+	unit: string;
+	fuelRemaining: number;
+	flightDurationSec: number;
+	driftFromPadCenterPx: number;
+}
+
+// Game-space pixels to "meters" conversion. The lander HUD reports speed
+// at ~scaled units; the pad is ~80px wide. Treat 1m ≈ 1px for share-card
+// purposes — close enough for "you drifted 47m" UX without making players
+// solve unit puzzles.
+const PIXELS_PER_METER = 1;
+
+export function computeHistoricYourValue(
+	input: HistoricComparisonInput,
+): number {
+	const unitLower = input.unit.toLowerCase().trim();
+	if (unitLower === "seconds" || unitLower === "sec" || unitLower === "s") {
+		// Remaining fuel ÷ thrust burn rate. Uses the project-wide constant,
+		// not an averaged-over-coasting estimate, so the "seconds remaining"
+		// figure matches what the player would have seen if they kept
+		// thrusting from touchdown.
+		return Math.round((input.fuelRemaining / FUEL_BURN_RATE) * 10) / 10;
+	}
+	if (unitLower === "m drift" || unitLower === "m" || unitLower === "meters") {
+		return Math.round(input.driftFromPadCenterPx / PIXELS_PER_METER);
+	}
+	if (unitLower === "min" || unitLower === "minutes") {
+		return Math.round((input.flightDurationSec / 60) * 10) / 10;
+	}
+	// Unknown unit: don't fabricate a number. Caller can guard on
+	// historicReference being undefined to skip rendering instead.
+	return Math.round(input.flightDurationSec * 10) / 10;
 }
 
 function getFuelGrade(pctRemaining: number): { letter: string; color: string } {
@@ -63,6 +119,7 @@ export function generateFlightReport(
 	seed: number,
 	score: number,
 	landed: boolean,
+	historicReference?: FlightReport["historicReference"],
 ): void {
 	const report: FlightReport = {
 		missionName,
@@ -77,6 +134,7 @@ export function generateFlightReport(
 		fuelStarted: STARTING_FUEL * lander.landerType.fuelMultiplier,
 		frames,
 		terrainPoints: terrain.points,
+		historicReference,
 	};
 
 	const canvas = document.createElement("canvas");
@@ -315,6 +373,22 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 	}
 
 	// Footer
+	// Historic mission "your value vs theirs" comparison line. Only
+	// renders when the caller passed historicReference (i.e. this is a
+	// HistoricMission). Sits above the footer.
+	if (r.historicReference) {
+		const ref = r.historicReference;
+		const yourBeat = ref.yourValue < ref.theirValue;
+		ctx.textAlign = "center";
+		ctx.font = 'bold 14px "Courier New", monospace';
+		ctx.fillStyle = yourBeat ? "#00ff88" : "#ffaa00";
+		ctx.fillText(
+			`${ref.label.toUpperCase()}: YOU ${ref.yourValue} ${ref.unit} · REF ${ref.theirValue} ${ref.unit}`,
+			CARD_WIDTH / 2,
+			CARD_HEIGHT - 40,
+		);
+	}
+
 	ctx.fillStyle = "#333333";
 	ctx.font = '11px "Courier New", monospace';
 	ctx.textAlign = "center";

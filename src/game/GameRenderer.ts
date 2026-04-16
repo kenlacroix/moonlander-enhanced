@@ -7,6 +7,8 @@ import type { Autopilot } from "../ai/Autopilot";
 import type { GhostPose } from "../ai/EpisodeRecorder";
 import type { TrainingStats } from "../ai/RLAgent";
 import type { TrainingLoop } from "../ai/TrainingLoop";
+import { APOLLO_MISSIONS } from "../data/apolloMissions";
+import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
@@ -33,6 +35,19 @@ import {
 } from "./RelayMode";
 import type { TerrainData } from "./Terrain";
 import { getWindLabel, type WindState } from "./Wind";
+
+/**
+ * Mirror of StateHandlers.getMenuMissions. Defined here too so the
+ * renderer doesn't import StateHandlers (which would create a cycle:
+ * GameRenderer → StateHandlers → Game → GameRenderer).
+ */
+function getMenuMissionsForRender(
+	mode: "freeplay" | "campaign" | "ai-theater" | "historic",
+): readonly Mission[] {
+	if (mode === "campaign") return CAMPAIGN;
+	if (mode === "historic") return [...APOLLO_MISSIONS, ...ARTEMIS_MISSIONS];
+	return MISSIONS;
+}
 
 export type GameStatus =
 	| "title"
@@ -65,12 +80,13 @@ export interface GameRenderState {
 	readonly score: number;
 	readonly lastRank: number | null;
 	readonly llmText: string;
+	readonly missionChatterText: string;
 	readonly artifactText: string;
 	readonly crashAnalysis: string;
 	readonly flightElapsed: number;
 	readonly titleSelection: number;
 	readonly selectedMission: number;
-	readonly gameMode: "freeplay" | "campaign" | "ai-theater";
+	readonly gameMode: "freeplay" | "campaign" | "ai-theater" | "historic";
 	readonly campaignCompleted: Set<number>;
 	readonly input: Input;
 	readonly latestTrainingStats: TrainingStats | null;
@@ -138,6 +154,31 @@ export class GameRenderer {
 		ctx.fill();
 		ctx.restore();
 		ctx.globalAlpha = 1;
+	}
+
+	private drawChatterCaption(text: string): void {
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		ctx.font = "13px 'Courier New', monospace";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "top";
+		const padX = 14;
+		const padY = 6;
+		const metrics = ctx.measureText(text);
+		const w = metrics.width + padX * 2;
+		const h = 22;
+		const x = 1280 / 2 - w / 2;
+		const y = 80;
+		ctx.fillStyle = "rgba(0,0,0,0.65)";
+		ctx.strokeStyle = "#ff8866";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.fill();
+		ctx.stroke();
+		ctx.fillStyle = "#ffd9c2";
+		ctx.fillText(text, 1280 / 2, y + padY - 1);
+		ctx.restore();
 	}
 
 	private drawForkCaption(
@@ -243,6 +284,10 @@ export class GameRenderer {
 
 		if (state.forkReplay) {
 			this.drawForkCaption(state.forkReplay);
+		}
+
+		if (state.missionChatterText) {
+			this.drawChatterCaption(state.missionChatterText);
 		}
 
 		// Post-flight telemetry chart
@@ -361,7 +406,7 @@ export class GameRenderer {
 	}
 
 	renderMenu(state: GameRenderState): void {
-		const missions = state.gameMode === "campaign" ? CAMPAIGN : MISSIONS;
+		const missions = getMenuMissionsForRender(state.gameMode);
 		const bestScores = new Map<number, number>();
 		for (const m of missions) {
 			const best = getBestScore(m.seed);
@@ -369,7 +414,7 @@ export class GameRenderer {
 		}
 		this.renderer.clear();
 		this.renderer.drawMissionSelect(
-			missions,
+			[...missions],
 			state.selectedMission,
 			bestScores,
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
