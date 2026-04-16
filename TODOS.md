@@ -42,7 +42,17 @@ Verify service worker network-first cache handles WebGL asset transition correct
 Active plan at `.plans/sprint-5-apollo.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-5-apollo.md`.
 - **Scope:** Apollo 11/15/17 + Artemis III + mission chatter + "margin vs Armstrong" share card. Single PR.
 - **Effort:** ~5h human / ~45-60 min CC.
-- **Status:** Plan approved in SCOPE EXPANSION mode. Architecture decisions locked (discriminated union, orthogonal missionMode, Achievement-scoped moments, streamingLLM extract). Ready to implement.
+- **Status:** ✅ SHIPPED v0.5.7.0 (PR #22, merged 2026-04-15).
+
+### Sprint 5.5 — Authentic Mode (CEO reviewed 2026-04-16, Codex-challenged)
+Active plan at `.plans/sprint-5.5-authentic-mode.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-16-sprint-5.5-authentic-mode.md`.
+- **Scope:** Per-mission Authentic toggle (default OFF) + Apollo 11 signature moments (altitude blackout via true AGL, 1202 alarm skip-on-collision) + Apollo 15/17 polish + Artemis III hazard-aware landing ellipse (fused from original ellipse+ribbon) + mobile touch toggle + dual-track leaderboard (`{seed}-{mode}` keyed).
+- **Effort:** ~9h human / ~105-120 min CC across one PR.
+- **Status:** CEO review complete (SELECTIVE EXPANSION, 6 cherry-picks accepted, 8 Codex tensions resolved). Ready for `/plan-eng-review`.
+
+### Sprint 5.5 polish backlog (post-ship)
+- **Standalone hazard ribbon overlay:** Sprint 5.5 fused ribbon into the landing ellipse (red on hazardous slope). If playtest shows fusion alone doesn't communicate "autonomous hazard detection" strongly enough, add a terrain-wide slope tint in a narrow altitude band. P2 post-5.5.
+- **Authentic variants for deferred historic missions:** Apollo 12/14/16, Luna 9, Chang'e series, SLIM 2024, Chandrayaan-3. Each inherits era-specific signature moments from the AuthenticMode subsystem. Compounds as Sprint 5 Part B and beyond land more missions. P2.
 
 ### Sprint 5 Part B — Specialized mission types
 Follow-up PR after Part A ships.
