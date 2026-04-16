@@ -40,16 +40,31 @@ export interface Agent {
 	dispose(): void;
 }
 
-export const AGENT_COLORS: Record<AgentKind, string> = {
-	dqn: "#00ff88",
-	"dqn-transfer": "#ff88cc",
-	pg: "#00aaff",
-	random: "#888888",
-};
+interface AgentMeta {
+	label: string;
+	color: string;
+	description: string;
+}
 
-export const AGENT_LABELS: Record<AgentKind, string> = {
-	dqn: "DQN (fresh)",
-	"dqn-transfer": "DQN (Moon→here)",
-	pg: "Policy Gradient",
-	random: "Random",
+export const AGENT_META: Record<AgentKind, AgentMeta> = {
+	dqn: {
+		label: "DQN (fresh)",
+		color: "#00ff88",
+		description: "Remembers 20,000 past attempts; replays them to learn.",
+	},
+	"dqn-transfer": {
+		label: "DQN (Moon→here)",
+		color: "#ff88cc",
+		description: "Started with Moon-trained memory; adapting to this world.",
+	},
+	pg: {
+		label: "Policy Gradient",
+		color: "#00aaff",
+		description: "Doesn't remember — just adjusts after each full attempt.",
+	},
+	random: {
+		label: "Random",
+		color: "#888888",
+		description: "Doesn't learn. Acts as a floor for comparison.",
+	},
 };
