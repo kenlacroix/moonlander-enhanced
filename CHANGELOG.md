@@ -2,6 +2,15 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.8.1] - 2026-04-16 (Sprint 2.6 Part A: AI Theater Explain Mode)
+
+### Added
+- AI VISION strip in the AI Theater panel: 11 labeled bars showing the DQN's state vector in real time (ΔX to pad, altitude, speeds, angle, fuel, approach velocity, and the rest). Bars are centered at zero, sign-colored (green positive, red negative), and refresh at 2 Hz so it's readable as the agent plays.
+- Plain-language algorithm descriptions under each legend entry — "Remembers 20,000 past attempts; replays them to learn" (DQN), "Doesn't remember — just adjusts after each full attempt" (Policy Gradient), and so on. No ML background needed to follow what's on the chart.
+
+### Changed
+- Consolidated `AGENT_LABELS` + `AGENT_COLORS` into a single `AGENT_META` registry with `{ label, color, description }` per agent kind. One source of truth for every place that renders an agent.
+
 ## [0.5.8.0] - 2026-04-16 (Sprint 2.7: Smarter DQN)
 
 ### Added
