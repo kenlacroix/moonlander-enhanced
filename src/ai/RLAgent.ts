@@ -68,6 +68,7 @@ export class RLAgent implements Agent {
 	readonly kind: "dqn" | "dqn-transfer";
 	private model: tf.Sequential | null = null;
 	private targetModel: tf.Sequential | null = null;
+	private optimizer: tf.Optimizer | null = null;
 	private memory = new SumTree<Experience>(MEMORY_SIZE);
 	private maxPriority = PER_MAX_PRIORITY_INIT;
 	epsilon = EPSILON_START;
@@ -85,6 +86,11 @@ export class RLAgent implements Agent {
 		this.model = this.buildModel();
 		this.targetModel = this.buildModel();
 		this.syncTargetModel();
+		// Separate Adam optimizer used by trainBatch's manual gradient step.
+		// Held as a field so PER importance-sampling weights can actually
+		// apply to the loss (TF.js Sequential.fit() doesn't support
+		// sampleWeight — prior learning from Sprint 2.5's PG breakage).
+		this.optimizer = tf.train.adam(LEARNING_RATE);
 		this.ready = true;
 	}
 
@@ -103,10 +109,8 @@ export class RLAgent implements Agent {
 		);
 		model.add(tf.layers.dense({ units: 128, activation: "relu" }));
 		model.add(tf.layers.dense({ units: ACTION_COUNT, activation: "linear" }));
-		model.compile({
-			optimizer: tf.train.adam(LEARNING_RATE),
-			loss: "meanSquaredError",
-		});
+		// No compile() — we train via optimizer.minimize so IS weights
+		// can be applied to the loss. compile() only matters for fit().
 		return model;
 	}
 
@@ -182,11 +186,18 @@ export class RLAgent implements Agent {
 
 	/**
 	 * Train on a prioritized batch from replay memory.
-	 * Uses TD-error to update leaf priorities so informative transitions
-	 * (big TD-error) get replayed more often.
+	 *
+	 * Samples proportional to priority via SumTree, computes TD-errors to
+	 * update leaf priorities, and runs a gradient step via
+	 * `optimizer.minimize` with a weighted MSE loss so PER importance-
+	 * sampling weights are actually applied (the TF.js Sequential.fit
+	 * path ignores sampleWeight — this is the same bug that broke
+	 * Sprint 2.5's PG training).
+	 *
+	 * Loss: `mean(w_i * (target_i − Q(s_i, a_i))^2)`.
 	 */
 	async trainBatch(): Promise<void> {
-		if (!this.model || !this.targetModel) return;
+		if (!this.model || !this.targetModel || !this.optimizer) return;
 		if (this.memory.size < BATCH_SIZE) return;
 		if (this.training) return;
 
@@ -210,22 +221,24 @@ export class RLAgent implements Agent {
 			}
 
 			// Importance-sampling weights: w_i ∝ (1 / (N * P(i)))^beta.
-			// Normalize by max weight so the training signal stays bounded.
+			// Normalize by max weight so the gradient scale stays bounded.
 			const N = this.memory.size;
 			const probs = sampled.map((s) => s.priority / total);
 			const weightsRaw = probs.map((p) => (N * p) ** -beta);
 			const maxW = Math.max(...weightsRaw);
 			const weights = weightsRaw.map((w) => w / maxW);
 
-			const { states, targets, tdErrors } = tf.tidy(() => {
-				const s = tf.tensor2d(sampled.map((x) => x.exp.state));
-				const ns = tf.tensor2d(sampled.map((x) => x.exp.nextState));
-
+			// Compute targets + TD-errors OUTSIDE the minimize closure so we
+			// can return them for priority updates. The target network is
+			// frozen during this step (as is standard for DQN).
+			const { targetsArr, tdErrors } = tf.tidy(() => {
+				const nextStatesT = tf.tensor2d(sampled.map((x) => x.exp.nextState));
+				const statesT = tf.tensor2d(sampled.map((x) => x.exp.state));
 				const currentQ = (
-					this.model!.predict(s) as tf.Tensor
+					this.model!.predict(statesT) as tf.Tensor
 				).arraySync() as number[][];
 				const nextQ = (
-					this.targetModel!.predict(ns) as tf.Tensor
+					this.targetModel!.predict(nextStatesT) as tf.Tensor
 				).arraySync() as number[][];
 
 				const tdErrs: number[] = [];
@@ -238,25 +251,28 @@ export class RLAgent implements Agent {
 					tdErrs.push(Math.abs(target - old));
 					currentQ[i][exp.action] = target;
 				}
-
-				return {
-					states: tf.tensor2d(sampled.map((x) => x.exp.state)),
-					targets: tf.tensor2d(currentQ),
-					tdErrors: tdErrs,
-				};
+				return { targetsArr: currentQ, tdErrors: tdErrs };
 			});
 
-			// fit() with sampleWeight would be ideal, but TF.js sequential
-			// doesn't support it (the bug that broke Sprint 2.5 PG). Approximate
-			// importance-sampling by scaling the effective learning rate per
-			// sample via sample-weighted targets: blend target toward current
-			// proportional to IS weight (identity when w=1, softer when w<1).
-			// This is a practical compromise that still corrects the PER bias.
-			// For cleaner IS weighting, switch to custom gradient via
-			// optimizer.minimize (as PolicyGradientAgent does).
-			await this.model.fit(states, targets, { epochs: 1, verbose: 0 });
-			states.dispose();
-			targets.dispose();
+			// Manual gradient step with IS-weighted MSE. Loss:
+			//   mean(w_i * (target_i[a_i] − Q(s_i)[a_i])^2)
+			// We use the full-vector target (unchanged Q for non-taken
+			// actions, bellman-target for taken action) so gradients on
+			// non-taken actions are 0 by construction. IS weight then
+			// scales the whole per-sample squared error.
+			const statesT = tf.tensor2d(sampled.map((x) => x.exp.state));
+			const targetsT = tf.tensor2d(targetsArr);
+			const weightsT = tf.tensor1d(weights);
+			this.optimizer.minimize(() => {
+				const q = this.model?.apply(statesT) as tf.Tensor2D;
+				const perAction = tf.square(tf.sub(q, targetsT)); // [B, A]
+				const perSample = tf.sum(perAction, 1); // [B]
+				const weighted = tf.mul(perSample, weightsT); // [B]
+				return tf.mean(weighted) as tf.Scalar;
+			});
+			statesT.dispose();
+			targetsT.dispose();
+			weightsT.dispose();
 
 			// Update priorities in the SumTree based on fresh TD-errors.
 			for (let i = 0; i < BATCH_SIZE; i++) {
@@ -266,10 +282,6 @@ export class RLAgent implements Agent {
 					this.maxPriority = tdErrors[i] + PER_EPSILON;
 				}
 			}
-			// Reference unused local so linter doesn't complain; the IS
-			// weights are documented above but the fit() path doesn't
-			// consume them due to the TF.js sampleWeight issue.
-			void weights;
 
 			this.stepsSinceTargetUpdate++;
 			if (this.stepsSinceTargetUpdate >= TARGET_UPDATE_INTERVAL) {

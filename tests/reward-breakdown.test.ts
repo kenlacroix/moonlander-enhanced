@@ -161,6 +161,31 @@ describe("getState (Sprint 2.7 — 11 dims)", () => {
 		expect(s[8]).toBeCloseTo(10 / 300, 3); // starts fresh
 	});
 
+	it("altitude-above-pad (dim 9) differs from terrain-below altitude (dim 1)", () => {
+		// Terrain inline with pad at y=500, lander at y=250 above. If pad y and
+		// terrain-below y are equal, dim 1 and dim 9 should both represent the
+		// same vertical offset. BUT the regression Codex caught was that dim 9
+		// was computing the same expression as dim 1 (duplicate). This test
+		// ensures dim 9 uses pad.y specifically — when terrain and pad y differ,
+		// the two dims diverge.
+		const terrain = {
+			points: [
+				{ x: 0, y: 500 },
+				{ x: 640, y: 300 }, // lander is over a hill
+				{ x: 1280, y: 500 },
+			],
+			pads: [{ x: 620, y: 500, width: 40, points: 1 }],
+			seed: 1,
+		};
+		const lander = makeLander({ x: 640, y: 200 });
+		const s = getState(lander, terrain);
+		// Dim 1: altitude above terrain below (terrain at x=640 is y=300,
+		//   lander at y=200+LH/2=210ish → altitude = 300 - 210 = ~90 px)
+		// Dim 9: altitude above pad (pad at y=500, lander at y=210ish →
+		//   altitude = 500 - 210 = ~290 px, very different)
+		expect(Math.abs(s[1] - s[9])).toBeGreaterThan(0.2);
+	});
+
 	it("approach velocity (dim 10) positive when moving toward pad", () => {
 		const t = makeTerrain();
 		// Pad at x=640, lander at x=400 moving right → approaching

@@ -20,7 +20,8 @@ import {
  * 6:  fuel fraction (0..1)
  * 7:  horizontal distance to pad center / pad width
  * 8:  vertical acceleration (this-frame vy − prev-frame vy) — "am I braking?"
- * 9:  ground proximity directly below lander.x (not pad-relative altitude)
+ * 9:  altitude above the pad surface (informative when terrain between
+ *     lander and pad is higher than the pad itself)
  * 10: approach velocity toward pad (dot of velocity with unit dir-to-pad)
  *
  * Changing STATE_SIZE breaks saved IndexedDB weights with old 8-dim shape.
@@ -71,8 +72,16 @@ export function getState(lander: LanderState, terrain: TerrainData): number[] {
 	const vertAccel = (lander.vy - prevVy) / 300; // normalized, −1..1 typical
 	prevVy = lander.vy;
 
-	// Ground proximity: altitude directly below lander, not relative to pad
-	const groundProx = Math.min(altitude / 500, 1);
+	// Altitude above the pad surface specifically (dim 9). This differs
+	// from dim 1 (altitude above the terrain directly below lander.x) —
+	// when the agent is flying OVER non-pad terrain, dim 1 measures
+	// ground clearance but dim 9 measures how much further it still needs
+	// to descend to reach the landing target. Informative during final
+	// approach and when terrain between the lander and the pad is higher
+	// than the pad itself.
+	const altitudeAbovePad = pad
+		? Math.max(-1, Math.min(1, (pad.y - (lander.y + LANDER_HEIGHT / 2)) / 500))
+		: Math.min(altitude / 500, 1);
 
 	// Approach velocity: dot of velocity with unit vector toward pad
 	let approachVel = 0;
@@ -96,7 +105,7 @@ export function getState(lander: LanderState, terrain: TerrainData): number[] {
 		lander.fuel / STARTING_FUEL,
 		pad ? Math.abs(lander.x - padCenterX) / padWidth : 1,
 		vertAccel,
-		groundProx,
+		altitudeAbovePad,
 		approachVel,
 	];
 }
