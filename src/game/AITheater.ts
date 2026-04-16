@@ -1,4 +1,8 @@
 import type { Agent, AgentStats } from "../ai/Agent";
+import {
+	calculateRewardBreakdown,
+	type RewardBreakdown,
+} from "../ai/AgentEnv";
 import { EpisodeRecorder, type RecordedEpisode } from "../ai/EpisodeRecorder";
 import { PolicyGradientAgent } from "../ai/PolicyGradientAgent";
 import { RandomAgent } from "../ai/RandomAgent";
@@ -53,6 +57,7 @@ export class AITheater {
 	private recorder = new EpisodeRecorder(10);
 	private forkHandler: ((episode: RecordedEpisode) => void) | null = null;
 	private latestDqnState: number[] | null = null;
+	private lastDqnBreakdown: RewardBreakdown | null = null;
 
 	constructor() {
 		this.panel = new AITheaterPanel();
@@ -93,6 +98,7 @@ export class AITheater {
 		this.panel.mount();
 		this.panel.setEpisodesProvider(() => this.recorder.getEpisodes());
 		this.panel.setDqnStateProvider(() => this.latestDqnState);
+		this.panel.setDqnBreakdownProvider(() => this.lastDqnBreakdown);
 		this.panel.setForkRequestHandler((ep) => this.forkHandler?.(ep));
 		this.adjustGameLayout(true);
 
@@ -133,6 +139,7 @@ export class AITheater {
 		this.transferDqn = null;
 		this.slots = [];
 		this.latestDqnState = null;
+		this.lastDqnBreakdown = null;
 		this.panel.unmount();
 		this.adjustGameLayout(false);
 		this.currentSeed = null;
@@ -202,8 +209,20 @@ export class AITheater {
 
 	private async runEpisode(slot: AgentSlot): Promise<AgentStats> {
 		const { agent, game } = slot;
-		const record = agent === this.dqn;
-		if (record) this.recorder.abortCurrent();
+		const isDqn = agent === this.dqn;
+		const epBreakdown: RewardBreakdown | null = isDqn
+			? {
+					total: 0,
+					terminal: 0,
+					proximity: 0,
+					descent: 0,
+					speed: 0,
+					anglePenalty: 0,
+					approach: 0,
+					timeTax: 0,
+				}
+			: null;
+		if (isDqn) this.recorder.abortCurrent();
 		game.reset();
 		let totalReward = 0;
 		let steps = 0;
@@ -215,18 +234,38 @@ export class AITheater {
 			const action = agent.chooseAction(state);
 			const input = agent.actionToInput(action);
 
-			if (agent === this.dqn) this.latestDqnState = state;
-			if (record) this.recorder.onStep(action, game.lander);
+			if (isDqn) {
+				this.latestDqnState = state;
+				this.recorder.onStep(action, game.lander);
+			}
 
 			const result = game.step(input, FIXED_TIMESTEP);
 			landed = result.landed;
 
-			const reward = agent.calculateReward(
-				game.lander,
-				game.terrain,
-				landed,
-				result.crashed,
-			);
+			let reward: number;
+			if (epBreakdown) {
+				const bd = calculateRewardBreakdown(
+					game.lander,
+					game.terrain,
+					landed,
+					result.crashed,
+				);
+				epBreakdown.terminal += bd.terminal;
+				epBreakdown.proximity += bd.proximity;
+				epBreakdown.descent += bd.descent;
+				epBreakdown.speed += bd.speed;
+				epBreakdown.anglePenalty += bd.anglePenalty;
+				epBreakdown.approach += bd.approach;
+				epBreakdown.timeTax += bd.timeTax;
+				reward = bd.total;
+			} else {
+				reward = agent.calculateReward(
+					game.lander,
+					game.terrain,
+					landed,
+					result.crashed,
+				);
+			}
 
 			const nextState = agent.getState(game.lander, game.terrain);
 			agent.remember(state, action, reward, nextState, result.done);
@@ -247,7 +286,22 @@ export class AITheater {
 
 		await agent.endEpisode(totalReward);
 
-		if (record && this.currentSeed !== null) {
+		if (epBreakdown) {
+			// Derive total from summed components (not totalReward) so the
+			// panel's row math is self-consistent by construction; floating-
+			// point order would otherwise leave a ~1e-10 gap between them.
+			epBreakdown.total =
+				epBreakdown.terminal +
+				epBreakdown.proximity +
+				epBreakdown.descent +
+				epBreakdown.speed +
+				epBreakdown.anglePenalty +
+				epBreakdown.approach +
+				epBreakdown.timeTax;
+			this.lastDqnBreakdown = epBreakdown;
+		}
+
+		if (isDqn && this.currentSeed !== null) {
 			const recorded = this.recorder.onEpisodeEnd(
 				agent.episodeCount,
 				this.currentSeed,
