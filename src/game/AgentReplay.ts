@@ -1,3 +1,4 @@
+import { resetStateCache } from "../ai/AgentEnv";
 import type { RLAgent } from "../ai/RLAgent";
 import { LANDER_HEIGHT, WORLD_WIDTH } from "../utils/constants";
 import type { Game } from "./Game";
@@ -24,6 +25,7 @@ export function startAgentReplay(game: Game, seed?: number): void {
 	game.activeMission = null;
 	game.terrain = generateTerrain(game.seed);
 	game.lander = createLander(WORLD_WIDTH / 2, 80, getLanderType());
+	resetStateCache();
 	game.particles.clear();
 	game.resetCamera();
 	game.resetLoop();

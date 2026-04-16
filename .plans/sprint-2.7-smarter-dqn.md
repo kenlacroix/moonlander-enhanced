@@ -76,6 +76,15 @@ Fix: actually populate angular velocity (dim 5) instead of hardcoding 0.
 Current: 64→64→4 (linear output). Consider:
 - **Dueling DQN**: split final layer into value stream + advantage stream. Often learns faster because value and advantage are separate. Small code change (~20 lines).
 
+## Implementation note (2026-04-16)
+
+True Dueling DQN (split value/advantage streams) was deferred during implementation.
+It requires switching from `tf.sequential()` to the TF.js functional API
+(`tf.model({ inputs, outputs })`) with a custom mean-subtraction layer. That's
+~30 LOC of architectural complexity for marginal gains over the wider (128-unit)
+network that captures most of Dueling's capacity benefit. Moved to TODOS as
+a follow-up PR if the wider network doesn't deliver enough learning speed.
+
 ## Out of scope
 - Curriculum learning (start with easy terrain, progress to harder) — good idea but requires HeadlessGame to support dynamic difficulty mid-training
 - Double DQN (use online network for action selection, target network for evaluation) — moderate lift, diminishing returns if PER is already in

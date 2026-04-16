@@ -2,6 +2,27 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.8.0] - 2026-04-16 (Sprint 2.7: Smarter DQN)
+
+### Added
+- DQN now actually learns from its failures. Prioritized Experience Replay samples surprising transitions (high TD-error) ~10x more often than mundane ones, so the agent focuses on its mistakes instead of the 19,999 "falling through empty space" frames that all look the same.
+- Agent "sees" more: state vector expanded from 8 to 11 dimensions with vertical acceleration (is the agent braking?), ground proximity (how close is the dirt below me, not just the pad?), and approach velocity (am I heading toward the pad or drifting past it?). Angular velocity is now populated too, fixing a long-standing hardcoded `0`.
+- Landing quality matters. Terminal reward now scales from +100 (messy but legal) to +200 (perfect landing — zero speed, upright, pad-centered). Agent learns to prefer *good* landings, not just any landing.
+
+### Changed
+- Reward shaping roughly doubled in strength so the gradient signal is meaningful before the first landing. New components: approach-velocity bonus and stronger angle penalty. Breakdown exposed via `calculateRewardBreakdown()` for Sprint 2.6's Explain Mode.
+- DQN network widened from 64 to 128 units per hidden layer (more capacity, still fast).
+- Faster hyperparameters: epsilon decay 0.995 → 0.99, target network soft-update every 200 steps (was 500), batch size 64 → 128, learning rate 0.0005 → 0.001.
+
+### Architecture
+- New `SumTree` data structure (O(log N) prioritized sampling, 80-line ring-buffer with unit tests).
+- Module-level `prevVy` cache with `resetStateCache()` hook for episode boundaries (HeadlessGame.reset and AgentReplay.startAgentReplay call it).
+- Saved IndexedDB weights from pre-Sprint-2.7 auto-detected via `stateSize` metadata; agent discards them, logs a console warning, and retrains from scratch. One-time cost; training is fast.
+
+### Deferred
+- True Dueling DQN architecture (split value/advantage streams) — parked as TODO. The wider network (128 units) captures most of the capacity benefit without switching to TF.js functional API. True dueling follow-up PR if needed.
+- Double DQN, n-step returns, curriculum learning — all tracked as post-Sprint-2.7 RL improvements.
+
 ## [0.5.7.0] - 2026-04-15 (Sprint 5 Part A)
 
 ### Added
