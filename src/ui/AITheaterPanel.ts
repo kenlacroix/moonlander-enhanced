@@ -1,4 +1,5 @@
 import { AGENT_META, type AgentKind, type AgentStats } from "../ai/Agent";
+import type { RewardBreakdown } from "../ai/AgentEnv";
 import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { GravityPreset } from "../game/GravityPresets";
 
@@ -6,6 +7,17 @@ const PANEL_WIDTH = 360;
 const CHART_HEIGHT = 160;
 const MAX_CHART_POINTS = 200;
 const VISION_REFRESH_MS = 500;
+const EXPLAIN_MODE_KEY = "moonlander-explain-mode";
+
+const BREAKDOWN_ROWS: ReadonlyArray<{ key: keyof RewardBreakdown; label: string }> = [
+	{ key: "terminal", label: "terminal (landing/crash)" },
+	{ key: "proximity", label: "proximity to pad" },
+	{ key: "descent", label: "descent progress" },
+	{ key: "speed", label: "controlled descent speed" },
+	{ key: "anglePenalty", label: "angle penalty" },
+	{ key: "approach", label: "approach velocity" },
+	{ key: "timeTax", label: "time tax" },
+];
 
 // Maps STATE_SIZE = 11 dimensions from AgentEnv.getState to display labels.
 // Keep order aligned with AgentEnv.ts docstring — reordering here would
@@ -58,6 +70,10 @@ export class AITheaterPanel {
 	private dqnStateProvider: (() => number[] | null) | null = null;
 	private visionRafId: number | null = null;
 	private visionLastDraw = 0;
+	private breakdownProvider: (() => RewardBreakdown | null) | null = null;
+	private explainMode = false;
+	private explainBtn!: HTMLButtonElement;
+	private breakdownEl!: HTMLDivElement;
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -103,7 +119,16 @@ export class AITheaterPanel {
 				WORLD: MOON · g=1.62
 			</div>
 			<div style="border-bottom:1px solid #333;padding-bottom:8px">
-				<div style="color:#888;font-size:11px;margin-bottom:4px">DQN STATUS</div>
+				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+					<div style="color:#888;font-size:11px">DQN STATUS</div>
+					<button id="at-explain"
+						style="background:#1a1a1a;color:#888;border:1px solid #444;
+						padding:2px 8px;cursor:pointer;font-family:inherit;font-size:10px;
+						border-radius:3px;letter-spacing:1px"
+						title="Toggle reward breakdown (shows what the DQN is actually optimizing)">
+						EXPLAIN
+					</button>
+				</div>
 				<span id="at-status" style="color:#ffaa00">INITIALIZING...</span>
 			</div>
 			<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -122,6 +147,15 @@ export class AITheaterPanel {
 				<div>
 					<div style="color:#888;font-size:11px">DQN LAST</div>
 					<span id="at-current" style="color:#fff;font-size:18px">—</span>
+				</div>
+			</div>
+			<div id="at-breakdown" style="display:none;background:#0d0d0d;border:1px solid #333;
+				border-radius:4px;padding:8px;font-size:11px;line-height:1.5">
+				<div style="color:#888;font-size:10px;margin-bottom:4px">
+					LAST EPISODE REWARD — components
+				</div>
+				<div id="at-breakdown-body" style="color:#aaa">
+					Waiting for first DQN episode...
 				</div>
 			</div>
 			<div>
@@ -185,6 +219,13 @@ export class AITheaterPanel {
 		) as HTMLButtonElement;
 		this.visionCanvas = this.panel.querySelector("#at-vision")!;
 		this.visionCtx = this.visionCanvas.getContext("2d")!;
+		this.explainBtn = this.panel.querySelector(
+			"#at-explain",
+		) as HTMLButtonElement;
+		this.breakdownEl = this.panel.querySelector(
+			"#at-breakdown",
+		) as HTMLDivElement;
+		this.explainBtn.addEventListener("click", () => this.toggleExplain());
 
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
@@ -215,6 +256,8 @@ export class AITheaterPanel {
 
 	mount(): void {
 		document.body.appendChild(this.panel);
+		this.explainMode = this.readExplainModePref();
+		this.applyExplainMode();
 		this.startVisionLoop();
 	}
 
@@ -227,10 +270,76 @@ export class AITheaterPanel {
 		this.onForkRequested = null;
 		this.episodesProvider = null;
 		this.dqnStateProvider = null;
+		this.breakdownProvider = null;
 	}
 
 	setDqnStateProvider(provider: () => number[] | null): void {
 		this.dqnStateProvider = provider;
+	}
+
+	setDqnBreakdownProvider(provider: () => RewardBreakdown | null): void {
+		this.breakdownProvider = provider;
+	}
+
+	private readExplainModePref(): boolean {
+		try {
+			return localStorage.getItem(EXPLAIN_MODE_KEY) === "1";
+		} catch {
+			return false;
+		}
+	}
+
+	private writeExplainModePref(on: boolean): void {
+		try {
+			localStorage.setItem(EXPLAIN_MODE_KEY, on ? "1" : "0");
+		} catch {
+			// localStorage unavailable (private browsing) — preference lives in-session only.
+		}
+	}
+
+	private toggleExplain(): void {
+		this.explainMode = !this.explainMode;
+		this.writeExplainModePref(this.explainMode);
+		this.applyExplainMode();
+	}
+
+	private applyExplainMode(): void {
+		this.breakdownEl.style.display = this.explainMode ? "block" : "none";
+		this.explainBtn.style.color = this.explainMode ? "#00ff88" : "#888";
+		this.explainBtn.style.borderColor = this.explainMode ? "#00ff88" : "#444";
+		if (this.explainMode) this.renderBreakdown();
+	}
+
+	private renderBreakdown(): void {
+		const body = this.breakdownEl.querySelector(
+			"#at-breakdown-body",
+		) as HTMLDivElement | null;
+		if (!body) return;
+		const bd = this.breakdownProvider?.() ?? null;
+		if (!bd) {
+			body.textContent = "Waiting for first DQN episode...";
+			return;
+		}
+		const fmt = (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1));
+		const color = (v: number) =>
+			v > 0 ? "#00ff88" : v < 0 ? "#ff8866" : "#666";
+		const rows = BREAKDOWN_ROWS.map((row) => {
+			const v = bd[row.key];
+			return `
+				<div style="display:flex;justify-content:space-between">
+					<span style="color:${color(v)};font-family:monospace">${fmt(v).padStart(7)}</span>
+					<span style="color:#888">${row.label}</span>
+				</div>
+			`;
+		}).join("");
+		body.innerHTML = `
+			<div style="display:flex;justify-content:space-between;
+				border-bottom:1px solid #333;padding-bottom:4px;margin-bottom:4px">
+				<span style="color:#fff;font-family:monospace">${fmt(bd.total).padStart(7)}</span>
+				<span style="color:#ccc;font-weight:bold">total</span>
+			</div>
+			${rows}
+		`;
 	}
 
 	setWatchBestHandler(handler: () => void): void {
@@ -379,7 +488,10 @@ export class AITheaterPanel {
 		}
 
 		this.drawChart();
-		if (stats.kind === "dqn") this.refreshForkInfo();
+		if (stats.kind === "dqn") {
+			this.refreshForkInfo();
+			if (this.explainMode) this.renderBreakdown();
+		}
 	}
 
 	private getNarration(
