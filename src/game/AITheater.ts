@@ -182,10 +182,6 @@ export class AITheater {
 		return this.latestDqnState;
 	}
 
-	getLastDqnBreakdown(): RewardBreakdown | null {
-		return this.lastDqnBreakdown;
-	}
-
 	private async runTrainingLoop(): Promise<void> {
 		while (this.training && !this.abortRequested) {
 			const slot = this.slots[this.currentSlotIdx];
@@ -213,38 +209,41 @@ export class AITheater {
 
 	private async runEpisode(slot: AgentSlot): Promise<AgentStats> {
 		const { agent, game } = slot;
-		const record = agent === this.dqn;
-		const trackBreakdown = agent === this.dqn;
-		if (record) this.recorder.abortCurrent();
+		const isDqn = agent === this.dqn;
+		const epBreakdown: RewardBreakdown | null = isDqn
+			? {
+					total: 0,
+					terminal: 0,
+					proximity: 0,
+					descent: 0,
+					speed: 0,
+					anglePenalty: 0,
+					approach: 0,
+					timeTax: 0,
+				}
+			: null;
+		if (isDqn) this.recorder.abortCurrent();
 		game.reset();
 		let totalReward = 0;
 		let steps = 0;
 		let landed = false;
 		let stepsThisTick = 0;
-		const epBreakdown: RewardBreakdown = {
-			total: 0,
-			terminal: 0,
-			proximity: 0,
-			descent: 0,
-			speed: 0,
-			anglePenalty: 0,
-			approach: 0,
-			timeTax: 0,
-		};
 
 		while (steps < MAX_STEPS_PER_EPISODE) {
 			const state = agent.getState(game.lander, game.terrain);
 			const action = agent.chooseAction(state);
 			const input = agent.actionToInput(action);
 
-			if (agent === this.dqn) this.latestDqnState = state;
-			if (record) this.recorder.onStep(action, game.lander);
+			if (isDqn) {
+				this.latestDqnState = state;
+				this.recorder.onStep(action, game.lander);
+			}
 
 			const result = game.step(input, FIXED_TIMESTEP);
 			landed = result.landed;
 
 			let reward: number;
-			if (trackBreakdown) {
+			if (epBreakdown) {
 				const bd = calculateRewardBreakdown(
 					game.lander,
 					game.terrain,
@@ -287,12 +286,22 @@ export class AITheater {
 
 		await agent.endEpisode(totalReward);
 
-		if (trackBreakdown) {
-			epBreakdown.total = totalReward;
+		if (epBreakdown) {
+			// Derive total from summed components (not totalReward) so the
+			// panel's row math is self-consistent by construction; floating-
+			// point order would otherwise leave a ~1e-10 gap between them.
+			epBreakdown.total =
+				epBreakdown.terminal +
+				epBreakdown.proximity +
+				epBreakdown.descent +
+				epBreakdown.speed +
+				epBreakdown.anglePenalty +
+				epBreakdown.approach +
+				epBreakdown.timeTax;
 			this.lastDqnBreakdown = epBreakdown;
 		}
 
-		if (record && this.currentSeed !== null) {
+		if (isDqn && this.currentSeed !== null) {
 			const recorded = this.recorder.onEpisodeEnd(
 				agent.episodeCount,
 				this.currentSeed,

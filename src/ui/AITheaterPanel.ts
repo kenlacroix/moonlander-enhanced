@@ -74,6 +74,7 @@ export class AITheaterPanel {
 	private explainMode = false;
 	private explainBtn!: HTMLButtonElement;
 	private breakdownEl!: HTMLDivElement;
+	private breakdownBodyEl!: HTMLDivElement;
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -152,10 +153,10 @@ export class AITheaterPanel {
 			<div id="at-breakdown" style="display:none;background:#0d0d0d;border:1px solid #333;
 				border-radius:4px;padding:8px;font-size:11px;line-height:1.5">
 				<div style="color:#888;font-size:10px;margin-bottom:4px">
-					LAST EPISODE REWARD — components
+					WHAT THE DQN OPTIMIZES — last episode
 				</div>
 				<div id="at-breakdown-body" style="color:#aaa">
-					Waiting for first DQN episode...
+					Waiting for first DQN episode (appears once an episode ends)...
 				</div>
 			</div>
 			<div>
@@ -225,7 +226,16 @@ export class AITheaterPanel {
 		this.breakdownEl = this.panel.querySelector(
 			"#at-breakdown",
 		) as HTMLDivElement;
+		this.breakdownBodyEl = this.breakdownEl.querySelector(
+			"#at-breakdown-body",
+		) as HTMLDivElement;
 		this.explainBtn.addEventListener("click", () => this.toggleExplain());
+		this.explainBtn.addEventListener("mouseenter", () => {
+			if (!this.explainMode) this.explainBtn.style.borderColor = "#666";
+		});
+		this.explainBtn.addEventListener("mouseleave", () => {
+			if (!this.explainMode) this.explainBtn.style.borderColor = "#444";
+		});
 
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
@@ -307,38 +317,44 @@ export class AITheaterPanel {
 		this.breakdownEl.style.display = this.explainMode ? "block" : "none";
 		this.explainBtn.style.color = this.explainMode ? "#00ff88" : "#888";
 		this.explainBtn.style.borderColor = this.explainMode ? "#00ff88" : "#444";
+		this.explainBtn.setAttribute(
+			"aria-pressed",
+			this.explainMode ? "true" : "false",
+		);
 		if (this.explainMode) this.renderBreakdown();
 	}
 
 	private renderBreakdown(): void {
-		const body = this.breakdownEl.querySelector(
-			"#at-breakdown-body",
-		) as HTMLDivElement | null;
-		if (!body) return;
 		const bd = this.breakdownProvider?.() ?? null;
 		if (!bd) {
-			body.textContent = "Waiting for first DQN episode...";
+			this.breakdownBodyEl.textContent =
+				"Waiting for first DQN episode (appears once an episode ends)...";
 			return;
 		}
 		const fmt = (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1));
 		const color = (v: number) =>
-			v > 0 ? "#00ff88" : v < 0 ? "#ff8866" : "#666";
+			v > 0 ? "#00ff88" : v < 0 ? "#ff8866" : "#888";
+		// Value column uses tabular-nums + fixed min-width so +/- digits line up
+		// across rows without depending on HTML whitespace (which collapses).
+		const numStyle =
+			"font-family:monospace;font-variant-numeric:tabular-nums;" +
+			"display:inline-block;min-width:5ch;text-align:right";
 		const rows = BREAKDOWN_ROWS.map((row) => {
 			const v = bd[row.key];
 			return `
 				<div style="display:flex;justify-content:space-between">
-					<span style="color:${color(v)};font-family:monospace">${fmt(v).padStart(7)}</span>
+					<span style="color:${color(v)};${numStyle}">${fmt(v)}</span>
 					<span style="color:#888">${row.label}</span>
 				</div>
 			`;
 		}).join("");
-		body.innerHTML = `
+		this.breakdownBodyEl.innerHTML = `
+			${rows}
 			<div style="display:flex;justify-content:space-between;
-				border-bottom:1px solid #333;padding-bottom:4px;margin-bottom:4px">
-				<span style="color:#fff;font-family:monospace">${fmt(bd.total).padStart(7)}</span>
+				border-top:1px solid #333;padding-top:4px;margin-top:4px">
+				<span style="color:#fff;${numStyle}">${fmt(bd.total)}</span>
 				<span style="color:#ccc;font-weight:bold">total</span>
 			</div>
-			${rows}
 		`;
 	}
 
