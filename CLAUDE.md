@@ -328,18 +328,28 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 2.6 — AI Theater Explain Mode
+### Sprint 2.6 — AI Theater Explain Mode ⚠️ Parts A+B shipped (v0.5.8.1 / v0.5.8.2); Part C remaining
 
 *CEO+Eng reviewed 2026-04-15 in SCOPE EXPANSION mode. Plan at `.plans/sprint-2.6-explain-mode.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-2.6-explain-mode.md`.*
 
-- [ ] AI VISION strip: 8 labeled horizontal bars showing the state vector in real time (~2Hz, rAF-throttled)
-- [ ] Reward breakdown overlay: per-episode component totals (proximity, descent, speed, angle penalty, time tax) via `calculateRewardBreakdown()`, toggled with EXPLAIN button
-- [ ] Algorithm description cards under each legend entry (AGENT_META collapsed registry replacing AGENT_LABELS + AGENT_COLORS + AGENT_DESCRIPTIONS)
+**Part A — AI VISION strip + AGENT_META registry ✅ COMPLETE (v0.5.8.1, PR #27)**
+- [x] AI VISION strip: 11 labeled horizontal bars showing the state vector in real time (~2Hz, rAF-throttled). (State vector grew from 8 to 11 dims in Sprint 2.7, so the strip shipped with 11 bars.)
+- [x] Algorithm description cards under each legend entry (AGENT_META collapsed registry replacing AGENT_LABELS + AGENT_COLORS + AGENT_DESCRIPTIONS).
+
+**Part B — Reward breakdown overlay ✅ COMPLETE (v0.5.8.2, PR #29)**
+- [x] Reward breakdown overlay: per-episode component totals (terminal, proximity, descent, speed, angle penalty, approach, time tax) via `calculateRewardBreakdown()`, toggled with EXPLAIN button. Preference persists via `localStorage["moonlander-explain-mode"]`.
+
+**Part C — Tutorial + polish (remaining)**
 - [ ] First-run 3-card inline tutorial (localStorage `moonlander-ai-theater-tour-seen`), dismissible, never reappears
 - [ ] `?` keyboard toggle for compact vs expanded mode (localStorage-persisted)
 - [ ] E1: RANDOM badge flashes on exploratory actions (makes epsilon concrete)
 - [ ] E2: Hover tooltips on state-vector bars (raw value + human-readable label)
 - [ ] E3: First-landing glow on algorithm card (3 sec on first success)
+
+**Part C also natural home for deferred findings from Parts A+B** (tracked in TODOS.md):
+- Transfer DQN breakdown on non-Moon worlds (Part B found that on Europa/Jupiter/etc. the transfer-DQN slot isn't captured in the overlay)
+- `REWARD_COMPONENT_KEYS` single source of truth (drift hazard across 3 call sites)
+- Codex second opinion on Parts A+B (blocked 2026-04-16 by account limit, reset 2026-04-20)
 
 **Deferred:** E4 interactive reward-function sliders (live retrain) — promoted to its own future sprint.
 
