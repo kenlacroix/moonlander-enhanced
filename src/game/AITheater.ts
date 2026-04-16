@@ -52,6 +52,7 @@ export class AITheater {
 	private currentSlotIdx = 0;
 	private recorder = new EpisodeRecorder(10);
 	private forkHandler: ((episode: RecordedEpisode) => void) | null = null;
+	private latestDqnState: number[] | null = null;
 
 	constructor() {
 		this.panel = new AITheaterPanel();
@@ -91,6 +92,7 @@ export class AITheater {
 
 		this.panel.mount();
 		this.panel.setEpisodesProvider(() => this.recorder.getEpisodes());
+		this.panel.setDqnStateProvider(() => this.latestDqnState);
 		this.panel.setForkRequestHandler((ep) => this.forkHandler?.(ep));
 		this.adjustGameLayout(true);
 
@@ -130,6 +132,7 @@ export class AITheater {
 		}
 		this.transferDqn = null;
 		this.slots = [];
+		this.latestDqnState = null;
 		this.panel.unmount();
 		this.adjustGameLayout(false);
 		this.currentSeed = null;
@@ -166,6 +169,10 @@ export class AITheater {
 
 	getAgent(): RLAgent {
 		return this.dqn;
+	}
+
+	getLatestDqnState(): number[] | null {
+		return this.latestDqnState;
 	}
 
 	private async runTrainingLoop(): Promise<void> {
@@ -208,6 +215,7 @@ export class AITheater {
 			const action = agent.chooseAction(state);
 			const input = agent.actionToInput(action);
 
+			if (agent === this.dqn) this.latestDqnState = state;
 			if (record) this.recorder.onStep(action, game.lander);
 
 			const result = game.step(input, FIXED_TIMESTEP);

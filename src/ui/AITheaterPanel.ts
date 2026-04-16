@@ -1,15 +1,28 @@
-import {
-	AGENT_COLORS,
-	AGENT_LABELS,
-	type AgentKind,
-	type AgentStats,
-} from "../ai/Agent";
+import { AGENT_META, type AgentKind, type AgentStats } from "../ai/Agent";
 import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { GravityPreset } from "../game/GravityPresets";
 
 const PANEL_WIDTH = 360;
 const CHART_HEIGHT = 160;
 const MAX_CHART_POINTS = 200;
+const VISION_REFRESH_MS = 500;
+
+// Maps STATE_SIZE = 11 dimensions from AgentEnv.getState to display labels.
+// Keep order aligned with AgentEnv.ts docstring — reordering here would
+// mis-label the bars without breaking any type-checked reference.
+const STATE_LABELS: readonly string[] = [
+	"ΔX TO PAD",
+	"ALTITUDE",
+	"H-SPEED",
+	"V-SPEED",
+	"ANGLE",
+	"ANG VEL",
+	"FUEL",
+	"OFF-PAD",
+	"V-ACCEL",
+	"PAD-ALT",
+	"APPROACH",
+];
 
 interface Track {
 	rewardHistory: number[];
@@ -40,6 +53,11 @@ export class AITheaterPanel {
 	private tracks: Record<AgentKind, Track> = this.makeTracks();
 	private forkInfoEl!: HTMLDivElement;
 	private forkBtn!: HTMLButtonElement;
+	private visionCanvas!: HTMLCanvasElement;
+	private visionCtx!: CanvasRenderingContext2D;
+	private dqnStateProvider: (() => number[] | null) | null = null;
+	private visionRafId: number | null = null;
+	private visionLastDraw = 0;
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -63,14 +81,19 @@ export class AITheaterPanel {
 			overflowY: "auto",
 		});
 
-		const legendHtml = AGENT_ORDER.map(
-			(k) => `
-				<div style="display:flex;align-items:center;gap:6px">
-					<span style="display:inline-block;width:14px;height:3px;background:${AGENT_COLORS[k]}"></span>
-					<span style="color:#aaa;font-size:11px">${AGENT_LABELS[k]}</span>
+		const legendHtml = AGENT_ORDER.map((k) => {
+			const meta = AGENT_META[k];
+			return `
+				<div style="display:flex;align-items:flex-start;gap:6px;margin-top:4px">
+					<span style="display:inline-block;width:10px;height:10px;background:${meta.color};
+						border-radius:50%;flex-shrink:0;margin-top:3px"></span>
+					<div style="flex:1;min-width:0">
+						<div style="color:#ddd;font-size:11px;font-weight:bold">${meta.label}</div>
+						<div style="color:#888;font-size:10px;line-height:1.3">${meta.description}</div>
+					</div>
 				</div>
-			`,
-		).join("");
+			`;
+		}).join("");
 
 		this.panel.innerHTML = `
 			<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
@@ -105,7 +128,14 @@ export class AITheaterPanel {
 				<div style="color:#888;font-size:11px;margin-bottom:4px">REWARD CURVES (smoothed)</div>
 				<canvas id="at-chart" width="${PANEL_WIDTH - 32}" height="${CHART_HEIGHT}"
 					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
-				<div style="display:flex;justify-content:space-around;margin-top:6px">${legendHtml}</div>
+				<div style="display:flex;flex-direction:column;margin-top:6px">${legendHtml}</div>
+			</div>
+			<div style="border-top:1px solid #222;padding-top:8px">
+				<div style="color:#888;font-size:11px;margin-bottom:4px">
+					AI VISION <span style="color:#555">— what the DQN sees this frame</span>
+				</div>
+				<canvas id="at-vision" width="${PANEL_WIDTH - 32}" height="160"
+					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
 			</div>
 			<div style="border-top:1px solid #222;padding-top:8px">
 				<div style="color:#888;font-size:11px;margin-bottom:4px">MISSION REPLAY</div>
@@ -153,6 +183,8 @@ export class AITheaterPanel {
 		this.forkBtn = this.panel.querySelector(
 			"#at-fork-btn",
 		) as HTMLButtonElement;
+		this.visionCanvas = this.panel.querySelector("#at-vision")!;
+		this.visionCtx = this.visionCanvas.getContext("2d")!;
 
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
@@ -183,15 +215,22 @@ export class AITheaterPanel {
 
 	mount(): void {
 		document.body.appendChild(this.panel);
+		this.startVisionLoop();
 	}
 
 	unmount(): void {
+		this.stopVisionLoop();
 		this.panel.remove();
 		this.tracks = this.makeTracks();
 		this.firstCrash = false;
 		this.selectedEpisodeId = null;
 		this.onForkRequested = null;
 		this.episodesProvider = null;
+		this.dqnStateProvider = null;
+	}
+
+	setDqnStateProvider(provider: () => number[] | null): void {
+		this.dqnStateProvider = provider;
 	}
 
 	setWatchBestHandler(handler: () => void): void {
@@ -336,7 +375,7 @@ export class AITheaterPanel {
 				hintEl.textContent = `Training... ${20 - stats.episode} episodes until ready`;
 			}
 		} else if (isFirstLanding) {
-			this.narrationEl.textContent = `${AGENT_LABELS[stats.kind]} landed for the first time at episode ${stats.episode}.`;
+			this.narrationEl.textContent = `${AGENT_META[stats.kind].label} landed for the first time at episode ${stats.episode}.`;
 		}
 
 		this.drawChart();
@@ -370,6 +409,79 @@ export class AITheaterPanel {
 		return stats.landed
 			? "Landed. DQN reinforces this trajectory via Q-targets."
 			: "Training... three algorithms, same terrain, different learning rules.";
+	}
+
+	private startVisionLoop(): void {
+		if (this.visionRafId !== null) return;
+		const tick = (t: number) => {
+			this.visionRafId = requestAnimationFrame(tick);
+			if (t - this.visionLastDraw < VISION_REFRESH_MS) return;
+			this.visionLastDraw = t;
+			this.drawVision();
+		};
+		this.visionRafId = requestAnimationFrame(tick);
+	}
+
+	private stopVisionLoop(): void {
+		if (this.visionRafId !== null) {
+			cancelAnimationFrame(this.visionRafId);
+			this.visionRafId = null;
+		}
+	}
+
+	private drawVision(): void {
+		const ctx = this.visionCtx;
+		const w = this.visionCanvas.width;
+		const h = this.visionCanvas.height;
+		ctx.clearRect(0, 0, w, h);
+
+		const state = this.dqnStateProvider?.() ?? null;
+		const n = STATE_LABELS.length;
+		const rowH = h / n;
+		const labelW = 66;
+		const valueW = 40;
+		const trackX = labelW + 4;
+		const trackW = w - labelW - valueW - 8;
+		const midX = trackX + trackW / 2;
+
+		ctx.font = "10px 'Courier New', monospace";
+		ctx.textBaseline = "middle";
+
+		for (let i = 0; i < n; i++) {
+			const y = i * rowH + rowH / 2;
+			ctx.fillStyle = "#777";
+			ctx.textAlign = "right";
+			ctx.fillText(STATE_LABELS[i], labelW, y);
+
+			ctx.strokeStyle = "#222";
+			ctx.lineWidth = 1;
+			ctx.strokeRect(trackX, y - 4, trackW, 8);
+			ctx.fillStyle = "#1a1a1a";
+			ctx.fillRect(trackX + 1, y - 3, trackW - 2, 6);
+
+			ctx.strokeStyle = "#333";
+			ctx.beginPath();
+			ctx.moveTo(midX, y - 4);
+			ctx.lineTo(midX, y + 4);
+			ctx.stroke();
+
+			if (state && i < state.length) {
+				const v = Math.max(-1, Math.min(1, state[i]));
+				const barW = (Math.abs(v) * trackW) / 2;
+				ctx.fillStyle = v >= 0 ? "#00ff88" : "#ff6666";
+				if (v >= 0) ctx.fillRect(midX, y - 3, barW, 6);
+				else ctx.fillRect(midX - barW, y - 3, barW, 6);
+
+				ctx.fillStyle = "#ccc";
+				ctx.textAlign = "left";
+				const sign = state[i] >= 0 ? "+" : "";
+				ctx.fillText(`${sign}${state[i].toFixed(2)}`, trackX + trackW + 4, y);
+			} else {
+				ctx.fillStyle = "#444";
+				ctx.textAlign = "left";
+				ctx.fillText("—", trackX + trackW + 4, y);
+			}
+		}
 	}
 
 	private drawChart(): void {
@@ -417,7 +529,7 @@ export class AITheaterPanel {
 			const data = this.tracks[kind].rewardHistory;
 			if (data.length < 2) continue;
 
-			ctx.strokeStyle = AGENT_COLORS[kind];
+			ctx.strokeStyle = AGENT_META[kind].color;
 			ctx.lineWidth = 2;
 			ctx.globalAlpha = 0.95;
 			ctx.beginPath();
