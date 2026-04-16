@@ -347,6 +347,32 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
+### Sprint 2.7 — Smarter DQN
+
+*CEO-reviewed 2026-04-15 in HOLD SCOPE mode. Plan at `.plans/sprint-2.7-smarter-dqn.md`. Approach A (full plan) accepted.*
+
+**Part A — Reward shaping + state expansion (~3h human / ~30 min CC):**
+- [ ] Overhaul `calculateReward` with structured, stronger shaping (proximity, descent, speed, angle, approach-velocity, time-tax) and quality-scaled terminal reward
+- [ ] Implement as `calculateRewardBreakdown()` so Sprint 2.6 gets the breakdown for free
+- [ ] Expand state vector 8→11 dims: vertical acceleration, ground proximity, approach velocity; fix angular velocity (dim 5, currently hardcoded 0)
+- [ ] Update STATE_SIZE, DQN + PG model input shapes
+- [ ] Weight migration: detect shape mismatch on load, log warning, retrain from scratch
+
+**Part B — Prioritized Experience Replay (~2h / ~20 min CC):**
+- [ ] SumTree data structure (~80 LOC, O(log N) sampling)
+- [ ] Replace RLAgent.memory flat array with PER buffer
+- [ ] TD-error tracking + importance-sampling weight correction
+- [ ] Beta annealing (0.4 → 1.0)
+
+**Part C — Dueling DQN + hyperparameter polish (~1h / ~10 min CC):**
+- [ ] Split final layer into value + advantage streams
+- [ ] Batch size 64→128, learning rate schedule, epsilon decay 0.995→0.99
+- [ ] Benchmark: fixed-seed learning curve comparison
+
+**Exit question:** Does watching the DQN learn feel like watching something figure it out, or like watching a random number generator get lucky?
+
+---
+
 ### Sprint 3 — Mission Replay Archaeology — split into A (MVP) + B (hazard-faithful)
 
 **Part A — Replay + fork-on-keypress ✅ COMPLETE**
