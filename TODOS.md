@@ -64,6 +64,22 @@ Apollo 12, 14, 16; Luna 16 (sample return); Chang'e 3/4/5; SLIM 2024; Chandrayaa
 
 ---
 
+## P3 — Pre-existing UX quirks surfaced during play-test (2026-04-16)
+
+### Refresh drops player back into last-played mission (intentional, but surprising for dev)
+`main.ts` reads `?seed=N` from the URL on load and `selectMission` in `src/game/StateHandlers.ts:272` writes the current mission's seed to the URL via `replaceState`. Shipping as designed for URL-encoded-seed sharing (Phase 4): a friend opens `?seed=1969` and lands in that mission. But when the developer refreshes their own tab mid-session, they get dropped back into the last mission instead of the title screen. Even refreshing during an AI Theater session pulls you into the AI's background-training seed. Workaround today: manually strip the URL to `localhost:5173/` before refresh.
+- **Possible fix (small):** only auto-enter "playing" when the seed came from a shared link (e.g., sniff `document.referrer`, or require an explicit `?play=1` co-param), otherwise return to menu and pre-select that mission.
+- **Possible fix (tiny):** make the menu's "Back to menu" / ESC path clear the `?seed=` query param, so the next refresh lands on the title screen.
+- **Why it matters:** every new contributor will hit this on their first refresh after touching any mission.
+- **Effort:** XS (CC: ~10 min for the tiny fix, ~20 min for the smarter one)
+
+### ESC doesn't reliably return to menu
+ESC works in some contexts but not others (user flagged as known). Needs a single unified handler in the input system that maps ESC → title screen from every non-critical state (playing, training, editor, AI theater, mission select, etc.).
+- **Why it matters:** primary "get me out of here" affordance, broken.
+- **Effort:** S (CC: ~20 min — thread an `escapeToMenu` action through `Input.ts` and each status handler)
+
+---
+
 ## P2 — Sprint 2.6 Explain Mode — deferred findings (from /review on PR #28, 2026-04-16)
 
 ### Transfer DQN breakdown missing on non-Moon worlds
