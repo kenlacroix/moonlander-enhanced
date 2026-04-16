@@ -2,6 +2,15 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.8.2] - 2026-04-16 (Sprint 2.6 Part B: Reward Breakdown Overlay)
+
+### Added
+- EXPLAIN button in the AI Theater header. Toggle it to reveal a reward breakdown for the last DQN episode — total, then the component contributions (terminal landing/crash, proximity, descent, speed, angle penalty, approach, time tax). Positives render green, penalties red. Now you can see *why* the agent's score moved.
+- Preference persists across sessions via localStorage (`moonlander-explain-mode`). Off by default — new viewers still get the compact layout they saw before.
+
+### Changed
+- AI Theater now accumulates the per-component reward breakdown during DQN episodes by calling `calculateRewardBreakdown()` directly (single source of truth from Sprint 2.7). Non-DQN agents keep the scalar fast path.
+
 ## [0.5.8.1] - 2026-04-16 (Sprint 2.6 Part A: AI Theater Explain Mode)
 
 ### Added
