@@ -328,6 +328,25 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
+### Sprint 2.6 — AI Theater Explain Mode
+
+*CEO+Eng reviewed 2026-04-15 in SCOPE EXPANSION mode. Plan at `.plans/sprint-2.6-explain-mode.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-2.6-explain-mode.md`.*
+
+- [ ] AI VISION strip: 8 labeled horizontal bars showing the state vector in real time (~2Hz, rAF-throttled)
+- [ ] Reward breakdown overlay: per-episode component totals (proximity, descent, speed, angle penalty, time tax) via `calculateRewardBreakdown()`, toggled with EXPLAIN button
+- [ ] Algorithm description cards under each legend entry (AGENT_META collapsed registry replacing AGENT_LABELS + AGENT_COLORS + AGENT_DESCRIPTIONS)
+- [ ] First-run 3-card inline tutorial (localStorage `moonlander-ai-theater-tour-seen`), dismissible, never reappears
+- [ ] `?` keyboard toggle for compact vs expanded mode (localStorage-persisted)
+- [ ] E1: RANDOM badge flashes on exploratory actions (makes epsilon concrete)
+- [ ] E2: Hover tooltips on state-vector bars (raw value + human-readable label)
+- [ ] E3: First-landing glow on algorithm card (3 sec on first success)
+
+**Deferred:** E4 interactive reward-function sliders (live retrain) — promoted to its own future sprint.
+
+**Exit question:** Can someone with zero RL background watch AI Theater for 60 seconds and leave knowing what the AI sees, what it's optimizing, and why the curves differ?
+
+---
+
 ### Sprint 3 — Mission Replay Archaeology — split into A (MVP) + B (hazard-faithful)
 
 **Part A — Replay + fork-on-keypress ✅ COMPLETE**
