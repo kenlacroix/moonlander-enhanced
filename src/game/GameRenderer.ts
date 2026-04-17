@@ -17,9 +17,9 @@ import type { TelemetryRecorder } from "../systems/Telemetry";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
 import type { Artifact } from "./Artifacts";
 import { type FlightConfig, loadAuthenticPreference } from "./AuthenticMode";
-import { isHistoricMission } from "./HistoricMission";
 import type { Camera } from "./Camera";
 import { type GravityStormState, getGravityStormLabel } from "./GravityStorm";
+import { isHistoricMission } from "./HistoricMission";
 import type { LanderState } from "./Lander";
 import {
 	CAMPAIGN,
@@ -118,6 +118,10 @@ export interface GameRenderState {
 		readonly forkFrame: number | null;
 	} | null;
 	readonly currentFlight: FlightConfig | null;
+	readonly tutorialOverlay: {
+		readonly missionId: number;
+		readonly framesRemaining: number;
+	} | null;
 }
 
 export class GameRenderer {
@@ -267,6 +271,9 @@ export class GameRenderer {
 			state.status === "playing" || state.status === "landed"
 				? state.telemetry.getDuration()
 				: null;
+		const scoreMode = state.currentFlight?.authenticMode
+			? "authentic"
+			: "vanilla";
 		this.renderer.drawHUD(
 			state.lander,
 			state.score,
@@ -277,7 +284,7 @@ export class GameRenderer {
 			alienLabel,
 			stormLabel,
 			elapsed,
-			getBestTime(state.seed) ?? null,
+			getBestTime(state.seed, scoreMode) ?? null,
 			state.currentFlight?.authenticState ?? null,
 			state.terrain ?? null,
 		);
@@ -422,7 +429,11 @@ export class GameRenderer {
 		let authenticInfo: { missionId: number; on: boolean } | null = null;
 		if (state.gameMode === "historic") {
 			const selected = missions[state.selectedMission];
-			if (selected && isHistoricMission(selected) && selected.kind === "landing") {
+			if (
+				selected &&
+				isHistoricMission(selected) &&
+				selected.kind === "landing"
+			) {
 				authenticInfo = {
 					missionId: selected.id,
 					on: loadAuthenticPreference(selected.id),
@@ -430,17 +441,33 @@ export class GameRenderer {
 			}
 		}
 		this.renderer.clear();
+		// Dual-track leaderboard: when on historic missions, also pull the
+		// Authentic best score for each seed so the row can show both.
+		const authenticBestScores =
+			state.gameMode === "historic" ? new Map<number, number>() : undefined;
+		if (authenticBestScores) {
+			for (const m of missions) {
+				const best = getBestScore(m.seed, "authentic");
+				if (best !== undefined) authenticBestScores.set(m.seed, best);
+			}
+		}
 		this.renderer.drawMissionSelect(
 			[...missions],
 			state.selectedMission,
 			bestScores,
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
 			authenticInfo,
+			authenticBestScores,
 		);
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {
 			this.renderer.drawRelayIndicator(state.relay !== null);
 			this.renderer.drawGravitySelector(state.gravityPreset);
+		}
+		if (state.tutorialOverlay) {
+			this.renderer.drawAuthenticTutorial(
+				state.tutorialOverlay.framesRemaining,
+			);
 		}
 	}
 

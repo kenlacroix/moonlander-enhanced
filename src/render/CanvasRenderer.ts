@@ -439,7 +439,6 @@ export class CanvasRenderer {
 		);
 	}
 
-
 	drawTitle(
 		selection: number,
 		completedCount: number,
@@ -536,6 +535,7 @@ export class CanvasRenderer {
 		bestScores: Map<number, number>,
 		campaignProgress?: Set<number>,
 		authenticInfo?: { missionId: number; on: boolean } | null,
+		authenticBestScores?: Map<number, number>,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -620,13 +620,26 @@ export class CanvasRenderer {
 				y + 22,
 			);
 
-			// Best score
+			// Best score — vanilla on the first line, Authentic best
+			// stacked below when present (dual-track display).
 			const best = bestScores.get(m.seed);
-			if (best !== undefined) {
+			const authBest = authenticBestScores?.get(m.seed);
+			if (best !== undefined || authBest !== undefined) {
 				ctx.textAlign = "right";
-				ctx.fillStyle = "#00ff88";
-				ctx.font = '14px "Courier New", monospace';
-				ctx.fillText(`BEST: ${best}`, CANVAS_WIDTH / 2 + 300, y + 6);
+				if (best !== undefined) {
+					ctx.fillStyle = "#00ff88";
+					ctx.font = '14px "Courier New", monospace';
+					ctx.fillText(`BEST: ${best}`, CANVAS_WIDTH / 2 + 300, y + 4);
+				}
+				if (authBest !== undefined) {
+					ctx.fillStyle = "#ffb000";
+					ctx.font = '11px "Courier New", monospace';
+					ctx.fillText(
+						`AUTHENTIC: ${authBest}`,
+						CANVAS_WIDTH / 2 + 300,
+						y + 20,
+					);
+				}
 			}
 		}
 
@@ -654,6 +667,77 @@ export class CanvasRenderer {
 				y,
 			);
 		}
+
+		ctx.restore();
+	}
+
+	/**
+	 * Sprint 5.5 Authentic pre-launch tutorial overlay. Shown once per
+	 * mission on first Authentic launch; blocks menu nav while visible.
+	 * 3-card layout walks the player through what to expect before the
+	 * briefing eats up the first 5s of flight.
+	 */
+	drawAuthenticTutorial(framesRemaining: number): void {
+		const ctx = this.ctx;
+		ctx.save();
+
+		// Dim background
+		ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+		ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+		const title = "AUTHENTIC MODE — 1969 TECH";
+		const cards = [
+			{
+				head: "ANALOG INSTRUMENTS",
+				body: "Your altitude readout goes blank in the last 50m — just like Armstrong. Trust your eyes.",
+			},
+			{
+				head: "AGC EXECUTIVE OVERFLOW",
+				body: "Somewhere in descent the 2KB flight computer chokes. Thrust locks for 400ms. Don't panic.",
+			},
+			{
+				head: "THE MARGIN",
+				body: "Armstrong touched down with 22 seconds of fuel. Can you beat him, without the modern tech?",
+			},
+		];
+
+		ctx.fillStyle = "#ffb000";
+		ctx.font = 'bold 22px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText(title, CANVAS_WIDTH / 2, 120);
+
+		const cardW = 280;
+		const cardH = 160;
+		const gap = 20;
+		const totalW = cards.length * cardW + (cards.length - 1) * gap;
+		const startX = (CANVAS_WIDTH - totalW) / 2;
+		const cardY = 170;
+
+		for (let i = 0; i < cards.length; i++) {
+			const cx = startX + i * (cardW + gap);
+			ctx.strokeStyle = "#ffb000";
+			ctx.lineWidth = 1;
+			ctx.strokeRect(cx, cardY, cardW, cardH);
+
+			ctx.fillStyle = "#ffb000";
+			ctx.font = 'bold 14px "Courier New", monospace';
+			ctx.textAlign = "left";
+			ctx.fillText(cards[i].head, cx + 16, cardY + 28);
+
+			ctx.fillStyle = "#ffffff";
+			ctx.font = '12px "Courier New", monospace';
+			wrapText(ctx, cards[i].body, cx + 16, cardY + 54, cardW - 32, 16);
+		}
+
+		const seconds = (framesRemaining / 60).toFixed(1);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText(
+			`Auto-dismiss in ${seconds}s — press ENTER or ESC to launch`,
+			CANVAS_WIDTH / 2,
+			cardY + cardH + 40,
+		);
 
 		ctx.restore();
 	}
@@ -1346,4 +1430,33 @@ export class CanvasRenderer {
 
 		ctx.restore();
 	}
+}
+
+/**
+ * Simple word-wrap helper for small multi-line text blocks (Authentic
+ * tutorial cards). Breaks on spaces, doesn't handle hyphenation. Fine for
+ * short strings; don't use for user-provided content.
+ */
+function wrapText(
+	ctx: CanvasRenderingContext2D,
+	text: string,
+	x: number,
+	y: number,
+	maxWidth: number,
+	lineHeight: number,
+): void {
+	const words = text.split(/\s+/);
+	let line = "";
+	let cursorY = y;
+	for (let i = 0; i < words.length; i++) {
+		const probe = line ? `${line} ${words[i]}` : words[i];
+		if (ctx.measureText(probe).width > maxWidth && line) {
+			ctx.fillText(line, x, cursorY);
+			line = words[i];
+			cursorY += lineHeight;
+		} else {
+			line = probe;
+		}
+	}
+	if (line) ctx.fillText(line, x, cursorY);
 }

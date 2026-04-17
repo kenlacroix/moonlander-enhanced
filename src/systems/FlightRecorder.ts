@@ -39,6 +39,12 @@ interface FlightReport {
 		theirValue: number; // historical reference
 		unit: string; // "seconds", "m drift", etc.
 	};
+	/**
+	 * Sprint 5.5 — when true, the share card stamps an era-colored
+	 * AUTHENTIC corner badge. "apollo" = amber 1969, "artemis" = cyan
+	 * 2028. Undefined for vanilla runs.
+	 */
+	authenticEra?: "apollo" | "artemis";
 }
 
 /**
@@ -120,6 +126,7 @@ export function generateFlightReport(
 	score: number,
 	landed: boolean,
 	historicReference?: FlightReport["historicReference"],
+	authenticEra?: "apollo" | "artemis",
 ): void {
 	const report: FlightReport = {
 		missionName,
@@ -135,6 +142,7 @@ export function generateFlightReport(
 		frames,
 		terrainPoints: terrain.points,
 		historicReference,
+		authenticEra,
 	};
 
 	const canvas = document.createElement("canvas");
@@ -406,4 +414,24 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 		CARD_WIDTH - 30,
 		CARD_HEIGHT - 18,
 	);
+
+	// Sprint 5.5 — AUTHENTIC corner badge for Authentic-Mode runs. Era-
+	// colored amber/cyan with matching label. Upper-left corner stays
+	// clear of the landing grade (upper-right) and mission name (left).
+	if (r.authenticEra) {
+		const color = r.authenticEra === "apollo" ? "#ffb000" : "#00ccff";
+		const label =
+			r.authenticEra === "apollo" ? "AUTHENTIC 1969" : "AUTHENTIC 2028";
+		const badgeW = 132;
+		const badgeH = 22;
+		const bx = CARD_WIDTH - badgeW - 30;
+		const by = CARD_HEIGHT - badgeH - 60;
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 1;
+		ctx.strokeRect(bx, by, badgeW, badgeH);
+		ctx.fillStyle = color;
+		ctx.font = 'bold 11px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.fillText(label, bx + badgeW / 2, by + 15);
+	}
 }

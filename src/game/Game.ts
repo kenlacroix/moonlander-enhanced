@@ -97,6 +97,17 @@ export class Game {
 	 * HeadlessGame, fork replays, or freeplay — those paths keep it null.
 	 */
 	currentFlight: FlightConfig | null = null;
+	/**
+	 * Sprint 5.5 pre-launch Authentic tutorial overlay. Non-null only
+	 * during the 3-second block shown on mission-select the first time a
+	 * player launches Authentic on a given mission. Key:
+	 * moonlander-authentic-intro-seen-{missionId} written on dismiss so
+	 * the overlay never reappears for that mission.
+	 */
+	tutorialOverlay: {
+		missionId: number;
+		framesRemaining: number;
+	} | null = null;
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
 	titleSelection = 0;
@@ -390,7 +401,10 @@ export class Game {
 		this.camera_ = new Camera();
 		this.gameLoop.resetAccumulator();
 		this.fuelWarningCooldown = 0;
-		this.ghostRecorder.start(this.seed_);
+		const ghostMode = this.currentFlight?.authenticMode
+			? "authentic"
+			: "vanilla";
+		this.ghostRecorder.start(this.seed_, ghostMode);
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.physics.reset();
@@ -404,7 +418,7 @@ export class Game {
 			: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		this.audio.soundtrack.start();
-		const ghostRun = loadGhostForSeed(this.seed_);
+		const ghostRun = loadGhostForSeed(this.seed_, ghostMode);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
 	}
 

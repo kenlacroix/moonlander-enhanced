@@ -33,6 +33,7 @@ export function handleCollisionResult(
 			game.seed,
 			game.score,
 			game.telemetry.getDuration(),
+			game.currentFlight?.authenticMode ? "authentic" : "vanilla",
 		);
 		game.llm.scanNearbyArtifact(game, game.artifacts, game.lander.x);
 		game.llm.fetchCommentary(game, game.lander, game.score, true);

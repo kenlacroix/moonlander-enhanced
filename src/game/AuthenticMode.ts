@@ -209,6 +209,25 @@ export function captionFor(state: AuthenticState | null): {
 }
 
 const AUTHENTIC_KEY_PREFIX = "moonlander-authentic-";
+const INTRO_SEEN_PREFIX = "moonlander-authentic-intro-seen-";
+export const TUTORIAL_FRAMES = 180; // 3s at 60fps
+
+export function hasSeenAuthenticIntro(missionId: number): boolean {
+	try {
+		return localStorage.getItem(`${INTRO_SEEN_PREFIX}${missionId}`) === "1";
+	} catch {
+		return true; // localStorage unavailable — suppress the overlay so
+		// we don't spam players who can't persist the dismiss.
+	}
+}
+
+export function markAuthenticIntroSeen(missionId: number): void {
+	try {
+		localStorage.setItem(`${INTRO_SEEN_PREFIX}${missionId}`, "1");
+	} catch {
+		// ignore
+	}
+}
 
 export function loadAuthenticPreference(missionId: number): boolean {
 	try {

@@ -37,10 +37,18 @@ function unpackInput(frame: InputFrame): InputState {
 	};
 }
 
+/**
+ * Sprint 5.5 — ghosts are partitioned by `mode: "vanilla" | "authentic"`
+ * so an Authentic Apollo 11 replay can't overwrite a vanilla best on the
+ * same seed. Legacy ghosts (no mode field) read back as vanilla.
+ */
+export type GhostMode = "vanilla" | "authentic";
+
 export interface GhostRun {
 	seed: number;
 	score: number;
 	frames: InputFrame[];
+	mode?: GhostMode;
 }
 
 const STORAGE_KEY = "moonlander-ghosts";
@@ -49,10 +57,12 @@ const MAX_STORED_GHOSTS = 10;
 export class GhostRecorder {
 	private frames: InputFrame[] = [];
 	private seed = 0;
+	private mode: GhostMode = "vanilla";
 
-	/** Start recording a new run */
-	start(seed: number): void {
+	/** Start recording a new run. `mode` defaults to vanilla for non-historic paths. */
+	start(seed: number, mode: GhostMode = "vanilla"): void {
 		this.seed = seed;
+		this.mode = mode;
 		this.frames = [];
 	}
 
@@ -61,7 +71,7 @@ export class GhostRecorder {
 		this.frames.push(packInput(input));
 	}
 
-	/** Save the completed run if it beats the stored ghost for this seed */
+	/** Save the completed run if it beats the stored ghost for this seed+mode */
 	save(score: number): void {
 		if (score <= 0 || this.frames.length === 0) return;
 
@@ -69,16 +79,20 @@ export class GhostRecorder {
 			seed: this.seed,
 			score,
 			frames: this.frames,
+			mode: this.mode,
 		};
 
 		try {
 			const ghosts = loadGhosts();
-			const existing = ghosts.find((g) => g.seed === this.seed);
+			const existing = ghosts.find(
+				(g) => g.seed === this.seed && (g.mode ?? "vanilla") === this.mode,
+			);
 
 			if (existing) {
 				if (score > existing.score) {
 					existing.score = run.score;
 					existing.frames = run.frames;
+					existing.mode = run.mode;
 				}
 			} else {
 				ghosts.push(run);
@@ -134,15 +148,28 @@ function loadGhosts(): GhostRun[] {
 	}
 }
 
-/** Load the ghost for a specific seed, if one exists */
-export function loadGhostForSeed(seed: number): GhostRun | null {
+/**
+ * Load the ghost for a specific seed + mode, if one exists. Legacy ghosts
+ * without a `mode` field are treated as vanilla — an Authentic query will
+ * not match them, so each mode gets its own best ghost cleanly.
+ */
+export function loadGhostForSeed(
+	seed: number,
+	mode: GhostMode = "vanilla",
+): GhostRun | null {
 	const ghosts = loadGhosts();
-	return ghosts.find((g) => g.seed === seed) ?? null;
+	return (
+		ghosts.find((g) => g.seed === seed && (g.mode ?? "vanilla") === mode) ??
+		null
+	);
 }
 
 /** Export a ghost run as a JSON string for sharing */
-export function exportGhost(seed: number): string | null {
-	const ghost = loadGhostForSeed(seed);
+export function exportGhost(
+	seed: number,
+	mode: GhostMode = "vanilla",
+): string | null {
+	const ghost = loadGhostForSeed(seed, mode);
 	if (!ghost) return null;
 	return JSON.stringify(ghost);
 }
@@ -158,13 +185,21 @@ export function importGhost(json: string): GhostRun | null {
 		) {
 			return null;
 		}
-		// Save it to localStorage
+		// Imported ghosts without a mode field default to vanilla — they
+		// were exported pre-5.5 or from a non-historic mission. Keeps
+		// imports from silently colonizing an Authentic slot.
+		const runMode: GhostMode =
+			run.mode === "authentic" ? "authentic" : "vanilla";
+		run.mode = runMode;
 		const ghosts = loadGhosts();
-		const existing = ghosts.find((g) => g.seed === run.seed);
+		const existing = ghosts.find(
+			(g) => g.seed === run.seed && (g.mode ?? "vanilla") === runMode,
+		);
 		if (existing) {
 			if (run.score > existing.score) {
 				existing.score = run.score;
 				existing.frames = run.frames;
+				existing.mode = runMode;
 			}
 		} else {
 			ghosts.push(run);
@@ -180,8 +215,8 @@ export function importGhost(json: string): GhostRun | null {
 }
 
 /** Download a ghost as a .json file */
-export function downloadGhost(seed: number): void {
-	const json = exportGhost(seed);
+export function downloadGhost(seed: number, mode: GhostMode = "vanilla"): void {
+	const json = exportGhost(seed, mode);
 	if (!json) return;
 	const blob = new Blob([json], { type: "application/json" });
 	const url = URL.createObjectURL(blob);

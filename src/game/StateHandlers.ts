@@ -19,8 +19,11 @@ import { LANDER_HEIGHT, STARTING_FUEL } from "../utils/constants";
 import { startAgentReplay } from "./AgentReplay";
 import {
 	buildAuthenticState,
+	hasSeenAuthenticIntro,
 	loadAuthenticPreference,
+	markAuthenticIntroSeen,
 	saveAuthenticPreference,
+	TUTORIAL_FRAMES,
 } from "./AuthenticMode";
 import type { Game } from "./Game";
 import { nextPreset, prevPreset } from "./GravityPresets";
@@ -122,6 +125,21 @@ export function updateEditor(game: Game, input: InputState): void {
 
 export function updateMenu(game: Game, input: InputState): void {
 	const missions = getMenuMissions(game.gameMode);
+
+	// Tutorial overlay tick — while active, block menu nav and launch.
+	// Timeout OR dismiss (menuSelect / menuBack) closes it and writes the
+	// seen-key so it never reappears for this mission.
+	if (game.tutorialOverlay) {
+		game.tutorialOverlay.framesRemaining -= 1;
+		const dismissed = input.menuSelect || input.menuBack;
+		if (game.tutorialOverlay.framesRemaining <= 0 || dismissed) {
+			markAuthenticIntroSeen(game.tutorialOverlay.missionId);
+			game.tutorialOverlay = null;
+		}
+		game.renderMenu();
+		return;
+	}
+
 	if (input.menuUp)
 		game.selectedMission =
 			(game.selectedMission - 1 + missions.length) % missions.length;
@@ -134,6 +152,19 @@ export function updateMenu(game: Game, input: InputState): void {
 			!isMissionUnlocked(mission.id, game.campaignCompleted)
 		) {
 			// Locked
+		} else if (
+			isHistoricMission(mission) &&
+			mission.kind === "landing" &&
+			loadAuthenticPreference(mission.id) &&
+			!hasSeenAuthenticIntro(mission.id)
+		) {
+			// First launch of Authentic on this mission — pop the tutorial
+			// overlay instead of launching. The next menuSelect (or the 3s
+			// timeout) dismisses it and the player can launch for real.
+			game.tutorialOverlay = {
+				missionId: mission.id,
+				framesRemaining: TUTORIAL_FRAMES,
+			};
 		} else {
 			selectMission(game, mission);
 		}
@@ -169,7 +200,12 @@ export function updateMenu(game: Game, input: InputState): void {
 }
 
 export function handlePostFlightInput(game: Game, input: InputState): void {
-	if (input.exportGhost && game.status === "landed") downloadGhost(game.seed);
+	if (input.exportGhost && game.status === "landed") {
+		downloadGhost(
+			game.seed,
+			game.currentFlight?.authenticMode ? "authentic" : "vanilla",
+		);
+	}
 	if (
 		input.flightReport &&
 		(game.status === "landed" || game.status === "crashed")
@@ -180,6 +216,10 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 			game.activeMission.kind === "landing"
 				? buildHistoricReference(game)
 				: undefined;
+		const authEra: "apollo" | "artemis" | undefined =
+			game.currentFlight?.authenticMode && game.currentFlight.authenticState
+				? game.currentFlight.authenticState.era
+				: undefined;
 		generateFlightReport(
 			game.lander,
 			game.terrain,
@@ -189,6 +229,7 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 			game.score,
 			game.status === "landed",
 			historicRef,
+			authEra,
 		);
 	}
 	if (input.restart && game.status !== "playing") {
@@ -297,7 +338,11 @@ function selectMission(game: Game, mission: Mission): void {
 		game.currentFlight = null;
 	}
 	game.reset();
-	game.llm.fetchBriefing(game, mission);
+	game.llm.fetchBriefing(
+		game,
+		mission,
+		game.currentFlight?.authenticMode ?? false,
+	);
 	updateURL(mission.seed);
 	if (isHistoricMission(mission) && mission.kind === "landing") {
 		game.missionChatter.start(mission.facts, game.getLLMConfig());

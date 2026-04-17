@@ -1,8 +1,5 @@
 import type { Agent, AgentStats } from "../ai/Agent";
-import {
-	calculateRewardBreakdown,
-	type RewardBreakdown,
-} from "../ai/AgentEnv";
+import { calculateRewardBreakdown, type RewardBreakdown } from "../ai/AgentEnv";
 import { EpisodeRecorder, type RecordedEpisode } from "../ai/EpisodeRecorder";
 import { PolicyGradientAgent } from "../ai/PolicyGradientAgent";
 import { RandomAgent } from "../ai/RandomAgent";
