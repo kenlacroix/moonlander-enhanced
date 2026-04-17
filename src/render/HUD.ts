@@ -1,4 +1,12 @@
+import {
+	type AuthenticState,
+	captionFor,
+	ERA_COLORS,
+	isAltitudeBlackedOut,
+} from "../game/AuthenticMode";
 import type { LanderState } from "../game/Lander";
+import type { TerrainData } from "../game/Terrain";
+import { prefersReducedMotion } from "../utils/a11y";
 import {
 	CANVAS_HEIGHT,
 	CANVAS_WIDTH,
@@ -22,6 +30,9 @@ export class HUD {
 		gravityStormLabel: string | null = null,
 		elapsedTime: number | null = null,
 		bestTime: number | null = null,
+		authenticState: AuthenticState | null = null,
+		terrain: TerrainData | null = null,
+		isPlaying = true,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -31,9 +42,22 @@ export class HUD {
 		let y = 20;
 		const lineHeight = 22;
 
-		// Altitude (distance from bottom of screen — approximate)
-		const altitude = Math.max(0, CANVAS_HEIGHT - lander.y - 100).toFixed(0);
-		this.drawLabel(ctx, x, y, "ALT", `${altitude} m`);
+		// Altitude (distance from bottom of screen — approximate).
+		// Authentic (Apollo era only): readout blanks to "---" when lander is
+		// within 50 pixels AGL, mirroring Armstrong losing callouts for the
+		// last ~25 feet of descent. Display metric stays pixel-based; only
+		// the BLACKOUT trigger uses true AGL via Physics.getTerrainHeightAt.
+		const blackedOut = isAltitudeBlackedOut(authenticState, lander, terrain);
+		if (blackedOut) {
+			this.drawLabel(ctx, x, y, "ALT", "---");
+			if (authenticState && !authenticState.lowAltMessage.shown) {
+				authenticState.lowAltMessage.shown = true;
+				authenticState.lowAltMessage.framesRemaining = 60;
+			}
+		} else {
+			const altitude = Math.max(0, CANVAS_HEIGHT - lander.y - 100).toFixed(0);
+			this.drawLabel(ctx, x, y, "ALT", `${altitude} m`);
+		}
 		y += lineHeight;
 
 		// Vertical speed — warn if too fast
@@ -168,6 +192,60 @@ export class HUD {
 			CANVAS_WIDTH / 2,
 			CANVAS_HEIGHT - 20,
 		);
+
+		// Authentic Mode overlays — suppressed on landed/crashed so they
+		// don't stack on top of the post-flight result screen. Caption,
+		// 1202 banner, and LOW-ALT message all gate on isPlaying.
+		if (isPlaying) {
+			// Authentic Mode caption (top center) — era-colored tech label.
+			// While the 1202 alarm is ACTIVE, the caption is replaced with
+			// the program-alarm banner. 12-frame half-cycle → 2.5 Hz full
+			// cycle, comfortably below the WCAG 2.3.1 3-flashes/sec ceiling
+			// (saturated-red flashing is the specific seizure concern).
+			// prefers-reduced-motion: render steady amber, no strobing.
+			const caption = captionFor(authenticState);
+			if (caption) {
+				if (authenticState?.alarm?.state === "ACTIVE") {
+					const reduce = prefersReducedMotion();
+					const flashRed =
+						!reduce &&
+						Math.floor(authenticState.alarm.framesElapsed / 12) % 2 === 0;
+					ctx.fillStyle = flashRed
+						? ERA_COLORS.HAZARD_RED
+						: ERA_COLORS.APOLLO_AMBER;
+					ctx.font = 'bold 14px "Courier New", monospace';
+					ctx.textAlign = "center";
+					ctx.fillText(
+						"1202 PROGRAM ALARM — EXECUTIVE OVERFLOW",
+						CANVAS_WIDTH / 2,
+						12,
+					);
+				} else {
+					ctx.fillStyle = caption.color;
+					ctx.font = 'bold 13px "Courier New", monospace';
+					ctx.textAlign = "center";
+					ctx.fillText(caption.text, CANVAS_WIDTH / 2, 12);
+				}
+			}
+
+			// One-shot message on first frame below AGL blackout threshold.
+			// Drawn near the top-center, just below the AUTHENTIC caption,
+			// so it doesn't collide with the left-column fuel bar.
+			if (
+				authenticState &&
+				authenticState.lowAltMessage.framesRemaining > 0
+			) {
+				authenticState.lowAltMessage.framesRemaining -= 1;
+				ctx.fillStyle = "#ffb000";
+				ctx.font = 'bold 12px "Courier New", monospace';
+				ctx.textAlign = "center";
+				ctx.fillText(
+					"LOW-ALT READOUT UNAVAILABLE (AUTHENTIC)",
+					CANVAS_WIDTH / 2,
+					32,
+				);
+			}
+		}
 
 		ctx.restore();
 	}

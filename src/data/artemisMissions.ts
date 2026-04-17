@@ -35,6 +35,8 @@ export const ARTEMIS_MISSIONS: LandingMission[] = [
 			historicalReferenceLabel: "Shackleton rim accuracy",
 			historicalReferenceValue: 100,
 			historicalReferenceUnit: "m drift",
+			eraOneLiner:
+				"Starship HLS brings orbital LRO hazard maps, GPS-class positioning, autonomous terrain-relative navigation, and digital continuous throttle — a 60-year leap from Apollo's AGC and discrete RCS bursts.",
 		},
 		moments: [
 			{

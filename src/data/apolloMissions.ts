@@ -41,6 +41,8 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			historicalReferenceLabel: "Armstrong fuel margin",
 			historicalReferenceValue: 22,
 			historicalReferenceUnit: "seconds",
+			eraOneLiner:
+				"Eagle's 2KB guidance computer carried the crew down while Armstrong hunted for a boulder-free landing site in real time, juggling a 1202 executive overflow 10,000 feet up.",
 		},
 		moments: [
 			{
@@ -92,6 +94,8 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			historicalReferenceLabel: "Scott descent precision",
 			historicalReferenceValue: 5,
 			historicalReferenceUnit: "m drift",
+			eraOneLiner:
+				"J-mission Falcon flew a steeper descent with an upgraded guidance computer — still analog instruments, still discrete RCS thrusters, still no hazard avoidance.",
 		},
 		moments: [
 			{
@@ -130,6 +134,8 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			historicalReferenceLabel: "Cernan descent time",
 			historicalReferenceValue: 12,
 			historicalReferenceUnit: "min",
+			eraOneLiner:
+				"Last humans on the Moon flew the same 1960s guidance stack Apollo 11 used — Schmitt calling out instruments while Cernan wrestled a boulder-strewn valley.",
 		},
 		moments: [
 			{

@@ -2,6 +2,38 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.9.0] - 2026-04-17 (Sprint 5.5 Part A: Authentic Mode)
+
+### Added
+- **Authentic Mode toggle on historic missions.** Pick Apollo 11 / 15 / 17 / Artemis III on the HISTORIC MISSIONS screen and hit `A` to flip an era-accurate tech layer on or off. Preference sticks per-mission across sessions. Default is OFF — vanilla runs are byte-identical to before.
+- **Apollo 11: the 1202 program alarm.** Somewhere in descent (seed-deterministic, between 3.3 and 8.3 seconds in), the AGC throws an executive overflow. Thrust input goes dead for 400ms, the HUD banner flashes amber (2.5 Hz, WCAG 2.3.1-compliant), and a synthesized warble plays. Fast descenders who are already below 150px AGL at the scheduled frame dodge it entirely — Apollo crews called that a lucky break.
+- **Apollo 11/15/17: altitude blackout under 50 AGL.** Your altitude readout goes to `---` in the final meters, mirroring Armstrong landing with no callouts for the last 25 feet. First-frame "LOW-ALT READOUT UNAVAILABLE" primer so it reads as "this is the simulation" instead of "the game broke."
+- **Apollo 15/17: master alarm cue.** Soft one-shot audio when the lander crosses 150 AGL. No input lockout — advisory only, like it was in the real stack.
+- **Era captions and era colors.** HUD shows `AUTHENTIC 1969 TECH` in DSKY amber on Apollo, `AUTHENTIC 2028 TECH` in cyan on Artemis.
+- **Pre-launch tutorial overlay.** First time you flip Authentic ON for a mission, a 3-card overlay on the mission-select screen primes you for analog instruments, AGC overflow, and the fuel-margin challenge. Dismissible with ENTER or ESC; 3-second auto-dismiss; never reappears for a mission you've already seen.
+- **AUTHENTIC corner badge on share cards.** Flight reports from Authentic runs stamp an era-colored `AUTHENTIC 1969` or `AUTHENTIC 2028` corner badge.
+- **Dual-track leaderboard on historic mission-select.** `BEST` and `AUTHENTIC` best scores render stacked, so you can see your two tracks side by side.
+- **Era-flavored mission briefings.** With Authentic ON, the LLM briefing prompt shifts to emphasize era-tech context (2KB flight computer, discrete RCS, orbital LRO maps). Offline fallback appends an `eraOneLiner` drawn from verified mission facts.
+- **prefers-reduced-motion support.** When the OS requests reduced motion, the 1202 banner renders as steady amber instead of a strobe.
+
+### Changed
+- **Ghost replays partition by mode.** Authentic ghosts don't overwrite vanilla bests on the same seed. Legacy ghosts (pre-5.5) load as vanilla.
+- **Leaderboard records partition by mode.** Same seed, separate slots for `vanilla` and `authentic`. Pre-5.5 records migrate lazily on first vanilla write.
+- **Mission briefing cache partitions by mode.** Toggling Authentic returns a fresh briefing, not the cached opposite-mode one.
+- **Fork replays are vanilla-locked.** Captured AI episodes replay without Authentic mechanics regardless of your current preference, so the physics stays faithful to the original capture.
+
+### Architecture
+- New module `src/game/AuthenticMode.ts`: pure functions, typed state machine, zero-allocation OFF path. Verified byte-identical via regression test — the filter returns the same input reference when inactive, so Authentic cannot perturb vanilla flights.
+- 3 IRON RULE regression tests (OFF byte-identical, fork-replay vanilla-lock, 1202 skip-on-collision) plus unit, integration, and ghost-mode-isolation coverage. 242 tests green (up from 226).
+- New `src/utils/a11y.ts` with cached `prefersReducedMotion()` helper for the hot render path.
+
+### Deferred
+- Artemis III hazard-aware landing ellipse (Part B).
+- Apollo 13 "Survive" and Luna 9 auto-landing Authentic variants (Part B).
+- Contextual cockpit visual layer (scope-expansion idea captured in `.plans/sprint-5.5-authentic-mode.md`; not in this release).
+- Codex outside-voice review (account reset window open, listed in TODOS for follow-up).
+- Test coverage gaps for master-alarm, blackout positive path, briefing cache-key, ghost overwrite (listed in TODOS).
+
 ## [0.5.8.3] - 2026-04-16 (Sprint 2.6 Part C: Tutorial + Compact Toggle + Polish)
 
 ### Added

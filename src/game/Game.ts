@@ -32,6 +32,12 @@ import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
 import type { Artifact } from "./Artifacts";
 import { placeArtifacts } from "./Artifacts";
+import {
+	applyAuthenticFilter,
+	buildAuthenticState,
+	type FlightConfig,
+	updateAuthentic,
+} from "./AuthenticMode";
 import { Camera } from "./Camera";
 import { handleCollisionResult } from "./CollisionHandler";
 import { GameLoop } from "./GameLoop";
@@ -84,6 +90,24 @@ export class Game {
 	 * historic missions that opt into another kind.
 	 */
 	missionMode: "landing" | "survive" | "auto-landing" = "landing";
+	/**
+	 * Flight-scoped Authentic Mode config. Non-null only while a historic
+	 * mission flight is active (constructed in selectMission, cleared on
+	 * return-to-title / non-historic paths). Never set during AI Theater,
+	 * HeadlessGame, fork replays, or freeplay — those paths keep it null.
+	 */
+	currentFlight: FlightConfig | null = null;
+	/**
+	 * Sprint 5.5 pre-launch Authentic tutorial overlay. Non-null only
+	 * during the 3-second block shown on mission-select the first time a
+	 * player launches Authentic on a given mission. Key:
+	 * moonlander-authentic-intro-seen-{missionId} written on dismiss so
+	 * the overlay never reappears for that mission.
+	 */
+	tutorialOverlay: {
+		missionId: number;
+		framesRemaining: number;
+	} | null = null;
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
 	titleSelection = 0;
@@ -293,6 +317,10 @@ export class Game {
 		this.wind = null;
 		this.alien = null;
 		this.gravityStorm = null;
+		// Sprint 5.5 fork-replay vanilla-lock: captured episodes always replay
+		// without Authentic mechanics. Mirrors the gravity/hazard lock above
+		// — toggling Authentic after capture would diverge the trajectory.
+		this.currentFlight = { authenticMode: false, authenticState: null };
 		this.forkReplay = {
 			episode,
 			frame: 0,
@@ -342,6 +370,7 @@ export class Game {
 		this.wind = null;
 		this.alien = null;
 		this.gravityStorm = null;
+		this.currentFlight = null;
 		this.artifacts = [];
 		this.relay = null;
 		this.audio.soundtrack.start();
@@ -372,7 +401,10 @@ export class Game {
 		this.camera_ = new Camera();
 		this.gameLoop.resetAccumulator();
 		this.fuelWarningCooldown = 0;
-		this.ghostRecorder.start(this.seed_);
+		const ghostMode = this.currentFlight?.authenticMode
+			? "authentic"
+			: "vanilla";
+		this.ghostRecorder.start(this.seed_, ghostMode);
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.physics.reset();
@@ -386,7 +418,7 @@ export class Game {
 			: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		this.audio.soundtrack.start();
-		const ghostRun = loadGhostForSeed(this.seed_);
+		const ghostRun = loadGhostForSeed(this.seed_, ghostMode);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
 	}
 
@@ -439,6 +471,19 @@ export class Game {
 				fr.forkFrame = fr.episode.inputs.length;
 			}
 		}
+
+		// Sprint 5.5 — tick the Authentic state machine before the filter,
+		// so an ARMED → ACTIVE transition this frame immediately zeroes
+		// thrust on the same frame. Audio fires once on transition.
+		const authenticState = this.currentFlight?.authenticState ?? null;
+		const transition = updateAuthentic(
+			authenticState,
+			this.lander,
+			this.terrain,
+		);
+		if (transition === "alarm-fired") this.audio.playProgramAlarm();
+		else if (transition === "master-alarm-fired") this.audio.playMasterAlarm();
+		physicsInput = applyAuthenticFilter(physicsInput, authenticState);
 
 		const result = this.physics.step(
 			dt,

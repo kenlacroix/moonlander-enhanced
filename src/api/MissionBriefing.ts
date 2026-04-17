@@ -23,10 +23,15 @@ export async function getMissionBriefing(
 	mission: Mission,
 	onChunk: (text: string) => void,
 	historicalContext?: MissionFacts,
+	authentic = false,
 ): Promise<string> {
+	// Sprint 5.5 — cache key includes the authentic flag so toggling
+	// Authentic ON/OFF returns distinct briefings for the same mission
+	// (Authentic emphasizes era-tech context; vanilla is the baseline).
+	const authSuffix = authentic ? "-a" : "-v";
 	const cacheKey = historicalContext
-		? `${mission.seed}-h-${hashFacts(historicalContext)}`
-		: String(mission.seed);
+		? `${mission.seed}-h-${hashFacts(historicalContext)}${authSuffix}`
+		: `${mission.seed}${authSuffix}`;
 	const cached = briefingCache.get(cacheKey);
 	if (cached) {
 		onChunk(cached);
@@ -34,7 +39,7 @@ export async function getMissionBriefing(
 	}
 
 	const messages: LLMMessage[] = historicalContext
-		? historicMessages(mission, historicalContext)
+		? historicMessages(mission, historicalContext, authentic)
 		: genericMessages(mission);
 
 	const fullText = await streamCompletion(config, messages, onChunk);
@@ -46,10 +51,15 @@ export async function getMissionBriefing(
  * Offline fallback: render the fact sheet itself as a briefing-shaped
  * paragraph. Used when no LLM is configured so historic missions still
  * get authentic flavor.
+ *
+ * When `authentic` is true AND the fact sheet has an `eraOneLiner`, the
+ * one-liner is appended so the briefing foregrounds what made the
+ * era's tech different (2KB flight computer, analog instruments, etc.).
  */
 export function renderFactSheetBriefing(
 	mission: Mission,
 	facts: MissionFacts,
+	authentic = false,
 ): string {
 	const crew = [
 		facts.commander && `Commander ${facts.commander}`,
@@ -64,16 +74,27 @@ export function renderFactSheetBriefing(
 		`Landing site: ${facts.landingSite} (${facts.coordinates}).`,
 		`Powered descent from ${facts.descentStartAltitudeM.toLocaleString()} m AGL.`,
 		`Notable: ${facts.notableMoment}`,
+		authentic && facts.eraOneLiner ? `Era: ${facts.eraOneLiner}` : "",
 	]
 		.filter(Boolean)
 		.join(" ");
 }
 
-function historicMessages(mission: Mission, facts: MissionFacts): LLMMessage[] {
+function historicMessages(
+	mission: Mission,
+	facts: MissionFacts,
+	authentic = false,
+): LLMMessage[] {
+	const eraNote =
+		authentic && facts.eraOneLiner
+			? `\nEra-tech context (emphasize if possible): ${facts.eraOneLiner}`
+			: "";
 	return [
 		{
 			role: "system",
-			content: `You are NASA mission control radioing the lander pilot just before powered descent. Speak in short, clipped radio transmissions. Use ONLY the facts provided. Do not invent crew, dates, coordinates, fuel, or altitude numbers. If you don't know a value, omit it. 2-3 sentences. Plain text, no markdown.`,
+			content: authentic
+				? `You are NASA mission control radioing the lander pilot just before powered descent in AUTHENTIC mode. Emphasize era-specific tech limitations (analog instruments, limited guidance computer, discrete RCS, etc.) as mood. Use ONLY the facts provided. Do not invent crew, dates, coordinates, fuel, or altitude numbers. 2-3 sentences. Plain text, no markdown.`
+				: `You are NASA mission control radioing the lander pilot just before powered descent. Speak in short, clipped radio transmissions. Use ONLY the facts provided. Do not invent crew, dates, coordinates, fuel, or altitude numbers. If you don't know a value, omit it. 2-3 sentences. Plain text, no markdown.`,
 		},
 		{
 			role: "user",
@@ -83,7 +104,7 @@ Date: ${facts.date}
 Crew: ${facts.commander}${facts.lmPilot ? ` (cmdr) / ${facts.lmPilot} (LMP)` : ""}${facts.cmPilot ? ` / ${facts.cmPilot} (CMP)` : ""}
 Landing site: ${facts.landingSite} (${facts.coordinates})
 Descent start altitude: ${facts.descentStartAltitudeM} m
-Notable moment: ${facts.notableMoment}
+Notable moment: ${facts.notableMoment}${eraNote}
 
 Generate a pre-descent radio briefing using only these facts.`,
 		},

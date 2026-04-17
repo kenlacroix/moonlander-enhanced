@@ -36,7 +36,11 @@ export interface LLMStateHandle {
 export class LLMIntegration {
 	constructor(private getConfig: () => LLMConfig | null) {}
 
-	fetchBriefing(state: LLMStateHandle, mission: Mission): void {
+	fetchBriefing(
+		state: LLMStateHandle,
+		mission: Mission,
+		authentic = false,
+	): void {
 		const config = this.getConfig();
 		const historic = isHistoricMission(mission) ? mission.facts : undefined;
 		// Offline fallback: render the fact sheet directly so historic
@@ -44,7 +48,7 @@ export class LLMIntegration {
 		// gap from the eng review — must work without an LLM.
 		if (!config) {
 			state.llmText = historic
-				? renderFactSheetBriefing(mission, historic)
+				? renderFactSheetBriefing(mission, historic, authentic)
 				: "";
 			return;
 		}
@@ -57,12 +61,13 @@ export class LLMIntegration {
 				state.llmText += chunk;
 			},
 			historic,
+			authentic,
 		)
 			.catch(() => {
 				// API error — fall back to fact sheet for historic, blank
 				// for generic. Either way, game stays playable.
 				if (historic) {
-					state.llmText = renderFactSheetBriefing(mission, historic);
+					state.llmText = renderFactSheetBriefing(mission, historic, authentic);
 				}
 			})
 			.finally(() => {

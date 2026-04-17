@@ -21,6 +21,14 @@ export interface MissionFacts {
 	historicalReferenceLabel: string; // for share card: e.g. "Armstrong fuel margin"
 	historicalReferenceValue: number; // numeric value the player tries to match
 	historicalReferenceUnit: string; // "seconds", "m/s", etc.
+	/**
+	 * One-sentence era-tech note used by Authentic Mode briefings. Sets
+	 * the scene for the tech-era constraint the Authentic mechanics are
+	 * dramatizing (e.g. "Eagle's 2KB guidance computer carried the crew
+	 * down while Armstrong hunted for a boulder-free landing site in real
+	 * time."). Optional — missions without it skip era framing.
+	 */
+	eraOneLiner?: string;
 }
 
 /**

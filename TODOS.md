@@ -6,6 +6,16 @@ Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current sc
 
 ## P3 — Polish
 
+### Sprint 5.5 follow-ups (from /review pre-ship audit)
+Tracked from Pre-Landing Review against main on `sprint-5.5/authentic-mode` — accepted as defer, listed here so they don't get lost.
+
+- **Run /codex review on the Sprint 5.5 diff once account reset window reopens** — adversarial 2nd opinion was blocked 2026-04-16 (account limit, reset 2026-04-20). Sprint is now shippable but the outside-voice pass hasn't happened.
+- **Fill 4 test coverage gaps** — master-alarm path (AuthenticMode.ts:144), `isAltitudeBlackedOut` positive-path boundaries (AuthenticMode.ts:168), MissionBriefing authentic cache-key partitioning (MissionBriefing.ts:29), Ghost mode-scoped save overwrite (GhostReplay.ts:86). ~10 min CC. Genuine regression-catchers.
+- **Hoist leaderboard reads out of render hot path** — `renderMenu` currently calls `getBestScore` 2N times/frame (vanilla + authentic for each historic mission), each triggering a full localStorage JSON.parse. Small N so fine in practice; amplifies with mission growth. ~10 min CC.
+- **Replace remaining `#ffb000` / `#00ccff` literals with `ERA_COLORS`** — HUD is wired; CanvasRenderer (tutorial, mission-select indicator, dual-track leaderboard) and FlightRecorder (share-card badge) still use string literals. Mechanical sweep. ~5 min CC.
+- **Extract shared localStorage test polyfill** — duplicated across `authentic-regression.test.ts`, `authentic-integration.test.ts`, `ghost.test.ts`. Move to `tests/helpers/localStorage.ts`. ~5 min CC.
+- **Dead code from Part B scaffolding** — `EllipseState`, `hazardMask` on `AuthenticState`, `ELLIPSE_UPDATE_FRAMES`. Populated by `buildAuthenticState` for Artemis but never read. Keep if Part B is close; drop if deferring indefinitely.
+
 ### Add a favicon
 Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but produces a console error on every page load.
 - **Why:** Clean console on load; tiny branding win.

@@ -132,6 +132,55 @@ export class Audio {
 		osc.stop(now + 0.1);
 	}
 
+	/**
+	 * Apollo 11 1202 program alarm — ~200ms warble. Two square-wave bursts
+	 * at alternating pitches mimic the "master alarm" klaxon used in Apollo
+	 * mission audio. Graceful no-op when AudioContext is suspended.
+	 */
+	playProgramAlarm(): void {
+		if (!this.ctx) return;
+
+		const now = this.ctx.currentTime;
+		const pitches = [660, 880, 660, 880];
+		const noteLen = 0.05;
+		for (let i = 0; i < pitches.length; i++) {
+			const osc = this.ctx.createOscillator();
+			const gain = this.ctx.createGain();
+			osc.type = "square";
+			osc.frequency.value = pitches[i];
+			const start = now + i * noteLen;
+			gain.gain.setValueAtTime(0, start);
+			gain.gain.linearRampToValueAtTime(0.08, start + 0.005);
+			gain.gain.exponentialRampToValueAtTime(0.001, start + noteLen);
+			osc.connect(gain);
+			gain.connect(this.ctx.destination);
+			osc.start(start);
+			osc.stop(start + noteLen);
+		}
+	}
+
+	/**
+	 * Apollo 15/17 MASTER ALARM — softer one-shot; no input lockout paired
+	 * with this cue. Single ~250ms triangle note; deliberately less urgent
+	 * than 1202 since it's advisory.
+	 */
+	playMasterAlarm(): void {
+		if (!this.ctx) return;
+
+		const now = this.ctx.currentTime;
+		const osc = this.ctx.createOscillator();
+		const gain = this.ctx.createGain();
+		osc.type = "triangle";
+		osc.frequency.value = 520;
+		gain.gain.setValueAtTime(0, now);
+		gain.gain.linearRampToValueAtTime(0.05, now + 0.02);
+		gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+		osc.connect(gain);
+		gain.connect(this.ctx.destination);
+		osc.start(now);
+		osc.stop(now + 0.25);
+	}
+
 	/** Alien mischief warning — two-tone triangle warble */
 	playAlienWarning(): void {
 		if (!this.ctx) return;
