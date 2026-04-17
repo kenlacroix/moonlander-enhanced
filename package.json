@@ -1,6 +1,6 @@
 {
 	"name": "moonlander-enhanced",
-	"version": "1.0.0",
+	"version": "0.5.8.3",
 	"description": "A browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game",
 	"type": "module",
 	"scripts": {
