@@ -287,6 +287,7 @@ export class GameRenderer {
 			getBestTime(state.seed, scoreMode) ?? null,
 			state.currentFlight?.authenticState ?? null,
 			state.terrain ?? null,
+			state.status === "playing",
 		);
 
 		// Touch controls overlay

@@ -421,6 +421,7 @@ export class CanvasRenderer {
 		bestTime: number | null = null,
 		authenticState: AuthenticState | null = null,
 		terrain: TerrainData | null = null,
+		isPlaying = true,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -436,6 +437,7 @@ export class CanvasRenderer {
 			bestTime,
 			authenticState,
 			terrain,
+			isPlaying,
 		);
 	}
 
@@ -567,14 +569,16 @@ export class CanvasRenderer {
 				!campaignProgress.has(m.id - 1);
 			const isCompleted = campaignProgress?.has(m.id) ?? false;
 
-			// Selection highlight
+			// Selection highlight. Box is generous enough for the dual-track
+			// BEST / AUTHENTIC score stack on the right and the description
+			// line on the left without clipping descenders or glyph tops.
 			if (isSelected && !isLocked) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 320, y - 14, 640, 40);
+				ctx.fillRect(CANVAS_WIDTH / 2 - 340, y - 16, 680, 48);
 
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 320, y - 14, 640, 40);
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 340, y - 16, 680, 48);
 			}
 
 			// Status indicator for campaign
