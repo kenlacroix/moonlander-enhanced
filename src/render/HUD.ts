@@ -47,10 +47,7 @@ export class HUD {
 		const blackedOut = isAltitudeBlackedOut(authenticState, lander, terrain);
 		if (blackedOut) {
 			this.drawLabel(ctx, x, y, "ALT", "---");
-			if (
-				authenticState &&
-				!authenticState.lowAltMessage.shown
-			) {
+			if (authenticState && !authenticState.lowAltMessage.shown) {
 				authenticState.lowAltMessage.shown = true;
 				authenticState.lowAltMessage.framesRemaining = 60;
 			}
@@ -194,20 +191,33 @@ export class HUD {
 		);
 
 		// Authentic Mode caption (top center) — era-colored tech label.
+		// While the 1202 alarm is ACTIVE, the caption is replaced with
+		// the program-alarm banner. Flashes red/amber every 6 frames so
+		// it reads as urgent without strobing.
 		const caption = captionFor(authenticState);
 		if (caption) {
-			ctx.fillStyle = caption.color;
-			ctx.font = 'bold 13px "Courier New", monospace';
-			ctx.textAlign = "center";
-			ctx.fillText(caption.text, CANVAS_WIDTH / 2, 12);
+			if (authenticState?.alarm?.state === "ACTIVE") {
+				const flashRed =
+					Math.floor(authenticState.alarm.framesElapsed / 6) % 2 === 0;
+				ctx.fillStyle = flashRed ? "#ff3030" : "#ffb000";
+				ctx.font = 'bold 14px "Courier New", monospace';
+				ctx.textAlign = "center";
+				ctx.fillText(
+					"1202 PROGRAM ALARM — EXECUTIVE OVERFLOW",
+					CANVAS_WIDTH / 2,
+					12,
+				);
+			} else {
+				ctx.fillStyle = caption.color;
+				ctx.font = 'bold 13px "Courier New", monospace';
+				ctx.textAlign = "center";
+				ctx.fillText(caption.text, CANVAS_WIDTH / 2, 12);
+			}
 		}
 
 		// One-shot message on first frame below AGL blackout threshold.
 		// Primes the player so the "---" readout doesn't feel broken.
-		if (
-			authenticState &&
-			authenticState.lowAltMessage.framesRemaining > 0
-		) {
+		if (authenticState && authenticState.lowAltMessage.framesRemaining > 0) {
 			authenticState.lowAltMessage.framesRemaining -= 1;
 			ctx.fillStyle = "#ffb000";
 			ctx.font = 'bold 12px "Courier New", monospace';

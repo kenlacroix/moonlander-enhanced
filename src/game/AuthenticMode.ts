@@ -1,9 +1,9 @@
-import { getTerrainHeightAt } from "./Physics";
-import type { LanderState } from "./Lander";
 import type { InputState } from "../systems/Input";
-import type { TerrainData } from "./Terrain";
-import type { Mission } from "./Missions";
 import { isHistoricMission } from "./HistoricMission";
+import type { LanderState } from "./Lander";
+import type { Mission } from "./Missions";
+import { getTerrainHeightAt } from "./Physics";
+import type { TerrainData } from "./Terrain";
 
 export const ALARM_SEED_MULT = 31;
 export const ALARM_SEED_MOD = 300;
@@ -112,6 +112,78 @@ export function applyAuthenticFilter(
 	return input;
 }
 
+/**
+ * Event fired by updateAuthentic when the state machine transitions. Game
+ * uses this to dispatch one-shot audio / HUD effects without polling the
+ * state every tick (which would fire the alarm tone 24 times in a row).
+ */
+export type AuthenticTransition =
+	| "alarm-fired"
+	| "alarm-skipped"
+	| "alarm-ended"
+	| "master-alarm-fired"
+	| null;
+
+/**
+ * Tick the Authentic state machine one physics frame. Called from
+ * Game.onFixedUpdate BEFORE applyAuthenticFilter so ARMED → ACTIVE
+ * transitions inject into the filter on the very frame the alarm starts.
+ *
+ * Returns a transition event for the caller to react to (audio, HUD
+ * flash), or null if nothing changed state.
+ *
+ * Mutates `state` in place so the caller doesn't have to reassign. Pure
+ * function otherwise — no global state, no allocations in the hot path
+ * when no transition occurs.
+ */
+export function updateAuthentic(
+	state: AuthenticState | null,
+	lander: LanderState,
+	terrain: TerrainData | null,
+): AuthenticTransition {
+	if (state === null) return null;
+
+	// Apollo 11 1202 program alarm state machine.
+	if (state.alarm) {
+		const a = state.alarm;
+		if (a.state === "ARMED") {
+			if (a.framesElapsed >= a.scheduledFrame) {
+				// Reached scheduled frame — gate-check AGL. Above gate: fire.
+				// At or below: skip entirely (fast descenders get lucky).
+				const aboveGate = terrain
+					? getTerrainHeightAt(lander.x, terrain.points) - lander.y >
+						ALTITUDE_ALARM_GATE_PX
+					: true; // No terrain fallback: fire (matches plan intent)
+				if (aboveGate) {
+					a.state = "ACTIVE";
+					a.framesElapsed = 0;
+					return "alarm-fired";
+				}
+				a.state = "DONE";
+				return "alarm-skipped";
+			}
+			a.framesElapsed += 1;
+		} else if (a.state === "ACTIVE") {
+			if (a.framesElapsed >= ALARM_LOCKOUT_FRAMES) {
+				a.state = "DONE";
+				return "alarm-ended";
+			}
+			a.framesElapsed += 1;
+		}
+	}
+
+	// Apollo 15/17 MASTER ALARM — altitude-gated single fire, audio only.
+	if (state.masterAlarm && state.masterAlarm.state === "IDLE" && terrain) {
+		const agl = getTerrainHeightAt(lander.x, terrain.points) - lander.y;
+		if (agl > 0 && agl < MASTER_ALARM_GATE_PX) {
+			state.masterAlarm.state = "DONE";
+			return "master-alarm-fired";
+		}
+	}
+
+	return null;
+}
+
 export function isAltitudeBlackedOut(
 	state: AuthenticState | null,
 	lander: LanderState,
@@ -147,10 +219,7 @@ export function loadAuthenticPreference(missionId: number): boolean {
 	}
 }
 
-export function saveAuthenticPreference(
-	missionId: number,
-	on: boolean,
-): void {
+export function saveAuthenticPreference(missionId: number, on: boolean): void {
 	try {
 		if (on) {
 			localStorage.setItem(`${AUTHENTIC_KEY_PREFIX}${missionId}`, "1");

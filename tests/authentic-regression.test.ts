@@ -1,18 +1,30 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+	ALARM_LOCKOUT_FRAMES,
+	ALTITUDE_ALARM_GATE_PX,
+	type AuthenticState,
 	applyAuthenticFilter,
 	buildAuthenticState,
-	type AuthenticState,
 	type FlightConfig,
 	isAltitudeBlackedOut,
 	loadAuthenticPreference,
 	saveAuthenticPreference,
+	updateAuthentic,
 } from "../src/game/AuthenticMode";
+import { HeadlessGame } from "../src/game/HeadlessGame";
+import type { LanderState } from "../src/game/Lander";
+import type { Mission } from "../src/game/Missions";
+import type { TerrainData } from "../src/game/Terrain";
+import type { InputState } from "../src/systems/Input";
+import { FIXED_TIMESTEP } from "../src/utils/constants";
 
 // Node's default vitest environment has no localStorage. Install a minimal
 // in-memory polyfill for any test that exercises the preference API.
 beforeAll(() => {
-	if (typeof (globalThis as { localStorage?: Storage }).localStorage === "undefined") {
+	if (
+		typeof (globalThis as { localStorage?: Storage }).localStorage ===
+		"undefined"
+	) {
 		const store = new Map<string, string>();
 		(globalThis as { localStorage: Storage }).localStorage = {
 			getItem: (k) => store.get(k) ?? null,
@@ -30,12 +42,6 @@ beforeAll(() => {
 		};
 	}
 });
-import { HeadlessGame } from "../src/game/HeadlessGame";
-import type { LanderState } from "../src/game/Lander";
-import type { Mission } from "../src/game/Missions";
-import type { TerrainData } from "../src/game/Terrain";
-import type { InputState } from "../src/systems/Input";
-import { FIXED_TIMESTEP } from "../src/utils/constants";
 
 /**
  * Sprint 5.5 Part A — IRON RULE regression tests.
@@ -175,10 +181,7 @@ describe("Sprint 5.5 — CRITICAL regression tests", () => {
 		// Filter called with the forked config's null state must be a no-op
 		// passthrough — the alarm can never fire on fork replay.
 		const input: InputState = { ...THRUST_INPUT };
-		const result = applyAuthenticFilter(
-			input,
-			forkedFlight.authenticState,
-		);
+		const result = applyAuthenticFilter(input, forkedFlight.authenticState);
 		expect(result).toBe(input);
 
 		saveAuthenticPreference(999, false);
@@ -192,19 +195,14 @@ describe("Sprint 5.5 — CRITICAL regression tests", () => {
 	 * lander has descended past the gate (ALTITUDE_ALARM_GATE_PX = 150) by
 	 * the scheduled frame, the alarm skips entirely — the flight gets lucky.
 	 *
-	 * This test constructs an AuthenticState with the alarm armed, then
-	 * simulates the gate-check rule: if AGL was below the threshold at the
-	 * scheduled frame, state stays IDLE (never ARMED→ACTIVE) and physics
-	 * match a non-Authentic control run byte for byte.
-	 *
-	 * Note: Part A ships the state shape + gate constant but the
-	 * updateAuthentic state-machine tick lands with the 1202 alarm
-	 * implementation. This test asserts the structural invariant that
-	 * matters: the alarm state is explicitly ARMED on construction (so a
-	 * future tick can skip→DONE without passing through ACTIVE), never
-	 * pre-set to ACTIVE.
+	 * This test runs the updateAuthentic state machine against a fake
+	 * terrain + lander in both scenarios:
+	 *   - Above-gate case: alarm ARMED → ACTIVE, filter zeros thrust, then
+	 *     ACTIVE → DONE after ALARM_LOCKOUT_FRAMES tics.
+	 *   - Below-gate case: alarm ARMED → DONE directly, filter never
+	 *     zeroes thrust, so physics outcome is byte-identical to vanilla.
 	 */
-	it("1202 skip-on-collision: alarm starts ARMED (not ACTIVE), so skip-past-gate is possible", () => {
+	it("1202 skip-on-collision: below-gate descent skips alarm, physics match vanilla", () => {
 		const apollo11 = {
 			id: 511,
 			name: "Apollo 11",
@@ -230,25 +228,116 @@ describe("Sprint 5.5 — CRITICAL regression tests", () => {
 		const state = buildAuthenticState(apollo11, 11_1969, false);
 		expect(state).not.toBeNull();
 		if (!state) return;
-		expect(state.era).toBe("apollo");
-		expect(state.alarm).toBeDefined();
-		// Must start ARMED — never pre-ACTIVE. An ARMED alarm whose
-		// scheduledFrame arrives below the altitude gate can legally skip
-		// to DONE without ever firing (the skip-on-collision rule).
 		expect(state.alarm?.state).toBe("ARMED");
-		expect(state.alarm?.framesElapsed).toBe(0);
-		// scheduledFrame is deterministic: ((|seed| * 31) % 300) + 200.
-		// Same seed + same algorithm => same frame.
-		expect(state.alarm?.scheduledFrame).toBe(
-			((11_1969 * 31) % 300) + 200,
-		);
+		const scheduledFrame = state.alarm?.scheduledFrame;
+		expect(scheduledFrame).toBe(((11_1969 * 31) % 300) + 200);
 
-		// HeadlessGame is authentic-null; AGL blackout and filter are no-ops.
+		// Build a flat-terrain fixture the state machine can query. Points
+		// array is read by Physics.getTerrainHeightAt via linear interp,
+		// so two points at the same Y form a flat ground plane.
+		const flatTerrain = {
+			points: [
+				{ x: 0, y: 700 },
+				{ x: 5000, y: 700 },
+			],
+			pads: [],
+		} as unknown as TerrainData;
+
+		// Below-gate lander: AGL = 700 - 650 = 50 < ALTITUDE_ALARM_GATE_PX.
+		const belowGateLander = {
+			x: 100,
+			y: 650,
+			vx: 0,
+			vy: 0,
+			angle: 0,
+			fuel: 1000,
+			thrusting: false,
+			status: "flying",
+		} as unknown as LanderState;
+		expect(700 - 650).toBeLessThan(ALTITUDE_ALARM_GATE_PX);
+
+		// Advance the state machine up to the scheduled frame — at that
+		// point the gate check runs; below-gate should route ARMED → DONE
+		// via an "alarm-skipped" transition.
+		let transition: ReturnType<typeof updateAuthentic> = null;
+		for (let i = 0; i <= (scheduledFrame ?? 0); i++) {
+			transition = updateAuthentic(state, belowGateLander, flatTerrain);
+			if (transition !== null) break;
+		}
+		expect(transition).toBe("alarm-skipped");
+		expect(state.alarm?.state).toBe("DONE");
+		// Filter applied with the post-skip state MUST be a no-op — the
+		// player's input passes through unchanged.
+		const input = { ...THRUST_INPUT };
+		expect(applyAuthenticFilter(input, state)).toBe(input);
+	});
+
+	it("1202 fires above gate: ARMED → ACTIVE → DONE and filter zeros thrust during ACTIVE", () => {
+		const apollo11 = {
+			id: 511,
+			era: "1960s-70s-apollo",
+			kind: "landing",
+			seed: 11_1969,
+		} as unknown as Mission;
+
+		const state = buildAuthenticState(apollo11, 11_1969, false);
+		expect(state).not.toBeNull();
+		if (!state) return;
+		const scheduledFrame = state.alarm?.scheduledFrame ?? 0;
+
+		// Above-gate lander: AGL = 700 - 100 = 600 > ALTITUDE_ALARM_GATE_PX.
+		const flatTerrain = {
+			points: [
+				{ x: 0, y: 700 },
+				{ x: 5000, y: 700 },
+			],
+			pads: [],
+		} as unknown as TerrainData;
+		const aboveGateLander = {
+			x: 100,
+			y: 100,
+			vx: 0,
+			vy: 0,
+			angle: 0,
+			fuel: 1000,
+			thrusting: false,
+			status: "flying",
+		} as unknown as LanderState;
+
+		// Tick up to scheduled frame — should fire.
+		let fireTransition: ReturnType<typeof updateAuthentic> = null;
+		for (let i = 0; i <= scheduledFrame; i++) {
+			fireTransition = updateAuthentic(state, aboveGateLander, flatTerrain);
+			if (fireTransition !== null) break;
+		}
+		expect(fireTransition).toBe("alarm-fired");
+		expect(state.alarm?.state).toBe("ACTIVE");
+
+		// Filter now zeros thrustUp but preserves every other field.
+		const input: InputState = { ...THRUST_INPUT, rotateLeft: true };
+		const filtered = applyAuthenticFilter(input, state);
+		expect(filtered).not.toBe(input);
+		expect(filtered.thrustUp).toBe(false);
+		expect(filtered.rotateLeft).toBe(true);
+
+		// Continue ticking — after ALARM_LOCKOUT_FRAMES the alarm ends.
+		let endTransition: ReturnType<typeof updateAuthentic> = null;
+		for (let i = 0; i <= ALARM_LOCKOUT_FRAMES; i++) {
+			endTransition = updateAuthentic(state, aboveGateLander, flatTerrain);
+			if (endTransition === "alarm-ended") break;
+		}
+		expect(endTransition).toBe("alarm-ended");
+		expect(state.alarm?.state).toBe("DONE");
+
+		// Filter is a no-op again after DONE — thrustUp flows through.
+		const postDone = applyAuthenticFilter(input, state);
+		expect(postDone).toBe(input);
+	});
+
+	it("AGL blackout sanity: null state and empty terrain are no-ops", () => {
 		const headlessTerrain = null as unknown as TerrainData;
 		const fakeLander = { x: 0, y: 0 } as unknown as LanderState;
-		expect(isAltitudeBlackedOut(null, fakeLander, headlessTerrain)).toBe(
-			false,
-		);
+		expect(isAltitudeBlackedOut(null, fakeLander, headlessTerrain)).toBe(false);
 	});
 });
 

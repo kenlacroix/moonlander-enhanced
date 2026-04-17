@@ -30,13 +30,14 @@ import { WORLD_WIDTH } from "../utils/constants";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
 import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
+import type { Artifact } from "./Artifacts";
+import { placeArtifacts } from "./Artifacts";
 import {
 	applyAuthenticFilter,
 	buildAuthenticState,
 	type FlightConfig,
+	updateAuthentic,
 } from "./AuthenticMode";
-import type { Artifact } from "./Artifacts";
-import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
 import { handleCollisionResult } from "./CollisionHandler";
 import { GameLoop } from "./GameLoop";
@@ -457,10 +458,18 @@ export class Game {
 			}
 		}
 
-		physicsInput = applyAuthenticFilter(
-			physicsInput,
-			this.currentFlight?.authenticState ?? null,
+		// Sprint 5.5 — tick the Authentic state machine before the filter,
+		// so an ARMED → ACTIVE transition this frame immediately zeroes
+		// thrust on the same frame. Audio fires once on transition.
+		const authenticState = this.currentFlight?.authenticState ?? null;
+		const transition = updateAuthentic(
+			authenticState,
+			this.lander,
+			this.terrain,
 		);
+		if (transition === "alarm-fired") this.audio.playProgramAlarm();
+		else if (transition === "master-alarm-fired") this.audio.playMasterAlarm();
+		physicsInput = applyAuthenticFilter(physicsInput, authenticState);
 
 		const result = this.physics.step(
 			dt,
