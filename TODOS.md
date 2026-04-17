@@ -54,11 +54,17 @@ Active plan at `.plans/sprint-5-apollo.md`. CEO plan at `~/.gstack/projects/kenl
 - **Effort:** ~5h human / ~45-60 min CC.
 - **Status:** ✅ SHIPPED v0.5.7.0 (PR #22, merged 2026-04-15).
 
-### Sprint 5.5 — Authentic Mode (CEO reviewed 2026-04-16, Codex-challenged)
+### Sprint 5.5 Part A — Authentic Mode
 Active plan at `.plans/sprint-5.5-authentic-mode.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-16-sprint-5.5-authentic-mode.md`.
-- **Scope:** Per-mission Authentic toggle (default OFF) + Apollo 11 signature moments (altitude blackout via true AGL, 1202 alarm skip-on-collision) + Apollo 15/17 polish + Artemis III hazard-aware landing ellipse (fused from original ellipse+ribbon) + mobile touch toggle + dual-track leaderboard (`{seed}-{mode}` keyed).
+- **Scope:** Per-mission Authentic toggle (default OFF) + Apollo 11 signature moments (altitude blackout via true AGL, 1202 alarm skip-on-collision) + Apollo 15/17 master-alarm cue + tutorial overlay + share-card badge + dual-track leaderboard (`{seed}-{mode}` keyed) + Authentic-aware briefing + `prefers-reduced-motion` a11y.
 - **Effort:** ~9h human / ~105-120 min CC across one PR.
-- **Status:** CEO + Eng reviewed (0 unresolved; 3 CRITICAL regression tests mandated: OFF byte-identical, fork-replay vanilla-lock, 1202 skip-on-collision). Ready to implement on branch `sprint-5.5/authentic-mode` off main post-v0.5.8.0.
+- **Status:** ✅ SHIPPED v0.5.9.0 (PR #32, merged `3650820` on 2026-04-17). 242 tests pass. Artemis III hazard-aware landing ellipse + contextual cockpit + contact-light event deferred to Part B.
+
+### Sprint 5.5 Part B — Artemis ellipse + contextual cockpit + contact light
+Deferred from Part A per playtest + review outcomes.
+- **Scope:** Artemis III hazard-aware landing ellipse (4Hz projection, amber safe / red hazardous slope). Contextual Cockpit visual layer (cinematic cut + PIP slide-in modes). Apollo 11/15/17 contact-light event.
+- **Effort:** ~2-3h CC, single PR off current main.
+- **Status:** Scaffolding types (`EllipseState`, `hazardMask`) already present on `AuthenticState` in v0.5.9.0. Implementation pending. Reconsider scope after playtest feedback on Part A.
 
 ### Sprint 5.5 polish backlog (post-ship)
 - **Standalone hazard ribbon overlay:** Sprint 5.5 fused ribbon into the landing ellipse (red on hazardous slope). If playtest shows fusion alone doesn't communicate "autonomous hazard detection" strongly enough, add a terrain-wide slope tint in a narrow altitude band. P2 post-5.5.

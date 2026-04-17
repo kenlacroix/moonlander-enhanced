@@ -452,6 +452,48 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
+### Sprint 5.5 — Authentic Mode ⚠️ Part A shipped (v0.5.9.0); Contextual Cockpit + Artemis ellipse deferred
+
+*Plan at `.plans/sprint-5.5-authentic-mode.md`. CEO reviewed 2026-04-16 (SELECTIVE EXPANSION, 6 cherry-picks). Eng reviewed. Part A (Authentic Mode core + tutorial + share badge + briefing + Apollo 15/17 master alarm audio) shipped at v0.5.9.0 (PR #32, merged `3650820`). Contextual Cockpit visual layer, Artemis III hazard-aware landing ellipse, and contact-light event are deferred to Part B. Cockpit design doc preserved at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ken-sprint-2.6-part-c-design-20260416-194223.md`. Sprint 8 3D cockpit remains separate.*
+
+**Theme:** give Historic missions tech-era texture. Apollo 11 feels like 1969 (analog DSKY, 1202 alarm, altitude blackout). Artemis III feels like 2028 (hazard-aware landing ellipse). Authentic events get their natural visual home: period-accurate cockpit instruments in a two-mode presentation.
+
+**Authentic Mode core (per-mission opt-in) ✅ SHIPPED Part A (v0.5.9.0):**
+- [x] Toggle: desktop `A` key on historic mission-select, localStorage key `moonlander-authentic-{missionId}`. Mobile tap-zone deferred.
+- [x] Storage key isolation: ghost / leaderboard / briefing cache keys carry `-vanilla` or `-authentic` suffix. Legacy records migrate lazily on first vanilla write.
+- [x] Apollo 11: altitude blackout below 50 AGL (true terrain-height via `Physics.getTerrainHeightAt`). 1202 alarm (deterministic seed-scheduled `((seed * 31) % 300) + 200` frame, skip-on-collision safe via altitude gate). Contact light deferred.
+- [x] Apollo 15/17: altitude blackout inherited via `era: "apollo"`. Master alarm audio cue fires once below `MASTER_ALARM_GATE_PX = 150`, no input lockout.
+- [ ] Artemis III: hazard-aware landing ellipse (4Hz projection, amber safe / red hazardous slope). **Deferred to Part B.**
+
+**Contextual Cockpit visual layer (Authentic ON):**
+- [ ] **Mode 1 — Cinematic cut** (terminal events: touchdown, crash, contact light): full-screen close-up ~2-3 sec. Safe because flight is over or effectively over.
+- [ ] **Mode 2 — PIP slide-in** (mid-flight: 1202, altitude blackout, master alarm): ~220×160 panel slides into bottom-right for ~3 sec. Sim view never leaves screen. Slow-mo **visual-only** (render fps cap; physics stays deterministic) OR cut entirely if visual-only isn't clean.
+- [ ] **Mobile fallback:** cinematic cuts only, no PIP (220×160 on 375px is ~60% width, not a PIP).
+- [ ] **Shared asset set:** DSKY display, 8-ball attitude, contact light bulb, master alarm, radar altimeter bulb. Style = period-accurate Apollo LM (amber/green-on-black). Retro-vector variant is a P2 render pass, not a separate asset set.
+- [ ] **Motion sensitivity:** slide-in default on; `Reduce motion` setting respects `prefers-reduced-motion`.
+- [ ] **Event collision rule:** terminal events always interrupt mid-flight PIPs.
+
+**Accepted polish (from CEO review) ✅ SHIPPED Part A:**
+- [x] Pre-launch 3s tutorial overlay (once per mission) on mission-select screen. Write-on-dismiss `moonlander-authentic-intro-seen-{missionId}` so it never reappears.
+- [x] FlightRecorder share card: era-colored AUTHENTIC corner badge (amber for Apollo, cyan for Artemis).
+- [x] Authentic-aware mission briefing (LLM prompt + offline `eraOneLiner` fallback; populated for Apollo 11/15/17 + Artemis III).
+- [x] Dual-track leaderboard: `BEST` + `AUTHENTIC` stacked on historic mission-select rows.
+- [x] `prefers-reduced-motion` honored: 1202 banner renders steady amber (no strobe) when requested. `src/utils/a11y.ts` exports `prefersReducedMotion()` cached helper.
+
+**Mandatory regression tests ✅ SHIPPED Part A (242 total tests, +16 new):**
+- [x] Authentic OFF byte-identical: `applyAuthenticFilter(input, null)` returns same reference; scripted 500-frame sequence through HeadlessGame produces identical lander fingerprint with filter applied vs skipped.
+- [x] Fork-replay vanilla-lock: `startForkReplay` sets `currentFlight = { authenticMode: false, authenticState: null }` unconditionally — asserted structurally.
+- [x] 1202 skip-on-collision: below-gate descent routes `ARMED → DONE` with `"alarm-skipped"` transition, filter stays no-op; above-gate run fires `"alarm-fired"` then ends after `ALARM_LOCKOUT_FRAMES`.
+- [ ] Cockpit + AI Theater z-order co-existence: deferred with cockpit visual layer to Part B.
+
+**Assignment before cockpit code:** produce 4 Canvas-2D PNG mockups (contact light, 1202, altitude blackout, crash). Show side-by-side with current HUD banners to 3 people. If ≤1/3 prefer cockpit, shelve the cockpit layer and ship Authentic Mode with banners only.
+
+**Implementation branch:** `sprint-5.5/authentic-mode` off main post-v0.5.8.0.
+
+**Exit question:** Does a player who flips Authentic on Apollo 11 feel 1969 within one flight, AND describe the 1202 moment to a friend afterwards?
+
+---
+
 ### Sprint 6 — WebGL Visual Upgrade — L (~3-4hr CC)
 - [ ] Extract formal IRenderer interface from CanvasRenderer.ts
 - [ ] PixiJS v8 WebGLRenderer implementing IRenderer (keep 2D-focused, ThreeJSAdapter later)
@@ -499,13 +541,42 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ### Sprint 10 — Education + Platform (core) — M (~2hr CC)
 - [ ] Education mode: real-time force vector overlays, physics lesson panel
-- [ ] Mission SDK: JSON schema for community missions
+- [ ] Mission SDK: JSON schema for community missions (schema + strict validation on load — trust boundary, same surface as pre-existing Terrain Editor URL param TODO)
 
 **Exit question:** Has this grown beyond a solo project? Is that good or bad?
 
 ---
 
-**Total estimated CC time:** ~28-32 hours across all sprints
+### Sprint 11a — RL Playground Public Launch — S (~30-60 min CC)
+
+*CEO-reviewed 2026-04-16 in SCOPE EXPANSION mode. Plan at `.plans/stem-education-angle.md`. Ready to sprint anytime — not blocked by any other sprint.*
+
+**Theme:** one URL, 60 seconds to understanding. Turn this from "undiscovered solo project" into "has a front door." The narrow wedge is self-directed learners (HN / r/MachineLearning / X), NOT K-12 classrooms.
+- [ ] README.md (doesn't exist yet) — capsule pitch, one AI Theater GIF, "how to try" + "how to read the code"
+- [ ] LEARN.md — self-directed progression: land → open AI Theater → change `GravityPresets.ts` → open `RLAgent.ts` `calculateReward`
+- [ ] Light comment pass on `GravityPresets.ts` and `RLAgent.ts` (pedagogical prompts inline, NOT on raw `GRAVITY` constant — that's a scaled pixel-space value)
+- [ ] One distribution push (HN Show HN OR tweet-thread — pick one). Watch traffic for 14 days.
+
+**Exit question:** Did the distribution push generate any signal (stars, forks, referrer spikes, inbound)? Signal → schedule Sprint 11b. No signal after 4 weeks → premise was wrong, do not build the platform.
+
+---
+
+### Sprint 11b — Hackathon / Capstone Platform — XL (~10-15h CC)
+
+*Deferred. Gated on Sprint 11a producing a demand signal AND Sprint 6 (WebGL) shipping.*
+
+**Theme:** make MoonLander forkable-to-teach. Every community mission compounds the value of the whole.
+- [ ] Mission SDK (from Sprint 10) + strict community-mission loader failure modes
+- [ ] GitHub Classroom template with starter "good first mission" issues
+- [ ] Community mission leaderboard (localStorage scoped per `{mission-id, seed}`)
+- [ ] Share-to-learn URL scheme: encode mission ID + seed + optional authentic-mode flag
+- [ ] One or two author-seeded flagship community missions to prove the pattern
+
+**Exit question:** Did at least one non-author community mission land within 30 days of Mission SDK shipping?
+
+---
+
+**Total estimated CC time:** ~30-36 hours across all sprints (+ ~12-16h if Sprint 11b triggers)
 
 ---
 

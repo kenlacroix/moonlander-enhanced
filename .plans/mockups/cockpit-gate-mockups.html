@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>MoonLander Cockpit Kill Gate — 4 Mockups</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #ddd;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 14px;
+    margin: 0;
+    padding: 28px;
+    max-width: 1160px;
+  }
+  h1 { color: #ffb000; font-size: 22px; margin: 0 0 4px 0; letter-spacing: 0.04em; }
+  h1 + p { color: #999; margin: 0 0 24px 0; }
+  .rubric {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 14px 18px;
+    margin-bottom: 28px;
+    border-radius: 4px;
+  }
+  .rubric b { color: #ffb000; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+  .cell {
+    background: #0d0d0d;
+    border: 1px solid #262626;
+    padding: 12px 14px;
+    border-radius: 4px;
+  }
+  .cell-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .cell-banner .cell-label { color: #666; }
+  .cell-cockpit .cell-label { color: #ffb000; }
+  .event-title {
+    font-size: 18px;
+    color: #ddd;
+    margin: 32px 0 12px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #333;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    background: #000;
+    border-radius: 2px;
+  }
+  footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
+    color: #777;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  footer code { color: #ffb000; }
+</style>
+</head>
+<body>
+
+<h1>Cockpit Kill Gate — Apollo 11 Authentic Mode</h1>
+<p>4 event moments × 2 presentations. Sprint 5.5 Section 5.</p>
+
+<div class="rubric">
+  <b>The test:</b> Show these to 3 people. For each event, ask: "Which version makes you want to play Apollo 11 again?"<br />
+  <br />
+  <b>If ≥2/3 prefer cockpit → ship Section 5 (Contextual Cockpit).</b><br />
+  <b>If ≤1/3 prefer cockpit → ship Authentic Mode with banners only. Section 5 cut.</b>
+</div>
+
+<div class="event-title">① Contact Light (terminal event — cinematic cut)</div>
+<div class="row">
+  <div class="cell cell-banner"><div class="cell-label">Current: banner callout</div><canvas id="c1-banner" width="480" height="270"></canvas></div>
+  <div class="cell cell-cockpit"><div class="cell-label">Proposed: cockpit cinematic cut (~2.5s)</div><canvas id="c1-cockpit" width="480" height="270"></canvas></div>
+</div>
+
+<div class="event-title">② 1202 Program Alarm (mid-flight — PIP slide-in)</div>
+<div class="row">
+  <div class="cell cell-banner"><div class="cell-label">Current: flashing HUD banner</div><canvas id="c2-banner" width="480" height="270"></canvas></div>
+  <div class="cell cell-cockpit"><div class="cell-label">Proposed: cockpit PIP slide-in (~3s)</div><canvas id="c2-cockpit" width="480" height="270"></canvas></div>
+</div>
+
+<div class="event-title">③ Altitude Blackout Onset (mid-flight — PIP slide-in)</div>
+<div class="row">
+  <div class="cell cell-banner"><div class="cell-label">Current: HUD '---' + caption</div><canvas id="c3-banner" width="480" height="270"></canvas></div>
+  <div class="cell cell-cockpit"><div class="cell-label">Proposed: cockpit PIP slide-in (~3s)</div><canvas id="c3-cockpit" width="480" height="270"></canvas></div>
+</div>
+
+<div class="event-title">④ Crash (terminal event — cinematic cut)</div>
+<div class="row">
+  <div class="cell cell-banner"><div class="cell-label">Current: 'MISSION FAILED' banner</div><canvas id="c4-banner" width="480" height="270"></canvas></div>
+  <div class="cell cell-cockpit"><div class="cell-label">Proposed: cockpit cinematic cut (~2.5s)</div><canvas id="c4-cockpit" width="480" height="270"></canvas></div>
+</div>
+
+<footer>
+  <b>Context:</b> These are Canvas 2D static mockups. Final implementation in Sprint 5.5 would render these same compositions dynamically during flight.<br /><br />
+  <b>Style notes:</b> Apollo-amber (<code>#ffb000</code>) DSKY text, green-on-black LED digits, matte-grey metal panels with rivets, red master alarm (<code>#ff3030</code>). Period-accurate over stylized — retro-vector variant is deferred P2 polish.<br /><br />
+  <b>What's out of scope here:</b> slow-mo (cut during eng review), the slide-in animation itself (mockups show the "settled" frame), and sound design (1202 warble, contact-light beep, master alarm — all synthesized via Audio class).
+</footer>
+
+<script>
+// ============================================================
+// Shared drawing primitives
+// ============================================================
+const APOLLO_AMBER = '#ffb000';
+const DSKY_GREEN   = '#00ff55';
+const MASTER_RED   = '#ff3030';
+const PANEL_GREY   = '#2c2c2e';
+const PANEL_DARK   = '#18181a';
+const RIVET        = '#4a4a4d';
+const METAL_HI     = '#3f3f42';
+
+// ---- Scene: simulation view (terrain, stars, lander, optional HUD) ----
+function drawSimScene(ctx, w, h, opts = {}) {
+  const { landerY = 0.4, landerRot = 0.05, descending = true, crashed = false, blackoutActive = false } = opts;
+
+  // Space / stars
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#fff';
+  // deterministic pseudo-random star positions
+  const seed = 42;
+  for (let i = 0; i < 50; i++) {
+    const x = ((i * 7919 + seed) % w) | 0;
+    const y = ((i * 4111 + seed) % (h * 0.7)) | 0;
+    const s = (i % 3) === 0 ? 1.5 : 1;
+    ctx.fillRect(x, y, s, s);
+  }
+
+  // Earth on horizon (small partial sphere, upper right)
+  ctx.fillStyle = '#1a4a7a';
+  ctx.beginPath();
+  ctx.arc(w * 0.82, h * 0.12, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2a6aaa';
+  ctx.beginPath();
+  ctx.arc(w * 0.82, h * 0.12, 22, Math.PI * 0.1, Math.PI * 1.1);
+  ctx.fill();
+
+  // Terrain (jagged polyline at bottom ~35%)
+  const terrainTop = h * 0.75;
+  ctx.fillStyle = '#3a3a3a';
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, terrainTop + 10);
+  const terrainSeed = 1969;
+  let tx = 0;
+  while (tx <= w) {
+    const ty = terrainTop + Math.sin(tx * 0.07 + terrainSeed) * 8 + Math.cos(tx * 0.11) * 5;
+    ctx.lineTo(tx, ty);
+    tx += 12;
+  }
+  ctx.lineTo(w, terrainTop + 10);
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Landing pad (flat strip with beacons) at center bottom
+  const padX = w * 0.45;
+  const padY = terrainTop - 2;
+  const padW = 70;
+  ctx.fillStyle = '#555';
+  ctx.fillRect(padX, padY, padW, 4);
+  // pad lights
+  ctx.fillStyle = '#00ff88';
+  ctx.fillRect(padX - 2, padY - 4, 4, 4);
+  ctx.fillRect(padX + padW - 2, padY - 4, 4, 4);
+
+  // Lander
+  if (!crashed) {
+    const lx = w * 0.5;
+    const ly = h * landerY;
+    drawLander(ctx, lx, ly, landerRot, descending);
+  } else {
+    // Crash scene: scattered debris + fire glow
+    const cx = padX + padW * 0.5;
+    const cy = padY - 8;
+    // glow
+    const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 48);
+    grad.addColorStop(0, 'rgba(255,180,40,0.9)');
+    grad.addColorStop(0.5, 'rgba(255,80,40,0.5)');
+    grad.addColorStop(1, 'rgba(255,40,40,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - 50, cy - 50, 100, 100);
+    // debris pieces
+    ctx.fillStyle = '#aaa';
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = 12 + (i % 3) * 6;
+      ctx.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r - 2, 4, 3);
+    }
+  }
+
+  // Standard HUD (top-left telemetry strip)
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillStyle = '#9fe';
+  const altText = blackoutActive ? 'ALT:   ---' : 'ALT:  ' + (crashed ? '  0' : String(Math.round((1 - landerY) * 400)).padStart(3, ' '));
+  ctx.fillText(altText, 8, 16);
+  ctx.fillText('V-SPD:  ' + (crashed ? ' 42' : '-14'), 8, 30);
+  ctx.fillText('FUEL:   63%', 8, 44);
+  ctx.fillText('ANGLE:   3', 8, 58);
+  if (blackoutActive) {
+    ctx.fillStyle = '#ff8';
+    ctx.fillText('(AUTHENTIC)', 80, 16);
+  }
+}
+
+function drawLander(ctx, x, y, rot, descending) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // ascent stage
+  ctx.fillStyle = '#cfcfcf';
+  ctx.fillRect(-8, -10, 16, 10);
+  // descent stage (wider)
+  ctx.fillStyle = '#9a9a9a';
+  ctx.fillRect(-12, 0, 24, 8);
+  // legs
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-10, 7); ctx.lineTo(-16, 14);
+  ctx.moveTo(10, 7); ctx.lineTo(16, 14);
+  ctx.stroke();
+  // thruster plume
+  if (descending) {
+    const plumeGrad = ctx.createLinearGradient(0, 8, 0, 26);
+    plumeGrad.addColorStop(0, 'rgba(255,160,40,0.9)');
+    plumeGrad.addColorStop(1, 'rgba(255,80,40,0)');
+    ctx.fillStyle = plumeGrad;
+    ctx.beginPath();
+    ctx.moveTo(-5, 8);
+    ctx.lineTo(5, 8);
+    ctx.lineTo(0, 26);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---- HUD banner overlays (flat, current style) ----
+function drawBannerBar(ctx, w, h, y, height, color, bg = 'rgba(0,0,0,0.75)') {
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, y, w, height);
+  // top/bottom hairline
+  ctx.fillStyle = color;
+  ctx.fillRect(0, y, w, 1);
+  ctx.fillRect(0, y + height - 1, w, 1);
+}
+
+// ---- Panel chrome helpers (cockpit) ----
+function drawPanel(ctx, x, y, w, h, bg = PANEL_GREY) {
+  // base
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h);
+  // bevel highlight (top+left)
+  ctx.fillStyle = METAL_HI;
+  ctx.fillRect(x, y, w, 1);
+  ctx.fillRect(x, y, 1, h);
+  // bevel shadow (bottom+right)
+  ctx.fillStyle = PANEL_DARK;
+  ctx.fillRect(x, y + h - 1, w, 1);
+  ctx.fillRect(x + w - 1, y, 1, h);
+  // rivets in corners
+  [[x + 4, y + 4], [x + w - 5, y + 4], [x + 4, y + h - 5], [x + w - 5, y + h - 5]].forEach(([rx, ry]) => {
+    ctx.fillStyle = RIVET;
+    ctx.beginPath();
+    ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawBulb(ctx, cx, cy, r, lit, litColor, label) {
+  // socket
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+  ctx.fill();
+  // bulb
+  if (lit) {
+    const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, r + 6);
+    grad.addColorStop(0, litColor);
+    grad.addColorStop(0.5, litColor.replace(')', ',0.6)').replace('rgb', 'rgba'));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - r - 8, cy - r - 8, (r + 8) * 2, (r + 8) * 2);
+    ctx.fillStyle = litColor;
+  } else {
+    ctx.fillStyle = '#2a2a2a';
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  // label below
+  ctx.fillStyle = lit ? litColor : '#555';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, cx, cy + r + 14);
+  ctx.textAlign = 'start';
+}
+
+function drawDSKYPanel(ctx, x, y, w, h, rows, { alarm = false } = {}) {
+  drawPanel(ctx, x, y, w, h, '#14130f');
+  // display area
+  const dx = x + 8, dy = y + 6, dw = w - 16, dh = h - 12;
+  ctx.fillStyle = '#060604';
+  ctx.fillRect(dx, dy, dw, dh);
+  ctx.font = 'bold 12px ui-monospace, monospace';
+  const color = alarm ? MASTER_RED : APOLLO_AMBER;
+  ctx.fillStyle = color;
+  rows.forEach((row, i) => {
+    ctx.fillText(row, dx + 6, dy + 14 + i * 14);
+  });
+  // subtle scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let i = 0; i < dh; i += 3) {
+    ctx.fillRect(dx, dy + i, dw, 1);
+  }
+}
+
+// ============================================================
+// Mockup 1 — Contact Light
+// ============================================================
+function drawContactLightBanner(ctx, w, h) {
+  // Sim view, lander just above pad, thrusting gently
+  drawSimScene(ctx, w, h, { landerY: 0.62, landerRot: 0, descending: true });
+  // bottom banner
+  drawBannerBar(ctx, w, h, h - 30, 22, '#9fe');
+  ctx.font = 'bold 13px ui-monospace, monospace';
+  ctx.fillStyle = '#9fe';
+  ctx.textAlign = 'center';
+  ctx.fillText('◉ CONTACT LIGHT', w / 2, h - 14);
+  ctx.textAlign = 'start';
+}
+
+function drawContactLightCockpit(ctx, w, h) {
+  // Full-screen cockpit close-up
+  // Dark metal backdrop with vignette
+  const grad = ctx.createRadialGradient(w/2, h/2, 40, w/2, h/2, w * 0.7);
+  grad.addColorStop(0, '#1a1a1e');
+  grad.addColorStop(1, '#050506');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // central instrument cluster panel
+  drawPanel(ctx, w * 0.18, h * 0.22, w * 0.64, h * 0.56);
+
+  // Large contact-light bulb, center
+  drawBulb(ctx, w * 0.5, h * 0.44, 22, true, 'rgb(80,255,140)', 'LUNAR CONTACT');
+
+  // Small DSKY readout showing touchdown numbers (bottom of panel)
+  drawDSKYPanel(ctx, w * 0.28, h * 0.62, w * 0.44, 46,
+    ['PROG  68', 'VERB  16  NOUN  68', 'ALT  00001  V-DOWN  +0001']
+  );
+
+  // Subtle scanline on entire image for CRT feel
+  ctx.fillStyle = 'rgba(255,176,0,0.02)';
+  for (let i = 0; i < h; i += 3) ctx.fillRect(0, i, w, 1);
+
+  // Upper-left corner marker (authentic mode badge)
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = APOLLO_AMBER;
+  ctx.fillText('AUTHENTIC 1969', 10, 16);
+}
+
+// ============================================================
+// Mockup 2 — 1202 Program Alarm
+// ============================================================
+function drawAlarm1202Banner(ctx, w, h) {
+  drawSimScene(ctx, w, h, { landerY: 0.38, landerRot: -0.08, descending: true });
+  // flashing red banner across top (after HUD)
+  drawBannerBar(ctx, w, h, 70, 26, MASTER_RED, 'rgba(80,0,0,0.85)');
+  ctx.font = 'bold 13px ui-monospace, monospace';
+  ctx.fillStyle = MASTER_RED;
+  ctx.textAlign = 'center';
+  ctx.fillText('⚠ 1202 PROGRAM ALARM — EXECUTIVE OVERFLOW', w / 2, 86);
+  ctx.textAlign = 'start';
+}
+
+function drawAlarm1202Cockpit(ctx, w, h) {
+  // Sim view continues in background (slightly dimmed)
+  drawSimScene(ctx, w, h, { landerY: 0.38, landerRot: -0.08, descending: true });
+  // slight dim overlay to push attention to PIP
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, 0, w, h);
+
+  // PIP panel in bottom-right, ~220x160 but scaled to canvas (→ ~160x120)
+  const pw = 170, ph = 118;
+  const px = w - pw - 14, py = h - ph - 14;
+  drawPanel(ctx, px, py, pw, ph);
+
+  // Panel header strip
+  ctx.fillStyle = '#0b0b0c';
+  ctx.fillRect(px + 4, py + 4, pw - 8, 14);
+  ctx.font = '8px ui-monospace, monospace';
+  ctx.fillStyle = APOLLO_AMBER;
+  ctx.fillText('APOLLO GUIDANCE COMPUTER', px + 8, py + 14);
+
+  // DSKY big numeric display
+  drawDSKYPanel(ctx, px + 10, py + 22, pw - 72, 56,
+    ['PROG  1202', 'EXEC', 'OVERFLOW'],
+    { alarm: true }
+  );
+
+  // Master alarm bulb right side of panel
+  drawBulb(ctx, px + pw - 26, py + 42, 12, true, 'rgb(255,60,60)', 'MASTER');
+  // Program alarm bulb below master alarm
+  drawBulb(ctx, px + pw - 26, py + 86, 8, true, 'rgb(255,120,60)', 'PROG');
+
+  // Tiny scanlines on panel
+  ctx.fillStyle = 'rgba(255,176,0,0.03)';
+  for (let i = py; i < py + ph; i += 2) ctx.fillRect(px, i, pw, 1);
+
+  // Slide-in arrow indicator (hint that it slid in from right)
+  ctx.strokeStyle = APOLLO_AMBER;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath();
+  ctx.moveTo(px - 10, py + ph / 2);
+  ctx.lineTo(px - 4, py + ph / 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Authentic badge
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = APOLLO_AMBER;
+  ctx.fillText('AUTHENTIC 1969', 10, 16);
+}
+
+// ============================================================
+// Mockup 3 — Altitude Blackout Onset
+// ============================================================
+function drawBlackoutBanner(ctx, w, h) {
+  drawSimScene(ctx, w, h, { landerY: 0.55, landerRot: 0.02, descending: true, blackoutActive: true });
+  // grey caption banner bottom
+  drawBannerBar(ctx, w, h, h - 28, 20, '#888', 'rgba(40,40,40,0.85)');
+  ctx.font = 'bold 11px ui-monospace, monospace';
+  ctx.fillStyle = '#ccc';
+  ctx.textAlign = 'center';
+  ctx.fillText('LOW-ALT READOUT UNAVAILABLE (AUTHENTIC)', w / 2, h - 14);
+  ctx.textAlign = 'start';
+}
+
+function drawBlackoutCockpit(ctx, w, h) {
+  // Sim view behind (blackout active so ALT shows ---)
+  drawSimScene(ctx, w, h, { landerY: 0.55, landerRot: 0.02, descending: true, blackoutActive: true });
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, 0, w, h);
+
+  // PIP panel bottom-right
+  const pw = 170, ph = 118;
+  const px = w - pw - 14, py = h - ph - 14;
+  drawPanel(ctx, px, py, pw, ph);
+
+  ctx.fillStyle = '#0b0b0c';
+  ctx.fillRect(px + 4, py + 4, pw - 8, 14);
+  ctx.font = '8px ui-monospace, monospace';
+  ctx.fillStyle = APOLLO_AMBER;
+  ctx.fillText('LANDING RADAR', px + 8, py + 14);
+
+  // Radar altimeter gauge: circular dial, needle gone (dim)
+  const gcx = px + 50, gcy = py + 64, gr = 28;
+  // dial face
+  ctx.fillStyle = '#060604';
+  ctx.beginPath();
+  ctx.arc(gcx, gcy, gr, 0, Math.PI * 2);
+  ctx.fill();
+  // tick marks (dim — radar lost lock)
+  ctx.strokeStyle = '#3a3528';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(gcx + Math.cos(a) * (gr - 5), gcy + Math.sin(a) * (gr - 5));
+    ctx.lineTo(gcx + Math.cos(a) * (gr - 1), gcy + Math.sin(a) * (gr - 1));
+    ctx.stroke();
+  }
+  // "NO LOCK" text in middle
+  ctx.fillStyle = '#7a6030';
+  ctx.font = 'bold 9px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('NO LOCK', gcx, gcy + 2);
+  ctx.textAlign = 'start';
+
+  // Radar bulb — DARK (this is the key state)
+  drawBulb(ctx, px + pw - 26, py + 42, 12, false, 'rgb(255,176,0)', 'RADAR');
+
+  // "ALT < 50m" sub-label
+  ctx.fillStyle = '#666';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.fillText('< 50m AGL', px + pw - 50, py + ph - 10);
+
+  // slide-in marker
+  ctx.strokeStyle = APOLLO_AMBER;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath();
+  ctx.moveTo(px - 10, py + ph / 2);
+  ctx.lineTo(px - 4, py + ph / 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = APOLLO_AMBER;
+  ctx.fillText('AUTHENTIC 1969', 10, 16);
+}
+
+// ============================================================
+// Mockup 4 — Crash
+// ============================================================
+function drawCrashBanner(ctx, w, h) {
+  drawSimScene(ctx, w, h, { crashed: true });
+  // huge fail banner centered
+  drawBannerBar(ctx, w, h, h / 2 - 20, 40, MASTER_RED, 'rgba(80,0,0,0.9)');
+  ctx.font = 'bold 22px ui-monospace, monospace';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText('MISSION FAILED', w / 2, h / 2 + 5);
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = MASTER_RED;
+  ctx.fillText('Press R to restart', w / 2, h / 2 + 20);
+  ctx.textAlign = 'start';
+}
+
+function drawCrashCockpit(ctx, w, h) {
+  // Red-tinted vignette over shattered cockpit
+  const grad = ctx.createRadialGradient(w/2, h/2, 40, w/2, h/2, w * 0.7);
+  grad.addColorStop(0, '#1a0505');
+  grad.addColorStop(1, '#050000');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // panel (slightly larger, crash cut is full-screen)
+  drawPanel(ctx, w * 0.15, h * 0.18, w * 0.7, h * 0.64, '#1f1414');
+
+  // Master alarm HUGE lit bulb top center
+  drawBulb(ctx, w * 0.5, h * 0.34, 28, true, 'rgb(255,60,60)', 'MASTER ALARM');
+
+  // DSKY showing error code
+  drawDSKYPanel(ctx, w * 0.28, h * 0.52, w * 0.44, 58,
+    ['PROG  XX', 'VERB  99  NOUN  37', 'ERROR  909  00'],
+    { alarm: true }
+  );
+
+  // small fractured instrument indicators (dark bulbs with crack lines)
+  for (let i = 0; i < 3; i++) {
+    const bx = w * 0.22 + i * 20, by = h * 0.72;
+    drawBulb(ctx, bx, by, 6, false, 'rgb(120,120,120)', '');
+    // crack
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx - 4, by - 2);
+    ctx.lineTo(bx + 3, by + 3);
+    ctx.stroke();
+  }
+
+  // flicker lines (red noise bars)
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = 'rgba(255,40,40,0.08)';
+    const yy = (h * 0.2) + i * (h / 5);
+    ctx.fillRect(0, yy, w, 2);
+  }
+
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = MASTER_RED;
+  ctx.fillText('AUTHENTIC 1969', 10, 16);
+}
+
+// ============================================================
+// Render all canvases
+// ============================================================
+function renderTo(id, drawFn) {
+  const c = document.getElementById(id);
+  const ctx = c.getContext('2d');
+  drawFn(ctx, c.width, c.height);
+}
+
+renderTo('c1-banner',  drawContactLightBanner);
+renderTo('c1-cockpit', drawContactLightCockpit);
+renderTo('c2-banner',  drawAlarm1202Banner);
+renderTo('c2-cockpit', drawAlarm1202Cockpit);
+renderTo('c3-banner',  drawBlackoutBanner);
+renderTo('c3-cockpit', drawBlackoutCockpit);
+renderTo('c4-banner',  drawCrashBanner);
+renderTo('c4-cockpit', drawCrashCockpit);
+</script>
+
+</body>
+</html>
