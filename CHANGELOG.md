@@ -2,6 +2,17 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.8.3] - 2026-04-16 (Sprint 2.6 Part C: Tutorial + Compact Toggle + Polish)
+
+### Added
+- First-run 3-card inline tutorial inside the AI Theater panel — explains what AI VISION, the reward curves, and the algorithm cards are showing. Dismiss per-card (✕) or all at once (GOT IT). Shown once, remembered via `moonlander-ai-theater-tour-seen`.
+- Compact-mode toggle for AI Theater. Press `?` (or the `?` button next to EXPLAIN) to hide AI VISION + reward breakdown and restore the pre-2.6 dense layout. Persists via `moonlander-ai-theater-compact`. Default: expanded.
+- Hover tooltips on AI VISION bars — plain-language description of each state dimension plus the raw signed value.
+- First-landing glow on the legend card for each agent — 3-second pulse in the agent's own color the first time it lands. Per-agent timer so overlapping firsts don't collide.
+
+### Deferred
+- E1 (RANDOM badge on exploratory actions) — needs plumbing the exploration/exploitation branch from `RLAgent` through `AgentStats` to the panel. Left for a follow-up so Part C stays UI-only.
+
 ## [0.5.8.2] - 2026-04-16 (Sprint 2.6 Part B: Reward Breakdown Overlay)
 
 ### Added
