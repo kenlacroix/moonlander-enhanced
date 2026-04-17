@@ -2,7 +2,7 @@
 
 A browser-based, AI-enhanced reimagining of the 1979 Atari Moon Lander. Runs entirely in the browser. No install, no backend.
 
-Current version: **v0.5.8.0** (see [`CHANGELOG.md`](./CHANGELOG.md)).
+Current version: **v0.5.8.3** (see [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ## What's interesting
 
@@ -42,7 +42,7 @@ Opens at `http://localhost:5173`. No API keys needed for core gameplay. Optional
 
 ## Status
 
-Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint, with Sprint 5 (Historic Missions Part A) shipped at v0.5.7.0 and Sprint 2.7 (Smarter DQN) shipped at v0.5.8.0. Next up: Sprint 5.5 (Authentic Mode) or Sprint 2.6 (Explain Mode).
+Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint, with Sprint 5 Part A (Historic Missions) shipped at v0.5.7.0, Sprint 2.7 (Smarter DQN) at v0.5.8.0, and Sprint 2.6 (AI Theater Explain Mode) Parts A+B+C at v0.5.8.1–v0.5.8.3. Next up: Sprint 5.5 (Authentic Mode).
 
 ## License
 

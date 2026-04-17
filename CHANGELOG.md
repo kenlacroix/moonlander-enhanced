@@ -2,6 +2,35 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.8.3] - 2026-04-16 (Sprint 2.6 Part C: Tutorial + Compact Toggle + Polish)
+
+### Added
+- First-run 3-card inline tutorial inside the AI Theater panel — explains what AI VISION, the reward curves, and the algorithm cards are showing. Dismiss per-card (✕) or all at once (GOT IT). Shown once, remembered via `moonlander-ai-theater-tour-seen`.
+- Compact-mode toggle for AI Theater. Press `?` (or the `?` button next to EXPLAIN) to hide AI VISION + reward breakdown and restore the pre-2.6 dense layout. Persists via `moonlander-ai-theater-compact`. Default: expanded.
+- Hover tooltips on AI VISION bars — plain-language description of each state dimension plus the raw signed value.
+- First-landing glow on the legend card for each agent — 3-second pulse in the agent's own color the first time it lands. Per-agent timer so overlapping firsts don't collide.
+
+### Deferred
+- E1 (RANDOM badge on exploratory actions) — needs plumbing the exploration/exploitation branch from `RLAgent` through `AgentStats` to the panel. Left for a follow-up so Part C stays UI-only.
+
+## [0.5.8.2] - 2026-04-16 (Sprint 2.6 Part B: Reward Breakdown Overlay)
+
+### Added
+- EXPLAIN button in the AI Theater header. Toggle it to reveal a reward breakdown for the last DQN episode — total, then the component contributions (terminal landing/crash, proximity, descent, speed, angle penalty, approach, time tax). Positives render green, penalties red. Now you can see *why* the agent's score moved.
+- Preference persists across sessions via localStorage (`moonlander-explain-mode`). Off by default — new viewers still get the compact layout they saw before.
+
+### Changed
+- AI Theater now accumulates the per-component reward breakdown during DQN episodes by calling `calculateRewardBreakdown()` directly (single source of truth from Sprint 2.7). Non-DQN agents keep the scalar fast path.
+
+## [0.5.8.1] - 2026-04-16 (Sprint 2.6 Part A: AI Theater Explain Mode)
+
+### Added
+- AI VISION strip in the AI Theater panel: 11 labeled bars showing the DQN's state vector in real time (ΔX to pad, altitude, speeds, angle, fuel, approach velocity, and the rest). Bars are centered at zero, sign-colored (green positive, red negative), and refresh at 2 Hz so it's readable as the agent plays.
+- Plain-language algorithm descriptions under each legend entry — "Remembers 20,000 past attempts; replays them to learn" (DQN), "Doesn't remember — just adjusts after each full attempt" (Policy Gradient), and so on. No ML background needed to follow what's on the chart.
+
+### Changed
+- Consolidated `AGENT_LABELS` + `AGENT_COLORS` into a single `AGENT_META` registry with `{ label, color, description }` per agent kind. One source of truth for every place that renders an agent.
+
 ## [0.5.8.0] - 2026-04-16 (Sprint 2.7: Smarter DQN)
 
 ### Added

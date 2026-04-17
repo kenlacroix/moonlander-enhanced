@@ -1,15 +1,61 @@
-import {
-	AGENT_COLORS,
-	AGENT_LABELS,
-	type AgentKind,
-	type AgentStats,
-} from "../ai/Agent";
+import { AGENT_META, type AgentKind, type AgentStats } from "../ai/Agent";
+import type { RewardBreakdown } from "../ai/AgentEnv";
 import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { GravityPreset } from "../game/GravityPresets";
 
 const PANEL_WIDTH = 360;
 const CHART_HEIGHT = 160;
 const MAX_CHART_POINTS = 200;
+const VISION_REFRESH_MS = 500;
+const EXPLAIN_MODE_KEY = "moonlander-explain-mode";
+const COMPACT_MODE_KEY = "moonlander-ai-theater-compact";
+const TOUR_SEEN_KEY = "moonlander-ai-theater-tour-seen";
+const FIRST_LANDING_GLOW_MS = 3000;
+
+const BREAKDOWN_ROWS: ReadonlyArray<{
+	key: keyof RewardBreakdown;
+	label: string;
+}> = [
+	{ key: "terminal", label: "terminal (landing/crash)" },
+	{ key: "proximity", label: "proximity to pad" },
+	{ key: "descent", label: "descent progress" },
+	{ key: "speed", label: "controlled descent speed" },
+	{ key: "anglePenalty", label: "angle penalty" },
+	{ key: "approach", label: "approach velocity" },
+	{ key: "timeTax", label: "time tax" },
+];
+
+// Maps STATE_SIZE = 11 dimensions from AgentEnv.getState to display labels.
+// Keep order aligned with AgentEnv.ts docstring — reordering here would
+// mis-label the bars without breaking any type-checked reference.
+const STATE_LABELS: readonly string[] = [
+	"ΔX TO PAD",
+	"ALTITUDE",
+	"H-SPEED",
+	"V-SPEED",
+	"ANGLE",
+	"ANG VEL",
+	"FUEL",
+	"OFF-PAD",
+	"V-ACCEL",
+	"PAD-ALT",
+	"APPROACH",
+];
+
+// Human-readable tooltip body for each state dimension. Order matches STATE_LABELS.
+const STATE_HINTS: readonly string[] = [
+	"Horizontal distance from the lander to the pad center. Negative = pad to the left.",
+	"Height above the terrain directly below. Clamped at 1 when very high up.",
+	"Horizontal velocity. Positive = drifting right.",
+	"Vertical velocity. Positive = falling (toward ground).",
+	"Tilt angle from upright. 0 = vertical. Sign = lean direction.",
+	"Angular velocity — how fast the lander is rotating.",
+	"Fuel remaining as fraction of tank. 1.0 = full, 0 = empty.",
+	"Horizontal offset from pad center, measured in pad-widths. 0 = centered.",
+	"Vertical acceleration. Positive = accelerating downward. Thrust makes this negative.",
+	"Altitude above the pad surface specifically (differs from ALTITUDE when flying over terrain).",
+	"Velocity projected toward the pad. Positive = closing in, negative = drifting away.",
+];
 
 interface Track {
 	rewardHistory: number[];
@@ -40,6 +86,24 @@ export class AITheaterPanel {
 	private tracks: Record<AgentKind, Track> = this.makeTracks();
 	private forkInfoEl!: HTMLDivElement;
 	private forkBtn!: HTMLButtonElement;
+	private visionCanvas!: HTMLCanvasElement;
+	private visionCtx!: CanvasRenderingContext2D;
+	private dqnStateProvider: (() => number[] | null) | null = null;
+	private visionRafId: number | null = null;
+	private visionLastDraw = 0;
+	private breakdownProvider: (() => RewardBreakdown | null) | null = null;
+	private explainMode = false;
+	private explainBtn!: HTMLButtonElement;
+	private breakdownEl!: HTMLDivElement;
+	private breakdownBodyEl!: HTMLDivElement;
+	private compactMode = false;
+	private compactBtn!: HTMLButtonElement;
+	private visionSectionEl!: HTMLDivElement;
+	private legendRowEls: Partial<Record<AgentKind, HTMLDivElement>> = {};
+	private legendGlowTimers: Partial<Record<AgentKind, number>> = {};
+	private tutorialEl: HTMLDivElement | null = null;
+	private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+	private visionTooltipEl!: HTMLDivElement;
 
 	constructor() {
 		this.panel = document.createElement("div");
@@ -63,14 +127,21 @@ export class AITheaterPanel {
 			overflowY: "auto",
 		});
 
-		const legendHtml = AGENT_ORDER.map(
-			(k) => `
-				<div style="display:flex;align-items:center;gap:6px">
-					<span style="display:inline-block;width:14px;height:3px;background:${AGENT_COLORS[k]}"></span>
-					<span style="color:#aaa;font-size:11px">${AGENT_LABELS[k]}</span>
+		const legendHtml = AGENT_ORDER.map((k) => {
+			const meta = AGENT_META[k];
+			return `
+				<div data-legend-kind="${k}"
+					style="display:flex;align-items:flex-start;gap:6px;margin-top:4px;
+					padding:2px 4px;border-radius:4px;transition:box-shadow 0.3s ease">
+					<span style="display:inline-block;width:10px;height:10px;background:${meta.color};
+						border-radius:50%;flex-shrink:0;margin-top:3px"></span>
+					<div style="flex:1;min-width:0">
+						<div style="color:#ddd;font-size:11px;font-weight:bold">${meta.label}</div>
+						<div style="color:#888;font-size:10px;line-height:1.3">${meta.description}</div>
+					</div>
 				</div>
-			`,
-		).join("");
+			`;
+		}).join("");
 
 		this.panel.innerHTML = `
 			<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
@@ -80,7 +151,25 @@ export class AITheaterPanel {
 				WORLD: MOON · g=1.62
 			</div>
 			<div style="border-bottom:1px solid #333;padding-bottom:8px">
-				<div style="color:#888;font-size:11px;margin-bottom:4px">DQN STATUS</div>
+				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+					<div style="color:#888;font-size:11px">DQN STATUS</div>
+					<div style="display:flex;gap:4px">
+						<button id="at-explain"
+							style="background:#1a1a1a;color:#888;border:1px solid #444;
+							padding:2px 8px;cursor:pointer;font-family:inherit;font-size:10px;
+							border-radius:3px;letter-spacing:1px"
+							title="Toggle reward breakdown (shows what the DQN is actually optimizing)">
+							EXPLAIN
+						</button>
+						<button id="at-compact"
+							style="background:#1a1a1a;color:#888;border:1px solid #444;
+							padding:2px 8px;cursor:pointer;font-family:inherit;font-size:10px;
+							border-radius:3px;letter-spacing:1px;min-width:24px"
+							title="Toggle compact mode — hides AI VISION and reward breakdown (shortcut: ?)">
+							?
+						</button>
+					</div>
+				</div>
 				<span id="at-status" style="color:#ffaa00">INITIALIZING...</span>
 			</div>
 			<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -101,11 +190,31 @@ export class AITheaterPanel {
 					<span id="at-current" style="color:#fff;font-size:18px">—</span>
 				</div>
 			</div>
+			<div id="at-breakdown" style="display:none;background:#0d0d0d;border:1px solid #333;
+				border-radius:4px;padding:8px;font-size:11px;line-height:1.5">
+				<div style="color:#888;font-size:10px;margin-bottom:4px">
+					WHAT THE DQN OPTIMIZES — last episode
+				</div>
+				<div id="at-breakdown-body" style="color:#aaa">
+					Waiting for first DQN episode (appears once an episode ends)...
+				</div>
+			</div>
 			<div>
 				<div style="color:#888;font-size:11px;margin-bottom:4px">REWARD CURVES (smoothed)</div>
 				<canvas id="at-chart" width="${PANEL_WIDTH - 32}" height="${CHART_HEIGHT}"
 					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
-				<div style="display:flex;justify-content:space-around;margin-top:6px">${legendHtml}</div>
+				<div style="display:flex;flex-direction:column;margin-top:6px">${legendHtml}</div>
+			</div>
+			<div id="at-vision-section" style="border-top:1px solid #222;padding-top:8px;position:relative">
+				<div style="color:#888;font-size:11px;margin-bottom:4px">
+					AI VISION <span style="color:#555">— what the DQN sees this frame</span>
+				</div>
+				<canvas id="at-vision" width="${PANEL_WIDTH - 32}" height="160"
+					style="background:#111;border:1px solid #333;border-radius:4px;width:100%"></canvas>
+				<div id="at-vision-tooltip"
+					style="display:none;position:absolute;background:#000;border:1px solid #00ff88;
+					color:#e0e0e0;padding:6px 8px;font-size:10px;line-height:1.4;border-radius:4px;
+					pointer-events:none;z-index:10;max-width:220px;box-shadow:0 2px 8px #000"></div>
 			</div>
 			<div style="border-top:1px solid #222;padding-top:8px">
 				<div style="color:#888;font-size:11px;margin-bottom:4px">MISSION REPLAY</div>
@@ -153,6 +262,52 @@ export class AITheaterPanel {
 		this.forkBtn = this.panel.querySelector(
 			"#at-fork-btn",
 		) as HTMLButtonElement;
+		this.visionCanvas = this.panel.querySelector("#at-vision")!;
+		this.visionCtx = this.visionCanvas.getContext("2d")!;
+		this.explainBtn = this.panel.querySelector(
+			"#at-explain",
+		) as HTMLButtonElement;
+		this.breakdownEl = this.panel.querySelector(
+			"#at-breakdown",
+		) as HTMLDivElement;
+		this.breakdownBodyEl = this.breakdownEl.querySelector(
+			"#at-breakdown-body",
+		) as HTMLDivElement;
+		this.compactBtn = this.panel.querySelector(
+			"#at-compact",
+		) as HTMLButtonElement;
+		this.visionSectionEl = this.panel.querySelector(
+			"#at-vision-section",
+		) as HTMLDivElement;
+		this.visionTooltipEl = this.panel.querySelector(
+			"#at-vision-tooltip",
+		) as HTMLDivElement;
+		for (const kind of AGENT_ORDER) {
+			const row = this.panel.querySelector(
+				`[data-legend-kind="${kind}"]`,
+			) as HTMLDivElement | null;
+			if (row) this.legendRowEls[kind] = row;
+		}
+		this.explainBtn.addEventListener("click", () => this.toggleExplain());
+		this.explainBtn.addEventListener("mouseenter", () => {
+			if (!this.explainMode) this.explainBtn.style.borderColor = "#666";
+		});
+		this.explainBtn.addEventListener("mouseleave", () => {
+			if (!this.explainMode) this.explainBtn.style.borderColor = "#444";
+		});
+		this.compactBtn.addEventListener("click", () => this.toggleCompact());
+		this.compactBtn.addEventListener("mouseenter", () => {
+			if (!this.compactMode) this.compactBtn.style.borderColor = "#666";
+		});
+		this.compactBtn.addEventListener("mouseleave", () => {
+			if (!this.compactMode) this.compactBtn.style.borderColor = "#444";
+		});
+		this.visionCanvas.addEventListener("mousemove", (e) =>
+			this.handleVisionHover(e),
+		);
+		this.visionCanvas.addEventListener("mouseleave", () => {
+			this.visionTooltipEl.style.display = "none";
+		});
 
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
@@ -183,15 +338,313 @@ export class AITheaterPanel {
 
 	mount(): void {
 		document.body.appendChild(this.panel);
+		// Read both prefs first so applyExplainMode can consult compactMode.
+		this.compactMode = this.readCompactPref();
+		this.explainMode = this.readExplainModePref();
+		this.applyCompactMode();
+		this.applyExplainMode();
+		this.startVisionLoop();
+		this.keydownHandler = (e: KeyboardEvent) => this.handleKeydown(e);
+		window.addEventListener("keydown", this.keydownHandler);
+		if (!this.hasSeenTour()) this.showTutorial();
 	}
 
 	unmount(): void {
+		this.stopVisionLoop();
+		if (this.keydownHandler) {
+			window.removeEventListener("keydown", this.keydownHandler);
+			this.keydownHandler = null;
+		}
+		for (const kind of AGENT_ORDER) {
+			const t = this.legendGlowTimers[kind];
+			if (t !== undefined) window.clearTimeout(t);
+		}
+		this.legendGlowTimers = {};
+		this.tutorialEl?.remove();
+		this.tutorialEl = null;
 		this.panel.remove();
 		this.tracks = this.makeTracks();
 		this.firstCrash = false;
 		this.selectedEpisodeId = null;
 		this.onForkRequested = null;
 		this.episodesProvider = null;
+		this.dqnStateProvider = null;
+		this.breakdownProvider = null;
+	}
+
+	setDqnStateProvider(provider: () => number[] | null): void {
+		this.dqnStateProvider = provider;
+	}
+
+	setDqnBreakdownProvider(provider: () => RewardBreakdown | null): void {
+		this.breakdownProvider = provider;
+	}
+
+	private readExplainModePref(): boolean {
+		try {
+			return localStorage.getItem(EXPLAIN_MODE_KEY) === "1";
+		} catch {
+			return false;
+		}
+	}
+
+	private writeExplainModePref(on: boolean): void {
+		try {
+			localStorage.setItem(EXPLAIN_MODE_KEY, on ? "1" : "0");
+		} catch {
+			// localStorage unavailable (private browsing) — preference lives in-session only.
+		}
+	}
+
+	private toggleExplain(): void {
+		this.explainMode = !this.explainMode;
+		this.writeExplainModePref(this.explainMode);
+		this.applyExplainMode();
+	}
+
+	private applyExplainMode(): void {
+		// Compact mode suppresses breakdown visibility regardless of explain state.
+		this.breakdownEl.style.display =
+			this.explainMode && !this.compactMode ? "block" : "none";
+		this.explainBtn.style.color = this.explainMode ? "#00ff88" : "#888";
+		this.explainBtn.style.borderColor = this.explainMode ? "#00ff88" : "#444";
+		this.explainBtn.setAttribute(
+			"aria-pressed",
+			this.explainMode ? "true" : "false",
+		);
+		if (this.explainMode && !this.compactMode) this.renderBreakdown();
+	}
+
+	private readCompactPref(): boolean {
+		try {
+			return localStorage.getItem(COMPACT_MODE_KEY) === "1";
+		} catch {
+			return false;
+		}
+	}
+
+	private writeCompactPref(on: boolean): void {
+		try {
+			localStorage.setItem(COMPACT_MODE_KEY, on ? "1" : "0");
+		} catch {
+			// localStorage unavailable (private browsing) — preference lives in-session only.
+		}
+	}
+
+	private toggleCompact(): void {
+		this.compactMode = !this.compactMode;
+		this.writeCompactPref(this.compactMode);
+		this.applyCompactMode();
+	}
+
+	private applyCompactMode(): void {
+		this.visionSectionEl.style.display = this.compactMode ? "none" : "block";
+		// Breakdown visibility follows compact mode when on; otherwise explain mode wins.
+		this.breakdownEl.style.display =
+			!this.compactMode && this.explainMode ? "block" : "none";
+		this.compactBtn.style.color = this.compactMode ? "#00ff88" : "#888";
+		this.compactBtn.style.borderColor = this.compactMode ? "#00ff88" : "#444";
+		this.compactBtn.setAttribute(
+			"aria-pressed",
+			this.compactMode ? "true" : "false",
+		);
+	}
+
+	private handleKeydown(e: KeyboardEvent): void {
+		// Ignore when the user is typing into an input/textarea elsewhere.
+		const target = e.target as HTMLElement | null;
+		if (
+			target?.tagName === "INPUT" ||
+			target?.tagName === "TEXTAREA" ||
+			target?.isContentEditable
+		) {
+			return;
+		}
+		if (e.key === "?") {
+			e.preventDefault();
+			this.toggleCompact();
+		}
+	}
+
+	private hasSeenTour(): boolean {
+		try {
+			return localStorage.getItem(TOUR_SEEN_KEY) === "1";
+		} catch {
+			return true;
+		}
+	}
+
+	private markTourSeen(): void {
+		try {
+			localStorage.setItem(TOUR_SEEN_KEY, "1");
+		} catch {
+			// private browsing — tutorial reappears next session, acceptable.
+		}
+	}
+
+	private showTutorial(): void {
+		if (this.tutorialEl) return;
+		const overlay = document.createElement("div");
+		Object.assign(overlay.style, {
+			position: "absolute",
+			top: "60px",
+			left: "12px",
+			right: "12px",
+			zIndex: "200",
+			display: "flex",
+			flexDirection: "column",
+			gap: "8px",
+			pointerEvents: "none",
+		});
+		const cards: Array<{ title: string; body: string }> = [
+			{
+				title: "1 · REWARD CURVES",
+				body: "Each colored line is one AI's score over episodes. Higher = better. Watch DQN climb past Random to know learning is working.",
+			},
+			{
+				title: "2 · AI VISION",
+				body: "The 11 bars below the chart are what the DQN sees every frame — altitude, speed, angle, fuel, distance to pad. Its whole world.",
+			},
+			{
+				title: "3 · EXPLAIN",
+				body: "Click EXPLAIN to see the reward breakdown — the exact numbers the DQN is trying to maximize. Press ? to hide these sections any time.",
+			},
+		];
+		overlay.innerHTML = cards
+			.map(
+				(c, i) => `
+				<div data-tour-card="${i}"
+					style="background:#0a0a0a;border:2px solid #00ff88;border-radius:6px;
+					padding:10px 12px;font-size:11px;line-height:1.5;color:#e0e0e0;
+					pointer-events:auto;box-shadow:0 2px 12px rgba(0,255,136,0.2)">
+					<div style="display:flex;justify-content:space-between;align-items:baseline;
+						margin-bottom:4px">
+						<div style="color:#00ff88;font-weight:bold;letter-spacing:1px">${c.title}</div>
+						<button data-tour-dismiss="${i}"
+							style="background:transparent;color:#666;border:none;cursor:pointer;
+							font-family:inherit;font-size:14px;padding:0 4px">✕</button>
+					</div>
+					<div>${c.body}</div>
+				</div>
+			`,
+			)
+			.join("");
+		const gotItBtn = document.createElement("button");
+		gotItBtn.textContent = "GOT IT";
+		Object.assign(gotItBtn.style, {
+			background: "#00ff88",
+			color: "#000",
+			border: "none",
+			padding: "8px",
+			cursor: "pointer",
+			fontFamily: "inherit",
+			fontSize: "12px",
+			fontWeight: "bold",
+			letterSpacing: "2px",
+			borderRadius: "4px",
+			pointerEvents: "auto",
+			marginTop: "4px",
+		});
+		gotItBtn.addEventListener("click", () => this.dismissTutorial());
+		overlay.appendChild(gotItBtn);
+		overlay.querySelectorAll("[data-tour-dismiss]").forEach((btn) => {
+			btn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const idx = (e.currentTarget as HTMLElement).getAttribute(
+					"data-tour-dismiss",
+				);
+				const card = overlay.querySelector(`[data-tour-card="${idx}"]`);
+				card?.remove();
+				if (!overlay.querySelector("[data-tour-card]")) this.dismissTutorial();
+			});
+		});
+		this.panel.appendChild(overlay);
+		this.tutorialEl = overlay;
+	}
+
+	private dismissTutorial(): void {
+		this.tutorialEl?.remove();
+		this.tutorialEl = null;
+		this.markTourSeen();
+	}
+
+	private handleVisionHover(e: MouseEvent): void {
+		if (!this.dqnStateProvider) return;
+		const rect = this.visionCanvas.getBoundingClientRect();
+		const y = e.clientY - rect.top;
+		const n = STATE_LABELS.length;
+		const rowH = rect.height / n;
+		const row = Math.max(0, Math.min(n - 1, Math.floor(y / rowH)));
+		const state = this.dqnStateProvider();
+		const label = STATE_LABELS[row];
+		const hint = STATE_HINTS[row] ?? "";
+		const raw = state && row < state.length ? state[row] : null;
+		const rawStr =
+			raw === null
+				? "(no state yet — first episode still initializing)"
+				: `value ${raw >= 0 ? "+" : ""}${raw.toFixed(3)} (range −1…+1)`;
+		this.visionTooltipEl.innerHTML = `
+			<div style="color:#00ff88;font-weight:bold;margin-bottom:2px">${label}</div>
+			<div style="color:#bbb;margin-bottom:4px">${hint}</div>
+			<div style="color:#888;font-size:9px">${rawStr}</div>
+		`;
+		// Position tooltip near the row, clamped inside the panel.
+		const panelRect = this.panel.getBoundingClientRect();
+		const top = rect.top - panelRect.top + row * rowH + rowH / 2 - 20;
+		const left = Math.min(
+			rect.right - panelRect.left - 230,
+			e.clientX - panelRect.left + 10,
+		);
+		this.visionTooltipEl.style.top = `${top}px`;
+		this.visionTooltipEl.style.left = `${Math.max(8, left)}px`;
+		this.visionTooltipEl.style.display = "block";
+	}
+
+	private triggerLegendGlow(kind: AgentKind): void {
+		const row = this.legendRowEls[kind];
+		if (!row) return;
+		const color = AGENT_META[kind].color;
+		row.style.boxShadow = `0 0 12px ${color}, 0 0 4px ${color}`;
+		const prev = this.legendGlowTimers[kind];
+		if (prev !== undefined) window.clearTimeout(prev);
+		this.legendGlowTimers[kind] = window.setTimeout(() => {
+			row.style.boxShadow = "none";
+			delete this.legendGlowTimers[kind];
+		}, FIRST_LANDING_GLOW_MS);
+	}
+
+	private renderBreakdown(): void {
+		const bd = this.breakdownProvider?.() ?? null;
+		if (!bd) {
+			this.breakdownBodyEl.textContent =
+				"Waiting for first DQN episode (appears once an episode ends)...";
+			return;
+		}
+		const fmt = (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1));
+		const color = (v: number) =>
+			v > 0 ? "#00ff88" : v < 0 ? "#ff8866" : "#888";
+		// Value column uses tabular-nums + fixed min-width so +/- digits line up
+		// across rows without depending on HTML whitespace (which collapses).
+		const numStyle =
+			"font-family:monospace;font-variant-numeric:tabular-nums;" +
+			"display:inline-block;min-width:5ch;text-align:right";
+		const rows = BREAKDOWN_ROWS.map((row) => {
+			const v = bd[row.key];
+			return `
+				<div style="display:flex;justify-content:space-between">
+					<span style="color:${color(v)};${numStyle}">${fmt(v)}</span>
+					<span style="color:#888">${row.label}</span>
+				</div>
+			`;
+		}).join("");
+		this.breakdownBodyEl.innerHTML = `
+			${rows}
+			<div style="display:flex;justify-content:space-between;
+				border-top:1px solid #333;padding-top:4px;margin-top:4px">
+				<span style="color:#fff;${numStyle}">${fmt(bd.total)}</span>
+				<span style="color:#ccc;font-weight:bold">total</span>
+			</div>
+		`;
 	}
 
 	setWatchBestHandler(handler: () => void): void {
@@ -305,6 +758,7 @@ export class AITheaterPanel {
 		if (isNewBest) track.bestReward = stats.totalReward;
 		const isFirstLanding = stats.landed && !track.bestLanded;
 		if (stats.landed) track.bestLanded = true;
+		if (isFirstLanding) this.triggerLegendGlow(stats.kind);
 		const isFirstCrash = !stats.landed && !this.firstCrash;
 		if (!stats.landed && stats.episode === 1 && stats.kind === "dqn") {
 			this.firstCrash = true;
@@ -336,11 +790,14 @@ export class AITheaterPanel {
 				hintEl.textContent = `Training... ${20 - stats.episode} episodes until ready`;
 			}
 		} else if (isFirstLanding) {
-			this.narrationEl.textContent = `${AGENT_LABELS[stats.kind]} landed for the first time at episode ${stats.episode}.`;
+			this.narrationEl.textContent = `${AGENT_META[stats.kind].label} landed for the first time at episode ${stats.episode}.`;
 		}
 
 		this.drawChart();
-		if (stats.kind === "dqn") this.refreshForkInfo();
+		if (stats.kind === "dqn") {
+			this.refreshForkInfo();
+			if (this.explainMode) this.renderBreakdown();
+		}
 	}
 
 	private getNarration(
@@ -370,6 +827,79 @@ export class AITheaterPanel {
 		return stats.landed
 			? "Landed. DQN reinforces this trajectory via Q-targets."
 			: "Training... three algorithms, same terrain, different learning rules.";
+	}
+
+	private startVisionLoop(): void {
+		if (this.visionRafId !== null) return;
+		const tick = (t: number) => {
+			this.visionRafId = requestAnimationFrame(tick);
+			if (t - this.visionLastDraw < VISION_REFRESH_MS) return;
+			this.visionLastDraw = t;
+			this.drawVision();
+		};
+		this.visionRafId = requestAnimationFrame(tick);
+	}
+
+	private stopVisionLoop(): void {
+		if (this.visionRafId !== null) {
+			cancelAnimationFrame(this.visionRafId);
+			this.visionRafId = null;
+		}
+	}
+
+	private drawVision(): void {
+		const ctx = this.visionCtx;
+		const w = this.visionCanvas.width;
+		const h = this.visionCanvas.height;
+		ctx.clearRect(0, 0, w, h);
+
+		const state = this.dqnStateProvider?.() ?? null;
+		const n = STATE_LABELS.length;
+		const rowH = h / n;
+		const labelW = 66;
+		const valueW = 40;
+		const trackX = labelW + 4;
+		const trackW = w - labelW - valueW - 8;
+		const midX = trackX + trackW / 2;
+
+		ctx.font = "10px 'Courier New', monospace";
+		ctx.textBaseline = "middle";
+
+		for (let i = 0; i < n; i++) {
+			const y = i * rowH + rowH / 2;
+			ctx.fillStyle = "#777";
+			ctx.textAlign = "right";
+			ctx.fillText(STATE_LABELS[i], labelW, y);
+
+			ctx.strokeStyle = "#222";
+			ctx.lineWidth = 1;
+			ctx.strokeRect(trackX, y - 4, trackW, 8);
+			ctx.fillStyle = "#1a1a1a";
+			ctx.fillRect(trackX + 1, y - 3, trackW - 2, 6);
+
+			ctx.strokeStyle = "#333";
+			ctx.beginPath();
+			ctx.moveTo(midX, y - 4);
+			ctx.lineTo(midX, y + 4);
+			ctx.stroke();
+
+			if (state && i < state.length) {
+				const v = Math.max(-1, Math.min(1, state[i]));
+				const barW = (Math.abs(v) * trackW) / 2;
+				ctx.fillStyle = v >= 0 ? "#00ff88" : "#ff6666";
+				if (v >= 0) ctx.fillRect(midX, y - 3, barW, 6);
+				else ctx.fillRect(midX - barW, y - 3, barW, 6);
+
+				ctx.fillStyle = "#ccc";
+				ctx.textAlign = "left";
+				const sign = state[i] >= 0 ? "+" : "";
+				ctx.fillText(`${sign}${state[i].toFixed(2)}`, trackX + trackW + 4, y);
+			} else {
+				ctx.fillStyle = "#444";
+				ctx.textAlign = "left";
+				ctx.fillText("—", trackX + trackW + 4, y);
+			}
+		}
 	}
 
 	private drawChart(): void {
@@ -417,7 +947,7 @@ export class AITheaterPanel {
 			const data = this.tracks[kind].rewardHistory;
 			if (data.length < 2) continue;
 
-			ctx.strokeStyle = AGENT_COLORS[kind];
+			ctx.strokeStyle = AGENT_META[kind].color;
 			ctx.lineWidth = 2;
 			ctx.globalAlpha = 0.95;
 			ctx.beginPath();
