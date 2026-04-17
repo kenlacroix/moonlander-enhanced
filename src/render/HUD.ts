@@ -1,10 +1,12 @@
 import {
 	type AuthenticState,
 	captionFor,
+	ERA_COLORS,
 	isAltitudeBlackedOut,
 } from "../game/AuthenticMode";
 import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
+import { prefersReducedMotion } from "../utils/a11y";
 import {
 	CANVAS_HEIGHT,
 	CANVAS_WIDTH,
@@ -197,14 +199,20 @@ export class HUD {
 		if (isPlaying) {
 			// Authentic Mode caption (top center) — era-colored tech label.
 			// While the 1202 alarm is ACTIVE, the caption is replaced with
-			// the program-alarm banner. Flashes red/amber every 6 frames so
-			// it reads as urgent without strobing.
+			// the program-alarm banner. 12-frame half-cycle → 2.5 Hz full
+			// cycle, comfortably below the WCAG 2.3.1 3-flashes/sec ceiling
+			// (saturated-red flashing is the specific seizure concern).
+			// prefers-reduced-motion: render steady amber, no strobing.
 			const caption = captionFor(authenticState);
 			if (caption) {
 				if (authenticState?.alarm?.state === "ACTIVE") {
+					const reduce = prefersReducedMotion();
 					const flashRed =
-						Math.floor(authenticState.alarm.framesElapsed / 6) % 2 === 0;
-					ctx.fillStyle = flashRed ? "#ff3030" : "#ffb000";
+						!reduce &&
+						Math.floor(authenticState.alarm.framesElapsed / 12) % 2 === 0;
+					ctx.fillStyle = flashRed
+						? ERA_COLORS.HAZARD_RED
+						: ERA_COLORS.APOLLO_AMBER;
 					ctx.font = 'bold 14px "Courier New", monospace';
 					ctx.textAlign = "center";
 					ctx.fillText(

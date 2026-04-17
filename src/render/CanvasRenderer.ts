@@ -697,11 +697,11 @@ export class CanvasRenderer {
 			},
 			{
 				head: "AGC EXECUTIVE OVERFLOW",
-				body: "Somewhere in descent the 2KB flight computer chokes. Thrust locks for 400ms. Don't panic.",
+				body: "Somewhere in descent the 2KB flight computer chokes. Thrust locks for 400ms. Hold course — the computer will catch up.",
 			},
 			{
 				head: "THE MARGIN",
-				body: "Armstrong touched down with 22 seconds of fuel. Can you beat him, without the modern tech?",
+				body: "Armstrong touched down with 22 seconds of fuel. Beat him.",
 			},
 		];
 

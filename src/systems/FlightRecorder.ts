@@ -416,8 +416,9 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 	);
 
 	// Sprint 5.5 — AUTHENTIC corner badge for Authentic-Mode runs. Era-
-	// colored amber/cyan with matching label. Upper-left corner stays
-	// clear of the landing grade (upper-right) and mission name (left).
+	// colored amber/cyan with matching label. Sits in the lower-right,
+	// above the footer watermark, clear of the landing grade
+	// (upper-right) and mission name (left).
 	if (r.authenticEra) {
 		const color = r.authenticEra === "apollo" ? "#ffb000" : "#00ccff";
 		const label =
