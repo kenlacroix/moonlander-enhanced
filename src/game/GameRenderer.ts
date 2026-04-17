@@ -16,6 +16,8 @@ import { getBestScore, getBestTime } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
 import type { Artifact } from "./Artifacts";
+import { type FlightConfig, loadAuthenticPreference } from "./AuthenticMode";
+import { isHistoricMission } from "./HistoricMission";
 import type { Camera } from "./Camera";
 import { type GravityStormState, getGravityStormLabel } from "./GravityStorm";
 import type { LanderState } from "./Lander";
@@ -115,6 +117,7 @@ export interface GameRenderState {
 		readonly forked: boolean;
 		readonly forkFrame: number | null;
 	} | null;
+	readonly currentFlight: FlightConfig | null;
 }
 
 export class GameRenderer {
@@ -275,6 +278,8 @@ export class GameRenderer {
 			stormLabel,
 			elapsed,
 			getBestTime(state.seed) ?? null,
+			state.currentFlight?.authenticState ?? null,
+			state.terrain ?? null,
 		);
 
 		// Touch controls overlay
@@ -412,12 +417,25 @@ export class GameRenderer {
 			const best = getBestScore(m.seed);
 			if (best !== undefined) bestScores.set(m.seed, best);
 		}
+		// Sprint 5.5 — Authentic Mode indicator. Only populated when viewing
+		// historic missions and the selected mission is a historic landing.
+		let authenticInfo: { missionId: number; on: boolean } | null = null;
+		if (state.gameMode === "historic") {
+			const selected = missions[state.selectedMission];
+			if (selected && isHistoricMission(selected) && selected.kind === "landing") {
+				authenticInfo = {
+					missionId: selected.id,
+					on: loadAuthenticPreference(selected.id),
+				};
+			}
+		}
 		this.renderer.clear();
 		this.renderer.drawMissionSelect(
 			[...missions],
 			state.selectedMission,
 			bestScores,
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
+			authenticInfo,
 		);
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {

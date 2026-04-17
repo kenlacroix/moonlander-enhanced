@@ -30,6 +30,11 @@ import { WORLD_WIDTH } from "../utils/constants";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
 import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
+import {
+	applyAuthenticFilter,
+	buildAuthenticState,
+	type FlightConfig,
+} from "./AuthenticMode";
 import type { Artifact } from "./Artifacts";
 import { placeArtifacts } from "./Artifacts";
 import { Camera } from "./Camera";
@@ -84,6 +89,13 @@ export class Game {
 	 * historic missions that opt into another kind.
 	 */
 	missionMode: "landing" | "survive" | "auto-landing" = "landing";
+	/**
+	 * Flight-scoped Authentic Mode config. Non-null only while a historic
+	 * mission flight is active (constructed in selectMission, cleared on
+	 * return-to-title / non-historic paths). Never set during AI Theater,
+	 * HeadlessGame, fork replays, or freeplay — those paths keep it null.
+	 */
+	currentFlight: FlightConfig | null = null;
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
 	titleSelection = 0;
@@ -293,6 +305,10 @@ export class Game {
 		this.wind = null;
 		this.alien = null;
 		this.gravityStorm = null;
+		// Sprint 5.5 fork-replay vanilla-lock: captured episodes always replay
+		// without Authentic mechanics. Mirrors the gravity/hazard lock above
+		// — toggling Authentic after capture would diverge the trajectory.
+		this.currentFlight = { authenticMode: false, authenticState: null };
 		this.forkReplay = {
 			episode,
 			frame: 0,
@@ -342,6 +358,7 @@ export class Game {
 		this.wind = null;
 		this.alien = null;
 		this.gravityStorm = null;
+		this.currentFlight = null;
 		this.artifacts = [];
 		this.relay = null;
 		this.audio.soundtrack.start();
@@ -439,6 +456,11 @@ export class Game {
 				fr.forkFrame = fr.episode.inputs.length;
 			}
 		}
+
+		physicsInput = applyAuthenticFilter(
+			physicsInput,
+			this.currentFlight?.authenticState ?? null,
+		);
 
 		const result = this.physics.step(
 			dt,

@@ -1,5 +1,6 @@
 import type { AlienState } from "../game/Alien";
 import type { Artifact } from "../game/Artifacts";
+import type { AuthenticState } from "../game/AuthenticMode";
 import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
 import type { Mission } from "../game/Missions";
@@ -418,6 +419,8 @@ export class CanvasRenderer {
 		gravityStormLabel: string | null = null,
 		elapsedTime: number | null = null,
 		bestTime: number | null = null,
+		authenticState: AuthenticState | null = null,
+		terrain: TerrainData | null = null,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -431,8 +434,11 @@ export class CanvasRenderer {
 			gravityStormLabel,
 			elapsedTime,
 			bestTime,
+			authenticState,
+			terrain,
 		);
 	}
+
 
 	drawTitle(
 		selection: number,
@@ -529,6 +535,7 @@ export class CanvasRenderer {
 		selectedIndex: number,
 		bestScores: Map<number, number>,
 		campaignProgress?: Set<number>,
+		authenticInfo?: { missionId: number; on: boolean } | null,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -632,6 +639,21 @@ export class CanvasRenderer {
 			CANVAS_WIDTH / 2,
 			CANVAS_HEIGHT - 30,
 		);
+
+		// Sprint 5.5 — Authentic Mode indicator for historic mission-select.
+		// Only rendered when the caller passes authenticInfo (i.e. gameMode
+		// === "historic" AND selected mission is a historic landing).
+		if (authenticInfo) {
+			const y = CANVAS_HEIGHT - 60;
+			ctx.textAlign = "center";
+			ctx.font = 'bold 14px "Courier New", monospace';
+			ctx.fillStyle = authenticInfo.on ? "#ffb000" : "rgba(255, 176, 0, 0.5)";
+			ctx.fillText(
+				`[A] AUTHENTIC MODE: ${authenticInfo.on ? "ON" : "OFF"}`,
+				CANVAS_WIDTH / 2,
+				y,
+			);
+		}
 
 		ctx.restore();
 	}

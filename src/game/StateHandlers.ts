@@ -17,6 +17,11 @@ import {
 } from "../ui/TerrainEditor";
 import { LANDER_HEIGHT, STARTING_FUEL } from "../utils/constants";
 import { startAgentReplay } from "./AgentReplay";
+import {
+	buildAuthenticState,
+	loadAuthenticPreference,
+	saveAuthenticPreference,
+} from "./AuthenticMode";
 import type { Game } from "./Game";
 import { nextPreset, prevPreset } from "./GravityPresets";
 import { type HistoricMission, isHistoricMission } from "./HistoricMission";
@@ -133,6 +138,16 @@ export function updateMenu(game: Game, input: InputState): void {
 			selectMission(game, mission);
 		}
 	}
+	// [A] toggle for Authentic Mode on the historic mission-select screen.
+	// Context-scoped so it doesn't fight the in-flight autopilot-annotations
+	// consumer (which only runs when game.status === "playing").
+	if (input.toggleAnnotations && game.gameMode === "historic") {
+		const mission = missions[game.selectedMission];
+		if (mission && isHistoricMission(mission) && mission.kind === "landing") {
+			const current = loadAuthenticPreference(mission.id);
+			saveAuthenticPreference(mission.id, !current);
+		}
+	}
 	if (input.toggleRelay && game.gameMode === "freeplay") {
 		game.relay = game.relay ? null : createRelayState();
 	}
@@ -185,6 +200,7 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.audio.soundtrack.stop();
 		if (game.aiTheater.isActive) game.aiTheater.stop();
 		game.aiTheaterComparison = null;
+		game.currentFlight = null;
 		game.status = "menu";
 		return;
 	}
@@ -267,6 +283,19 @@ function selectMission(game: Game, mission: Mission): void {
 	// "survive" or "auto-landing" via their `kind` discriminator. This
 	// must be set before reset() so the physics path branches correctly.
 	game.missionMode = isHistoricMission(mission) ? mission.kind : "landing";
+	// Sprint 5.5 — construct flight-scoped Authentic config for historic
+	// landing missions. Non-historic and non-landing missions stay null.
+	if (isHistoricMission(mission) && mission.kind === "landing") {
+		const authenticOn = loadAuthenticPreference(mission.id);
+		game.currentFlight = {
+			authenticMode: authenticOn,
+			authenticState: authenticOn
+				? buildAuthenticState(mission, mission.seed, false)
+				: null,
+		};
+	} else {
+		game.currentFlight = null;
+	}
 	game.reset();
 	game.llm.fetchBriefing(game, mission);
 	updateURL(mission.seed);

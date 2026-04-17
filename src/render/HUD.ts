@@ -1,4 +1,10 @@
+import {
+	type AuthenticState,
+	captionFor,
+	isAltitudeBlackedOut,
+} from "../game/AuthenticMode";
 import type { LanderState } from "../game/Lander";
+import type { TerrainData } from "../game/Terrain";
 import {
 	CANVAS_HEIGHT,
 	CANVAS_WIDTH,
@@ -22,6 +28,8 @@ export class HUD {
 		gravityStormLabel: string | null = null,
 		elapsedTime: number | null = null,
 		bestTime: number | null = null,
+		authenticState: AuthenticState | null = null,
+		terrain: TerrainData | null = null,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -31,9 +39,25 @@ export class HUD {
 		let y = 20;
 		const lineHeight = 22;
 
-		// Altitude (distance from bottom of screen — approximate)
-		const altitude = Math.max(0, CANVAS_HEIGHT - lander.y - 100).toFixed(0);
-		this.drawLabel(ctx, x, y, "ALT", `${altitude} m`);
+		// Altitude (distance from bottom of screen — approximate).
+		// Authentic (Apollo era only): readout blanks to "---" when lander is
+		// within 50 pixels AGL, mirroring Armstrong losing callouts for the
+		// last ~25 feet of descent. Display metric stays pixel-based; only
+		// the BLACKOUT trigger uses true AGL via Physics.getTerrainHeightAt.
+		const blackedOut = isAltitudeBlackedOut(authenticState, lander, terrain);
+		if (blackedOut) {
+			this.drawLabel(ctx, x, y, "ALT", "---");
+			if (
+				authenticState &&
+				!authenticState.lowAltMessage.shown
+			) {
+				authenticState.lowAltMessage.shown = true;
+				authenticState.lowAltMessage.framesRemaining = 60;
+			}
+		} else {
+			const altitude = Math.max(0, CANVAS_HEIGHT - lander.y - 100).toFixed(0);
+			this.drawLabel(ctx, x, y, "ALT", `${altitude} m`);
+		}
 		y += lineHeight;
 
 		// Vertical speed — warn if too fast
@@ -168,6 +192,28 @@ export class HUD {
 			CANVAS_WIDTH / 2,
 			CANVAS_HEIGHT - 20,
 		);
+
+		// Authentic Mode caption (top center) — era-colored tech label.
+		const caption = captionFor(authenticState);
+		if (caption) {
+			ctx.fillStyle = caption.color;
+			ctx.font = 'bold 13px "Courier New", monospace';
+			ctx.textAlign = "center";
+			ctx.fillText(caption.text, CANVAS_WIDTH / 2, 12);
+		}
+
+		// One-shot message on first frame below AGL blackout threshold.
+		// Primes the player so the "---" readout doesn't feel broken.
+		if (
+			authenticState &&
+			authenticState.lowAltMessage.framesRemaining > 0
+		) {
+			authenticState.lowAltMessage.framesRemaining -= 1;
+			ctx.fillStyle = "#ffb000";
+			ctx.font = 'bold 12px "Courier New", monospace';
+			ctx.textAlign = "left";
+			ctx.fillText("LOW-ALT READOUT UNAVAILABLE (AUTHENTIC)", 20, 120);
+		}
 
 		ctx.restore();
 	}
