@@ -52,11 +52,11 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Set canvas to fixed game resolution
 		canvas.width = CANVAS_WIDTH;
 		canvas.height = CANVAS_HEIGHT;
-
-		// Scale CSS size to fit window while maintaining aspect ratio
-		this.fitToWindow();
-		window.addEventListener("resize", () => this.fitToWindow());
-
+		// CSS sizing lives in main.ts so both the UI canvas and the
+		// WebGL canvas resize in lockstep. The offscreen canvas that
+		// backs WebGLGameplayRenderer also goes through this
+		// constructor but is never attached to the DOM, so sizing
+		// there would be a no-op regardless.
 		const ctx = canvas.getContext("2d");
 		if (!ctx) throw new Error("Canvas 2D context not available");
 		this.ctx = ctx;
@@ -82,17 +82,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Canvas 2D has no GPU resources to release.
 	}
 
-	private fitToWindow(): void {
-		const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
-		const windowAspect = window.innerWidth / window.innerHeight;
-		if (windowAspect > aspect) {
-			this.canvas.style.height = "100vh";
-			this.canvas.style.width = `${window.innerHeight * aspect}px`;
-		} else {
-			this.canvas.style.width = "100vw";
-			this.canvas.style.height = `${window.innerWidth / aspect}px`;
-		}
-	}
 
 	setRetroSkin(skin: RetroVectorSkin | null): void {
 		this.retro = skin;

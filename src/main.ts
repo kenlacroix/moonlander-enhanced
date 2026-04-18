@@ -1,5 +1,6 @@
 import { Game } from "./game/Game";
 import { createGameplayRenderer } from "./render/createGameplayRenderer";
+import { fitCanvasToWindow } from "./render/fitCanvasToWindow";
 
 const uiCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 const glCanvas = document.getElementById(
@@ -32,6 +33,15 @@ const customTerrain = params.get("custom");
 		// separate WebGL canvas isn't used — hide it.
 		glCanvas.style.display = "none";
 	}
+	// Size both canvases identically (or just the UI canvas in fallback,
+	// since the GL canvas is hidden). Single source of truth for sizing
+	// prevents the two layers drifting out of alignment.
+	const fitAll = () => {
+		fitCanvasToWindow(uiCanvas);
+		if (backend === "webgl") fitCanvasToWindow(glCanvas);
+	};
+	fitAll();
+	window.addEventListener("resize", fitAll);
 	const game = new Game(
 		uiCanvas,
 		gameplay,
