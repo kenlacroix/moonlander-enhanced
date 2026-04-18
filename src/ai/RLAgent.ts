@@ -83,6 +83,12 @@ export class RLAgent implements Agent {
 
 	/** Initialize the neural network. Call once before training. */
 	async init(): Promise<void> {
+		// Ensure TF.js has picked a backend before building models. On
+		// mobile Firefox the WebGL backend is sometimes unavailable and
+		// it falls back silently to CPU, which is ~10-50x slower. Log
+		// the chosen backend so we can diagnose slow-training reports.
+		await tf.ready();
+		console.info(`[rl-agent] TF.js backend: ${tf.getBackend()}`);
 		this.model = this.buildModel();
 		this.targetModel = this.buildModel();
 		this.syncTargetModel();

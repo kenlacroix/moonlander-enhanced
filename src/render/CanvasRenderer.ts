@@ -519,7 +519,14 @@ export class CanvasRenderer implements IGameplayRenderer {
 			"Apollo, Artemis. Real missions. Real margins.",
 		];
 
-		const rowSpacing = 46;
+		// Each row carries two text lines: the 22px bold option name (baseline y+8,
+		// descender bottom ~y+12) and the 13px description (baseline y+26,
+		// descender bottom ~y+29). Old box (y-14, height 40 → ends at y+26)
+		// clipped the description descenders because the box bottom edge sat
+		// exactly on the baseline. New box is 46 tall (ends at y+32), clear of
+		// descenders with 3px of margin. rowSpacing bumped to 50 so adjacent
+		// boxes have a 4px gap and don't visually fuse into one strip.
+		const rowSpacing = 50;
 		const firstRowY =
 			CANVAS_HEIGHT / 2 - 20 - ((options.length - 5) * rowSpacing) / 2;
 		for (let i = 0; i < options.length; i++) {
@@ -528,10 +535,10 @@ export class CanvasRenderer implements IGameplayRenderer {
 
 			if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
+				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
