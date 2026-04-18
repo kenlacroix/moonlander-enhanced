@@ -231,6 +231,9 @@ Remaining items after cherry-picks ship:
 
 ## Completed
 
+### Sprint 6 Part A — WebGL foundation
+**Completed:** v0.5.9.2 (2026-04-18). `IGameplayRenderer` extract + PixiJS v8 `WebGLGameplayRenderer` (texture-sprite approach) + automatic Canvas fallback + `?renderer=canvas` debug override + dual-canvas DOM. Parts B (shader effects) and C (lighting + screen shake) remain in the active roadmap.
+
 ### Sprint 5 Part B — Specialized mission types
 **Completed:** v0.5.9.1 (2026-04-18). Apollo 13 Survive + Luna 9 auto-landing shipped alongside Sprint 5.5 polish.
 

@@ -10,6 +10,7 @@ import type { TrainingLoop } from "../ai/TrainingLoop";
 import { APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
+import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
 import { getBestScore, getBestTime } from "../systems/Leaderboard";
@@ -125,10 +126,29 @@ export interface GameRenderState {
 }
 
 export class GameRenderer {
-	constructor(private renderer: CanvasRenderer) {}
+	constructor(
+		private renderer: CanvasRenderer,
+		private gameplay: IGameplayRenderer,
+	) {}
 
 	setRetroSkin(skin: Parameters<CanvasRenderer["setRetroSkin"]>[0]): void {
 		this.renderer.setRetroSkin(skin);
+	}
+
+	/** Clear both layers at frame start. In Canvas fallback mode
+	 * gameplay === renderer (same instance, same canvas); skip the
+	 * duplicate clear in that case. */
+	private clearFrame(): void {
+		this.gameplay.clear();
+		if (this.gameplay !== this.renderer) {
+			this.renderer.clear();
+		}
+	}
+
+	/** Commit the gameplay layer's frame. No-op on Canvas (draws are
+	 * immediate); WebGL uploads the dirty texture and submits. */
+	private presentFrame(): void {
+		this.gameplay.present();
 	}
 
 	private drawAIGhostTrail(
@@ -221,29 +241,29 @@ export class GameRenderer {
 	render(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
 
-		this.renderer.clear();
-		this.renderer.drawBackground(state.camera);
+		this.clearFrame();
+		this.gameplay.drawBackground(state.camera);
 		// Apply cosmetic terrain wobble during gravity storms
 		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
 		const terrainOffset =
 			wobble !== 0 ? { x: offset.x, y: offset.y + wobble } : offset;
-		this.renderer.drawTerrain(state.terrain, terrainOffset);
-		this.renderer.drawParticles(state.particles.particles, offset);
+		this.gameplay.drawTerrain(state.terrain, terrainOffset);
+		this.gameplay.drawParticles(state.particles.particles, offset);
 		if (state.ghostPlayer?.isActive()) {
-			this.renderer.drawGhost(state.ghostPlayer.lander, offset);
+			this.gameplay.drawGhost(state.ghostPlayer.lander, offset);
 		}
 		if (state.artifacts.length > 0) {
-			this.renderer.drawArtifacts(state.artifacts, offset);
+			this.gameplay.drawArtifacts(state.artifacts, offset);
 		}
 		if (state.alien) {
-			this.renderer.drawAlien(
+			this.gameplay.drawAlien(
 				state.alien,
 				state.lander.x,
 				state.lander.y,
 				offset,
 			);
 		}
-		this.renderer.drawLander(state.lander, offset);
+		this.gameplay.drawLander(state.lander, offset);
 
 		if (state.forkReplay?.forked) {
 			this.drawAIGhostTrail(state.forkReplay, offset);
@@ -405,10 +425,12 @@ export class GameRenderer {
 				state.achievementToastTimer,
 			);
 		}
+
+		this.presentFrame();
 	}
 
 	renderTitle(state: GameRenderState): void {
-		this.renderer.clear();
+		this.clearFrame();
 		this.renderer.drawTitle(
 			state.titleSelection,
 			state.campaignCompleted.size,
@@ -416,6 +438,7 @@ export class GameRenderer {
 			getDailyDateLabel(),
 			getBestScore(getDailySeed()),
 		);
+		this.presentFrame();
 	}
 
 	renderMenu(state: GameRenderState): void {
@@ -441,7 +464,7 @@ export class GameRenderer {
 				};
 			}
 		}
-		this.renderer.clear();
+		this.clearFrame();
 		// Dual-track leaderboard: when on historic missions, also pull the
 		// Authentic best score for each seed so the row can show both.
 		const authenticBestScores =
@@ -470,10 +493,11 @@ export class GameRenderer {
 				state.tutorialOverlay.framesRemaining,
 			);
 		}
+		this.presentFrame();
 	}
 
 	renderTraining(state: GameRenderState): void {
-		this.renderer.clear();
+		this.clearFrame();
 		const history = state.trainingLoop?.agent.getRewardHistory() ?? [];
 		const stats = state.latestTrainingStats;
 		this.renderer.drawTrainingUI(
@@ -483,15 +507,16 @@ export class GameRenderer {
 			stats?.totalReward ?? 0,
 			history,
 		);
+		this.presentFrame();
 	}
 
 	renderAgentReplay(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
-		this.renderer.clear();
-		this.renderer.drawBackground(state.camera);
-		this.renderer.drawTerrain(state.terrain, offset);
-		this.renderer.drawParticles(state.particles.particles, offset);
-		this.renderer.drawLander(state.lander, offset);
+		this.clearFrame();
+		this.gameplay.drawBackground(state.camera);
+		this.gameplay.drawTerrain(state.terrain, offset);
+		this.gameplay.drawParticles(state.particles.particles, offset);
+		this.gameplay.drawLander(state.lander, offset);
 		this.renderer.drawHUD(state.lander, 0, null, false, false);
 
 		if (state.lander.status === "landed") {
@@ -507,5 +532,6 @@ export class GameRenderer {
 		} else {
 			this.renderer.drawMessage("", "AI AGENT PLAYING  |  ESC for menu");
 		}
+		this.presentFrame();
 	}
 }

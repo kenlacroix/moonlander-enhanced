@@ -18,16 +18,40 @@
                   height: 100vh;
                   overflow: hidden;
                 }
-                canvas {
+                /* Sprint 6 dual-canvas stack: WebGL gameplay on the
+                   bottom, Canvas 2D UI on top. Same size, same
+                   position. The UI canvas clears transparently when
+                   WebGL is active so the gameplay layer shows
+                   through. When the Canvas 2D fallback is active,
+                   the WebGL canvas is hidden and the UI canvas does
+                   both layers (opaque clear). */
+                #game-stage {
+                  position: relative;
+                  line-height: 0;
+                }
+                #game-canvas-gl,
+                #game-canvas {
                   display: block;
                   image-rendering: pixelated;
                   touch-action: none;
                   user-select: none;
                 }
+                #game-canvas-gl {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                }
+                #game-canvas {
+                  position: relative;
+                  z-index: 1;
+                }
   </style>
 </head>
 <body>
-  <canvas id="game-canvas"></canvas>
+  <div id="game-stage">
+    <canvas id="game-canvas-gl"></canvas>
+    <canvas id="game-canvas"></canvas>
+  </div>
   <script type="module" src="/src/main.ts"></script>
   <script>
     if ("serviceWorker" in navigator) {

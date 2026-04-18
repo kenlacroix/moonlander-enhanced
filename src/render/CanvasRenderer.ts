@@ -23,14 +23,29 @@ import {
 import { degToRad } from "../utils/math";
 import { Background } from "./Background";
 import { HUD } from "./HUD";
+import type { IGameplayRenderer } from "./IGameplayRenderer";
 
-export class CanvasRenderer {
+/**
+ * Canvas 2D renderer. Implements both the gameplay-layer interface
+ * (IGameplayRenderer, so it can be swapped with WebGLGameplayRenderer)
+ * and the UI-layer draw calls (drawHUD, drawTitle, drawMenu, etc. —
+ * these stay Canvas-only forever since text/layout in WebGL is pure
+ * cost for zero visual win).
+ *
+ * `transparentClear`: when WebGL is the active gameplay backend, this
+ * renderer is used as the UI overlay. It must clear transparently so
+ * the WebGL layer shows through underneath. When Canvas is the active
+ * gameplay backend (WebGL fallback), this renderer does everything,
+ * so clear() fills opaque black like before.
+ */
+export class CanvasRenderer implements IGameplayRenderer {
 	readonly canvas: HTMLCanvasElement;
 	readonly ctx: CanvasRenderingContext2D;
 	private background: Background;
 	private hud: HUD;
 	private beaconPhase = 0;
 	private retro: RetroVectorSkin | null = null;
+	private transparentClear = false;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
@@ -50,6 +65,23 @@ export class CanvasRenderer {
 		this.hud = new HUD();
 	}
 
+	setTransparentClear(transparent: boolean): void {
+		this.transparentClear = transparent;
+	}
+
+	present(): void {
+		// Canvas 2D draws are immediate — there's no frame to commit.
+	}
+
+	resize(_width: number, _height: number): void {
+		// Fixed-resolution canvas — resize is handled via CSS in fitToWindow.
+		// Part C may use this to support DPR scaling.
+	}
+
+	destroy(): void {
+		// Canvas 2D has no GPU resources to release.
+	}
+
 	private fitToWindow(): void {
 		const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
 		const windowAspect = window.innerWidth / window.innerHeight;
@@ -67,9 +99,15 @@ export class CanvasRenderer {
 	}
 
 	clear(): void {
-		this.ctx.fillStyle = "#000000";
-		this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-		// Apply scanline overlay in retro mode
+		if (this.transparentClear) {
+			this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		} else {
+			this.ctx.fillStyle = "#000000";
+			this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		}
+		// Apply scanline overlay in retro mode (always — the retro skin
+		// intentionally overlays the scanlines across the final frame,
+		// including when WebGL is drawing gameplay underneath).
 		this.retro?.drawScanlines(this.ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 	}
 

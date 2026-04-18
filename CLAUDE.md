@@ -486,15 +486,23 @@ Shipped alongside Sprint 5 Part B in the same PR.
 
 ---
 
-### Sprint 6 — WebGL Visual Upgrade — L (~3-4hr CC)
-- [ ] Extract formal IRenderer interface from CanvasRenderer.ts
-- [ ] PixiJS v8 WebGLRenderer implementing IRenderer (keep 2D-focused, ThreeJSAdapter later)
+### Sprint 6 — WebGL Visual Upgrade — L (~3-4hr CC) — split into A+B+C
+
+**Part A — Foundation ✅ COMPLETE (v0.5.9.2, PR #36)**
+- [x] Extract `IGameplayRenderer` interface (gameplay draws only; UI stays on Canvas 2D since text in WebGL is pure cost for zero visual win)
+- [x] PixiJS v8 `WebGLGameplayRenderer` implementing the interface (texture-sprite approach: Canvas 2D logic on offscreen → GPU texture upload → PixiJS blits each frame). Shaders attach to this same sprite in Part B.
+- [x] Async renderer factory with automatic Canvas fallback on WebGL init failure
+- [x] `?renderer=canvas` URL override for debugging / parity checks
+- [x] Dual-canvas DOM (WebGL underneath, Canvas 2D UI on top, transparent-cleared UI canvas in WebGL mode)
+
+**Part B — Shader effects (~90min CC)**
 - [ ] Bloom/glow shader on thruster plume and landing pad beacons
 - [ ] Heat distortion shader behind engine bell
 - [ ] Normal mapping on terrain surface
+
+**Part C — Lighting + polish (~45min CC)**
 - [ ] Dynamic sun lighting per mission
 - [ ] Screen shake on crash
-- [ ] Canvas fallback when WebGL unavailable
 
 **Exit question:** Does the WebGL version make you go "whoa" compared to Canvas?
 

@@ -2,6 +2,22 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.9.2] - 2026-04-18 (Sprint 6 Part A: WebGL foundation)
+
+### Added
+- **WebGL rendering pipeline.** The game world (terrain, lander, particles, thruster plume, ghost, artifacts, alien) now draws through a WebGL backend by default. UI stays on Canvas 2D because text and layout in WebGL is pure cost for zero visual win. Identical visuals to Canvas today — this ships the pipeline so Part B can layer shader effects (bloom, heat distortion, normal maps) on top.
+- **Automatic Canvas fallback.** If WebGL init fails (no context, driver reset, PixiJS throws), the game falls back to Canvas 2D without interruption. One logged warning, then you keep playing. Every browser that could run Canvas 2D before still runs the game.
+- **`?renderer=canvas` URL override.** Force the Canvas 2D path for debugging, visual parity checks, or anyone on a hardened config where WebGL behaves oddly.
+
+### Changed
+- **`IGameplayRenderer` interface.** The 8 gameplay draw calls (clear, drawBackground, drawTerrain, drawLander, drawGhost, drawParticles, drawArtifacts, drawAlien) plus lifecycle (present, resize, destroy) now go through a polymorphic interface. `CanvasRenderer` and `WebGLGameplayRenderer` both implement it. Game logic stayed untouched.
+- **Dual-canvas DOM.** `index.html` now has a WebGL canvas stacked underneath the UI canvas. In WebGL mode, the UI canvas clears transparently so the gameplay layer shows through. In fallback mode, the WebGL canvas is hidden and the UI canvas does both layers.
+
+### Architecture
+- **Texture-sprite WebGL approach.** WebGLGameplayRenderer reuses CanvasRenderer's draw logic on an offscreen 2D canvas, uploads that canvas as a GPU texture each frame via PixiJS, and blits it. Byte-identical visuals today. Shaders and filters attach to the same sprite in Part B. Trade-off is one full-canvas texture upload per frame (~3.7 MB @ 1280×720), which every consumer GPU in the last decade handles without breathing hard.
+- **Async renderer factory.** `createGameplayRenderer()` is async because PixiJS v8's `Application.init()` is async. `main.ts` gates `new Game()` on the result so the Game constructor receives a fully initialized renderer (no await-later surprises).
+- **PixiJS v8.18.1** added as a runtime dependency.
+
 ## [0.5.9.1] - 2026-04-18 (Sprint 5 Part B + Sprint 5.5 polish)
 
 ### Added
