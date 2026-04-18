@@ -141,6 +141,12 @@ export class GameRenderer {
 	 * after which the canvas stays black and no texture uploads
 	 * happen until the next gameplay frame. */
 	private lastFrameDrewGameplay = false;
+	/** Frame counter used to throttle the training screen's redraw.
+	 * Training runs the RL agent on the main thread; every rAF spent
+	 * redrawing the reward chart is time the agent doesn't spend
+	 * learning. 6x throttle gives a 10 Hz chart refresh, which is
+	 * still visually live, at 1/6 the draw cost. */
+	private trainingFrameTick = 0;
 
 	/** Full clear for gameplay screens: both layers get wiped, and the
 	 * gameplay-drawn flag is set so presentFrame() knows to commit. */
@@ -565,6 +571,14 @@ export class GameRenderer {
 	}
 
 	renderTraining(state: GameRenderState): void {
+		// Throttle to 10 Hz (every 6 rAF ticks at 60 Hz). The training
+		// loop runs the RL agent on the same thread as rendering, so
+		// every rAF spent redrawing the reward chart is main-thread
+		// time the agent could have used for a forward pass. 10 Hz is
+		// still live-feeling for a reward curve that updates once per
+		// episode anyway.
+		this.trainingFrameTick = (this.trainingFrameTick + 1) % 6;
+		if (this.trainingFrameTick !== 0) return;
 		this.clearUIFrame();
 		const history = state.trainingLoop?.agent.getRewardHistory() ?? [];
 		const stats = state.latestTrainingStats;
