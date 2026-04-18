@@ -95,6 +95,30 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 		// transparent-cleared UI overlay.
 		app.renderer.render(app.stage);
 
+		// WebGL contexts can be lost at any time. Most commonly on
+		// mobile/tablet browsers where the browser enforces a small
+		// cap on concurrent contexts per tab, and TF.js grabbing a
+		// second context can kick PixiJS off. When that happens, the
+		// gameplay layer silently freezes on the last frame while the
+		// UI canvas keeps drawing — confusing. Reload into the Canvas
+		// 2D fallback path (?renderer=canvas) so the user gets a
+		// working game on the same URL without a hard refresh.
+		canvas.addEventListener(
+			"webglcontextlost",
+			(e) => {
+				e.preventDefault();
+				console.warn(
+					"[renderer] WebGL context lost — reloading in Canvas 2D fallback mode",
+				);
+				const url = new URL(window.location.href);
+				if (url.searchParams.get("renderer") !== "canvas") {
+					url.searchParams.set("renderer", "canvas");
+					window.location.replace(url.toString());
+				}
+			},
+			{ once: true },
+		);
+
 		return new WebGLGameplayRenderer(
 			canvas,
 			offscreen,

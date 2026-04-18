@@ -3,6 +3,28 @@ import type { IGameplayRenderer } from "./IGameplayRenderer";
 import { WebGLGameplayRenderer } from "./WebGLGameplayRenderer";
 
 /**
+ * Conservative mobile/tablet detection. Signals we check, in order
+ * of reliability:
+ *  1. `navigator.maxTouchPoints > 1` — most touch-primary devices
+ *     (iPads, Android tablets, touch laptops). Modern iPadOS lies
+ *     about being "Macintosh" in UA, but maxTouchPoints is honest.
+ *  2. `Mobi|Android|iPhone|iPad` in UA — classic check.
+ * One hit is enough. Desktop browsers with touch displays get picked
+ * up by #1 too — acceptable false-positive, since the Canvas path
+ * works fine on them.
+ */
+function isMobileOrTablet(): boolean {
+	if (typeof navigator === "undefined") return false;
+	const touchPoints =
+		typeof navigator.maxTouchPoints === "number"
+			? navigator.maxTouchPoints
+			: 0;
+	if (touchPoints > 1) return true;
+	const ua = navigator.userAgent || "";
+	return /Mobi|Android|iPhone|iPad/i.test(ua);
+}
+
+/**
  * Result of renderer selection. `backend` is reported so the HUD /
  * settings panel can surface which pipeline is active ("WEBGL" vs
  * "CANVAS fallback") and so Part B / C can toggle features that only
@@ -33,6 +55,23 @@ export async function createGameplayRenderer(
 	const forceCanvas = params.get("renderer") === "canvas";
 	if (forceCanvas) {
 		console.info("[renderer] Canvas 2D forced by ?renderer=canvas");
+		return {
+			gameplay: new CanvasRenderer(canvasFallback),
+			backend: "canvas",
+		};
+	}
+
+	// Mobile/tablet heuristic: pre-emptively pick Canvas. Most phones
+	// and tablets cap concurrent WebGL contexts per tab at 1-2. The
+	// game would succeed at PixiJS init but then TF.js (AI Training,
+	// AI Theater) grabs another context and kicks PixiJS off, leaving
+	// the gameplay layer frozen. Canvas has no such cap. Users who
+	// want to override can append ?renderer=webgl manually.
+	const forceWebGL = params.get("renderer") === "webgl";
+	if (!forceWebGL && isMobileOrTablet()) {
+		console.info(
+			"[renderer] Mobile/tablet detected — defaulting to Canvas 2D to avoid WebGL context contention with TF.js. Override with ?renderer=webgl",
+		);
 		return {
 			gameplay: new CanvasRenderer(canvasFallback),
 			backend: "canvas",
