@@ -231,12 +231,9 @@ export class HUD {
 			// One-shot message on first frame below AGL blackout threshold.
 			// Drawn near the top-center, just below the AUTHENTIC caption,
 			// so it doesn't collide with the left-column fuel bar.
-			if (
-				authenticState &&
-				authenticState.lowAltMessage.framesRemaining > 0
-			) {
+			if (authenticState && authenticState.lowAltMessage.framesRemaining > 0) {
 				authenticState.lowAltMessage.framesRemaining -= 1;
-				ctx.fillStyle = "#ffb000";
+				ctx.fillStyle = ERA_COLORS.APOLLO_AMBER;
 				ctx.font = 'bold 12px "Courier New", monospace';
 				ctx.textAlign = "center";
 				ctx.fillText(

@@ -1,5 +1,8 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { renderFactSheetBriefing } from "../src/api/MissionBriefing";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	getMissionBriefing,
+	renderFactSheetBriefing,
+} from "../src/api/MissionBriefing";
 import {
 	hasSeenAuthenticIntro,
 	loadAuthenticPreference,
@@ -8,33 +11,48 @@ import {
 } from "../src/game/AuthenticMode";
 import type { MissionFacts } from "../src/game/HistoricMission";
 import type { Mission } from "../src/game/Missions";
-import { addScore, getBestScore, getScores } from "../src/systems/Leaderboard";
+import {
+	_resetLeaderboardCacheForTests,
+	addScore,
+	getBestScore,
+	getScores,
+} from "../src/systems/Leaderboard";
+import { installLocalStoragePolyfill } from "./helpers/localStorage";
 
-beforeAll(() => {
-	if (
-		typeof (globalThis as { localStorage?: Storage }).localStorage ===
-		"undefined"
-	) {
-		const store = new Map<string, string>();
-		(globalThis as { localStorage: Storage }).localStorage = {
-			getItem: (k) => store.get(k) ?? null,
-			setItem: (k, v) => {
-				store.set(k, String(v));
-			},
-			removeItem: (k) => {
-				store.delete(k);
-			},
-			clear: () => store.clear(),
-			key: (i) => Array.from(store.keys())[i] ?? null,
-			get length() {
-				return store.size;
-			},
-		};
-	}
-});
+// Stub the network-backed streamCompletion so the cache-key tests don't hit
+// a real LLM. The stub records every invocation so tests can assert how many
+// times the "network" was called for a given (mission, authentic) pair.
+const streamCompletionMock = vi.fn(
+	async (
+		_config: unknown,
+		messages: { role: string; content: string }[],
+		onChunk: (text: string) => void,
+	) => {
+		const systemMsg = messages.find((m) => m.role === "system")?.content ?? "";
+		// Emit distinct text for authentic vs vanilla system prompts so tests
+		// can also verify the two modes receive distinct prompts, not just
+		// distinct cache slots.
+		const fakeText = systemMsg.includes("AUTHENTIC mode")
+			? "AUTHENTIC BRIEFING STUB"
+			: "VANILLA BRIEFING STUB";
+		onChunk(fakeText);
+		return fakeText;
+	},
+);
+
+vi.mock("../src/api/LLMProvider", () => ({
+	streamCompletion: (
+		config: unknown,
+		messages: { role: string; content: string }[],
+		onChunk: (text: string) => void,
+	) => streamCompletionMock(config, messages, onChunk),
+}));
+
+beforeAll(installLocalStoragePolyfill);
 
 beforeEach(() => {
 	localStorage.clear();
+	_resetLeaderboardCacheForTests();
 });
 
 describe("Sprint 5.5 — localStorage preference roundtrip", () => {
@@ -163,5 +181,96 @@ describe("Sprint 5.5 — MissionBriefing offline fallback with eraOneLiner", () 
 		const text = renderFactSheetBriefing(mission, factsNoEra, true);
 		expect(text).not.toContain("Era:");
 		expect(text).toContain("Eagle"); // still renders the rest
+	});
+});
+
+describe("Sprint 5.5 — MissionBriefing cache-key partitioning by authentic flag", () => {
+	const llmConfig = {
+		provider: "anthropic" as const,
+		apiKey: "test-key",
+		model: "claude-test",
+	};
+
+	const apollo11Facts: MissionFacts = {
+		craftName: "Eagle",
+		date: "1969-07-20",
+		commander: "Neil Armstrong",
+		lmPilot: "Buzz Aldrin",
+		landingSite: "Sea of Tranquility",
+		coordinates: "0.67°N 23.47°E",
+		descentStartAltitudeM: 15240,
+		notableMoment: "Manual descent past a boulder field.",
+		historicalReferenceLabel: "Fuel margin",
+		historicalReferenceValue: 22,
+		historicalReferenceUnit: "seconds",
+		eraOneLiner: "2KB guidance computer.",
+	};
+
+	// The MissionBriefing cache is a module-level Map with no public reset.
+	// Each test uses a distinct seed so prior-test cache entries don't bleed
+	// in. This keeps the tests independent without needing to export an
+	// internal cache for tests to poke at.
+	function mission(seed: number): Mission {
+		return {
+			id: 511,
+			name: `APOLLO 11 (seed ${seed})`,
+			description: "Sea of Tranquility",
+			seed,
+		};
+	}
+
+	function freeplay(seed: number): Mission {
+		return {
+			id: 1,
+			name: `FREEPLAY (seed ${seed})`,
+			description: "generic",
+			seed,
+		};
+	}
+
+	beforeEach(() => {
+		streamCompletionMock.mockClear();
+	});
+
+	it("historic: authentic=false and authentic=true miss the cache independently", async () => {
+		const sink = () => {};
+		const m = mission(1_000_001);
+		const vanilla = await getMissionBriefing(
+			llmConfig,
+			m,
+			sink,
+			apollo11Facts,
+			false,
+		);
+		const authentic = await getMissionBriefing(
+			llmConfig,
+			m,
+			sink,
+			apollo11Facts,
+			true,
+		);
+		// Both variants hit the network — two separate cache slots.
+		expect(streamCompletionMock).toHaveBeenCalledTimes(2);
+		expect(vanilla).toBe("VANILLA BRIEFING STUB");
+		expect(authentic).toBe("AUTHENTIC BRIEFING STUB");
+	});
+
+	it("historic: second call with the same authentic flag hits the cache", async () => {
+		const sink = () => {};
+		const m = mission(1_000_002);
+		await getMissionBriefing(llmConfig, m, sink, apollo11Facts, true);
+		await getMissionBriefing(llmConfig, m, sink, apollo11Facts, true);
+		// First call populates the cache, second hits it — one network call.
+		expect(streamCompletionMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("non-historic (no facts): authentic=false and authentic=true miss independently", async () => {
+		const sink = () => {};
+		// No historicalContext passed — exercises the `${seed}${authSuffix}`
+		// branch of the cache key, not the hashed historic branch.
+		const m = freeplay(1_000_003);
+		await getMissionBriefing(llmConfig, m, sink, undefined, false);
+		await getMissionBriefing(llmConfig, m, sink, undefined, true);
+		expect(streamCompletionMock).toHaveBeenCalledTimes(2);
 	});
 });

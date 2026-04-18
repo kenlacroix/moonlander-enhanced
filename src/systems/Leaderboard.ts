@@ -39,22 +39,40 @@ function getEntries(
 	return [];
 }
 
+// In-memory mirror of the parsed leaderboard. Single-player game with no
+// cross-tab writers, so the cache is always consistent with our own writes.
+// Lazily populated on first read; invalidated on every write-through.
+// Previous behavior was: every getBestScore call ran localStorage.getItem +
+// JSON.parse. renderMenu calls getBestScore 2N times per frame (vanilla +
+// authentic for each mission), which compounds as mission count grows.
+let cached: LeaderboardData | null = null;
+
 function load(): LeaderboardData {
+	if (cached) return cached;
 	try {
-		const data = localStorage.getItem(STORAGE_KEY);
-		if (data) return JSON.parse(data) as LeaderboardData;
+		const raw = localStorage.getItem(STORAGE_KEY);
+		cached = raw ? (JSON.parse(raw) as LeaderboardData) : {};
 	} catch {
-		// localStorage unavailable
+		cached = {};
 	}
-	return {};
+	return cached;
 }
 
 function save(data: LeaderboardData): void {
+	cached = data;
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 	} catch {
 		// localStorage unavailable
 	}
+}
+
+/**
+ * Drop the in-memory cache. Only needed in tests that write to
+ * localStorage directly (bypassing save()) to seed legacy-format data.
+ */
+export function _resetLeaderboardCacheForTests(): void {
+	cached = null;
 }
 
 /** Add a score for a seed. Returns the rank (1-based) or null if it didn't make the board. */

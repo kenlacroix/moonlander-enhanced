@@ -1,6 +1,6 @@
 import type { AlienState } from "../game/Alien";
 import type { Artifact } from "../game/Artifacts";
-import type { AuthenticState } from "../game/AuthenticMode";
+import { type AuthenticState, ERA_COLORS } from "../game/AuthenticMode";
 import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
 import type { Mission } from "../game/Missions";
@@ -636,7 +636,7 @@ export class CanvasRenderer {
 					ctx.fillText(`BEST: ${best}`, CANVAS_WIDTH / 2 + 300, y + 4);
 				}
 				if (authBest !== undefined) {
-					ctx.fillStyle = "#ffb000";
+					ctx.fillStyle = ERA_COLORS.APOLLO_AMBER;
 					ctx.font = '11px "Courier New", monospace';
 					ctx.fillText(
 						`AUTHENTIC: ${authBest}`,
@@ -664,7 +664,9 @@ export class CanvasRenderer {
 			const y = CANVAS_HEIGHT - 60;
 			ctx.textAlign = "center";
 			ctx.font = 'bold 14px "Courier New", monospace';
-			ctx.fillStyle = authenticInfo.on ? "#ffb000" : "rgba(255, 176, 0, 0.5)";
+			ctx.fillStyle = authenticInfo.on
+				? ERA_COLORS.APOLLO_AMBER
+				: "rgba(255, 176, 0, 0.5)";
 			ctx.fillText(
 				`[A] AUTHENTIC MODE: ${authenticInfo.on ? "ON" : "OFF"}`,
 				CANVAS_WIDTH / 2,
@@ -705,7 +707,7 @@ export class CanvasRenderer {
 			},
 		];
 
-		ctx.fillStyle = "#ffb000";
+		ctx.fillStyle = ERA_COLORS.APOLLO_AMBER;
 		ctx.font = 'bold 22px "Courier New", monospace';
 		ctx.textAlign = "center";
 		ctx.fillText(title, CANVAS_WIDTH / 2, 120);
@@ -719,11 +721,11 @@ export class CanvasRenderer {
 
 		for (let i = 0; i < cards.length; i++) {
 			const cx = startX + i * (cardW + gap);
-			ctx.strokeStyle = "#ffb000";
+			ctx.strokeStyle = ERA_COLORS.APOLLO_AMBER;
 			ctx.lineWidth = 1;
 			ctx.strokeRect(cx, cardY, cardW, cardH);
 
-			ctx.fillStyle = "#ffb000";
+			ctx.fillStyle = ERA_COLORS.APOLLO_AMBER;
 			ctx.font = 'bold 14px "Courier New", monospace';
 			ctx.textAlign = "left";
 			ctx.fillText(cards[i].head, cx + 16, cardY + 28);

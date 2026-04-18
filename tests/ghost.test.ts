@@ -6,29 +6,9 @@ import {
 	loadGhostForSeed,
 } from "../src/systems/GhostReplay";
 import type { InputState } from "../src/systems/Input";
+import { installLocalStoragePolyfill } from "./helpers/localStorage";
 
-beforeAll(() => {
-	if (
-		typeof (globalThis as { localStorage?: Storage }).localStorage ===
-		"undefined"
-	) {
-		const store = new Map<string, string>();
-		(globalThis as { localStorage: Storage }).localStorage = {
-			getItem: (k) => store.get(k) ?? null,
-			setItem: (k, v) => {
-				store.set(k, String(v));
-			},
-			removeItem: (k) => {
-				store.delete(k);
-			},
-			clear: () => store.clear(),
-			key: (i) => Array.from(store.keys())[i] ?? null,
-			get length() {
-				return store.size;
-			},
-		};
-	}
-});
+beforeAll(installLocalStoragePolyfill);
 
 describe("GhostRecorder", () => {
 	it("records input frames", () => {
@@ -115,6 +95,63 @@ describe("Sprint 5.5 — Ghost mode isolation", () => {
 		expect(imported?.mode).toBe("authentic");
 		expect(loadGhostForSeed(99, "authentic")?.score).toBe(321);
 		expect(loadGhostForSeed(99, "vanilla")).toBeNull();
+	});
+
+	/**
+	 * GhostReplay.ts:86 — save() does a mode-scoped `find` and only
+	 * overwrites the matching slot. Two things must hold:
+	 *   1. Higher score in mode M overwrites the existing mode-M record.
+	 *   2. A save in mode M must not touch a record in the *other* mode,
+	 *      even when its score is lower than the incoming save.
+	 * Without the mode-scoped find, an Authentic high score would silently
+	 * clobber the vanilla best for the same seed.
+	 */
+	it("higher-score vanilla save overwrites vanilla slot but leaves authentic untouched", () => {
+		// Seed both slots first.
+		const rec1 = new GhostRecorder();
+		rec1.start(1969, "vanilla");
+		rec1.record({ thrustUp: true } as InputState);
+		rec1.save(100);
+
+		const rec2 = new GhostRecorder();
+		rec2.start(1969, "authentic");
+		rec2.record({ rotateLeft: true } as InputState);
+		rec2.save(50);
+
+		// New vanilla high score — higher than both existing records.
+		const rec3 = new GhostRecorder();
+		rec3.start(1969, "vanilla");
+		rec3.record({ rotateRight: true } as InputState);
+		rec3.record({ rotateRight: true } as InputState);
+		rec3.save(500);
+
+		// Vanilla slot was overwritten (higher score, new frames).
+		const vanilla = loadGhostForSeed(1969, "vanilla");
+		expect(vanilla?.score).toBe(500);
+		expect(vanilla?.frames.length).toBe(2);
+
+		// Authentic slot is completely untouched despite lower score.
+		const authentic = loadGhostForSeed(1969, "authentic");
+		expect(authentic?.score).toBe(50);
+		expect(authentic?.frames.length).toBe(1);
+	});
+
+	it("lower-score save in same mode does not overwrite", () => {
+		const rec1 = new GhostRecorder();
+		rec1.start(1969, "authentic");
+		rec1.record({ thrustUp: true } as InputState);
+		rec1.record({ thrustUp: true } as InputState);
+		rec1.save(400);
+
+		const rec2 = new GhostRecorder();
+		rec2.start(1969, "authentic");
+		rec2.record({ rotateLeft: true } as InputState);
+		rec2.save(100);
+
+		// Original higher score and its frames are preserved.
+		const ghost = loadGhostForSeed(1969, "authentic");
+		expect(ghost?.score).toBe(400);
+		expect(ghost?.frames.length).toBe(2);
 	});
 });
 

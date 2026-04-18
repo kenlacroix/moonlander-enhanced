@@ -1,7 +1,7 @@
-import type { LandingMission } from "../game/HistoricMission";
+import type { LandingMission, SurviveMission } from "../game/HistoricMission";
 
 /**
- * Apollo landings (Part A). Apollo 13 "Survive" lands in Part B.
+ * Apollo landings + Apollo 13's non-landing "survive" mission.
  *
  * Seeds are fixed for shareability + leaderboard determinism. Numbers
  * cited in `facts` come from NASA mission summaries; Wikipedia's Apollo
@@ -145,3 +145,50 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		],
 	},
 ];
+
+/**
+ * Apollo 13 — the "survive" mission. O2 tank ruptured en route; the crew
+ * used the LM as a lifeboat and slingshot around the Moon back to Earth.
+ * In-game this is modeled as "stay flying (don't crash, don't run out of
+ * control) for a target duration" — a highly compressed stand-in for the
+ * real 87-hour return trajectory. `survivalDurationSec` is the target;
+ * `MAX_FLIGHT_DURATION` is the hard upper bound.
+ */
+export const APOLLO_13: SurviveMission = {
+	id: 513,
+	name: "APOLLO 13 — AQUARIUS LIFEBOAT",
+	seed: 13_1970,
+	description: "Oxygen tank blew. Don't land — just get home alive.",
+	kind: "survive",
+	era: "1960s-70s-apollo",
+	survivalDurationSec: 90,
+	difficulty: {
+		landerType: "apollo-lm",
+		startingFuel: 700,
+		spawnY: 60,
+		// No pad required — but the terrain engine still generates them;
+		// these values only matter for the very unlikely case the player
+		// manually lands. Narrow pads discourage treating this as a
+		// landing mission.
+		padMinWidth: 40,
+		padMaxWidth: 60,
+		padCount: 1,
+	},
+	facts: {
+		craftName: "Aquarius (LM) / Odyssey (CM)",
+		date: "1970-04-11",
+		commander: "Jim Lovell",
+		lmPilot: "Fred Haise",
+		cmPilot: "Jack Swigert",
+		landingSite: "Never landed — free-return trajectory around the Moon",
+		coordinates: "N/A (loop-around)",
+		descentStartAltitudeM: 0,
+		notableMoment:
+			"Oxygen tank ruptured en route. Crew used the LM as a lifeboat and slingshot around the Moon back to Earth.",
+		historicalReferenceLabel: "Lovell survival duration",
+		historicalReferenceValue: 87,
+		historicalReferenceUnit: "hours",
+		eraOneLiner:
+			"Aquarius' descent engine, designed for a 12-minute landing burn, became a 14-hour life-support burn to bend the crew's trajectory back to Earth.",
+	},
+};

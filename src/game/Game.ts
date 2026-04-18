@@ -26,7 +26,7 @@ import {
 	deserializeEditor,
 	type EditorState,
 } from "../ui/TerrainEditor";
-import { WORLD_WIDTH } from "../utils/constants";
+import { MAX_FLIGHT_DURATION, WORLD_WIDTH } from "../utils/constants";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
 import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
@@ -39,11 +39,16 @@ import {
 	updateAuthentic,
 } from "./AuthenticMode";
 import { Camera } from "./Camera";
-import { handleCollisionResult } from "./CollisionHandler";
+import {
+	handleCollisionResult,
+	handleSurviveSuccess,
+	handleSurviveTimeout,
+} from "./CollisionHandler";
 import { GameLoop } from "./GameLoop";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
 import { type GravityPreset, getDefaultPreset } from "./GravityPresets";
 import { createGravityStorm, shouldSpawnGravityStorm } from "./GravityStorm";
+import { isHistoricMission } from "./HistoricMission";
 import { createLander, type LanderState } from "./Lander";
 import { getLanderType } from "./LanderTypes";
 import { LLMIntegration } from "./LLMIntegration";
@@ -52,7 +57,9 @@ import { ParticleSystem } from "./Particles";
 import { PhysicsManager } from "./PhysicsManager";
 import type { RelayState } from "./RelayMode";
 import {
+	HISTORIC_MISSIONS,
 	handlePostFlightInput,
+	selectMission,
 	updateEditor,
 	updateFlightVisuals,
 	updateMenu,
@@ -224,14 +231,25 @@ export class Game {
 				this.status = "title";
 			}
 		} else if (urlSeed && !Number.isNaN(urlSeed)) {
-			this.gameMode = "freeplay";
-			this.activeMission = {
-				id: 0,
-				name: `SEED ${urlSeed}`,
-				seed: urlSeed,
-				description: "Shared mission",
-			};
-			this.status = "playing";
+			// Shared/embed URLs must route historic seeds through selectMission
+			// so auto-landing (Luna 9) gets its autopilot force-enabled and
+			// survive (Apollo 13) gets its missionMode set. Before this lookup
+			// every urlSeed fell into the freeplay path below, so a shared
+			// Luna 9 link silently played as freeplay with the player flying.
+			const historic = HISTORIC_MISSIONS.find((m) => m.seed === urlSeed);
+			if (historic) {
+				this.gameMode = "historic";
+				selectMission(this, historic);
+			} else {
+				this.gameMode = "freeplay";
+				this.activeMission = {
+					id: 0,
+					name: `SEED ${urlSeed}`,
+					seed: urlSeed,
+					description: "Shared mission",
+				};
+				this.status = "playing";
+			}
 		} else {
 			this.status = "title";
 		}
@@ -497,7 +515,27 @@ export class Game {
 			this.seed_,
 			(input) => this.ghostRecorder.record(input),
 		);
-		if (!result) return;
+		if (!result) {
+			// Sprint 5 Part B — Apollo 13 "survive" mission terminates on
+			// a time condition rather than a pad touch. Ran after physics
+			// so any collision this frame takes precedence (a crash on the
+			// final millisecond is still a crash).
+			if (
+				this.missionMode === "survive" &&
+				this.activeMission &&
+				isHistoricMission(this.activeMission) &&
+				this.activeMission.kind === "survive"
+			) {
+				if (
+					this.physics.flightElapsed >= this.activeMission.survivalDurationSec
+				) {
+					handleSurviveSuccess(this);
+				} else if (this.physics.flightElapsed >= MAX_FLIGHT_DURATION) {
+					handleSurviveTimeout(this);
+				}
+			}
+			return;
+		}
 		handleCollisionResult(
 			this,
 			result.landed,

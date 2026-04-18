@@ -56,6 +56,16 @@ export const LANDER_TYPES: Record<string, LanderType> = {
 		color: "#e8b878",
 		description: "Modern Human Landing System. Heavier, more capable.",
 	},
+	"luna-9": {
+		name: "LUNA 9",
+		thrustMultiplier: 0.85,
+		fuelMultiplier: 0.5,
+		massMultiplier: 0.7,
+		rotationMultiplier: 1.1,
+		color: "#c8b080",
+		description:
+			"Soviet 1966 automated probe. Light, fuel-sparse, modest thrust.",
+	},
 };
 
 export function getLanderType(name?: string): LanderType {
