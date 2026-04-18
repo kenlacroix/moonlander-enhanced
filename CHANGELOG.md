@@ -5,20 +5,25 @@ All notable changes to MoonLander Enhanced will be documented in this file.
 ## [0.5.9.1] - 2026-04-18 (Sprint 5 Part B + Sprint 5.5 polish)
 
 ### Added
-- **Luna 9 auto-landing mission.** First soft lunar landing, 1966. New `auto-landing` mission kind: the autopilot flies, the player spectates. The `[P]` autopilot toggle is gated off for the duration so you can't yank control mid-descent. Luna-9 lander type with its own mass, thrust, and fuel profile.
-- **Apollo 13 "Survive" mission.** New `survive` mission kind: no pad, no landing — stay aloft for `survivalDurationSec`. Success on the duration threshold, timeout on `MAX_FLIGHT_DURATION`. Fuel-preserving score (conserving consumables is the whole story of Apollo 13).
-- **HistoricMission discriminated union.** `kind: "landing" | "survive" | "auto-landing"` on the mission type. Compile-time guarantee that Apollo 13 never accidentally wires `moments[]` and Luna 9 never skips autopilot setup.
-- **`MissionChatter` respects mission kind.** Landing-specific callouts only fire on landing missions; survive and auto-landing stay quiet (or chatter differently in future work).
+- **Luna 9 auto-landing mission.** Pick Luna 9 from HISTORIC MISSIONS and watch the first soft lunar landing (1966) play out. The autopilot flies, you spectate. `[P]` is gated off for the duration so you can't yank control mid-descent. Ships with a Luna-9 lander type carrying its own mass, thrust, and fuel profile.
+- **Apollo 13 "Survive" mission.** No pad, no landing. Keep the crew alive long enough to come home. Success fires at the survive duration, a miss wipes you at the hard timeout. Score rewards fuel preservation, because conserving consumables IS the story of Apollo 13.
+- **Mission-kind-aware chatter.** Radio callouts now respect whether you're landing, surviving, or spectating. Landing callouts stay on landing missions, so Apollo 13 doesn't yell "100 meters" at you mid-freefall.
 
 ### Changed
-- **URL / embed seed routing.** Shared URLs and `?embed=1` iframes now resolve historic seeds through `selectMission`. Before this, `?seed=<luna-9-seed>&embed=1` loaded as generic freeplay with the player flying manually — now it loads as Luna 9 with the autopilot engaged and the `[P]` toggle gated off, matching the in-app flow. Non-historic seeds still route to freeplay.
-- **`handleSurviveSuccess` honors `currentFlight.authenticMode`.** Leaderboard entries from survive missions now route to the vanilla or authentic slot based on the active flight config, mirroring `handleCollisionResult`. Today behaves identically (survive missions never populate `currentFlight`), but unblocks future Authentic Mode work on Apollo 13.
-- **CanvasRenderer, FlightRecorder, and HUD use `ERA_COLORS`.** Tutorial overlays, mission-select indicators, dual-track leaderboards, and the Authentic share-card badge all read from the central era-color module. No more `#ffb000` / `#00ccff` string literals in the render path.
-- **Shared localStorage test polyfill.** Extracted from three test files (`authentic-regression`, `authentic-integration`, `ghost`) into `tests/helpers/localStorage.ts`. One polyfill, three consumers.
-- **Expanded authentic-mode test coverage.** New assertions on the master-alarm gate boundary, `isAltitudeBlackedOut` boundary conditions, mission-briefing authentic cache-key partitioning, and ghost mode-scoped save overwrites. Seeds 1969, 4217, and 7001 now pin byte-identical non-historic terrain.
+- **Shared and embedded links actually work on historic missions.** Sending a friend `?seed=<luna9>&embed=1` used to drop them into generic freeplay with the lander unpowered. Now it opens Luna 9 with the autopilot engaged and `[P]` gated off, identical to picking it from the menu. Non-historic seeds still route to freeplay.
+- **Apollo 13 survive leaderboards route by mode.** Entries now honor the active flight's Authentic-vs-vanilla config for its leaderboard slot. Observable behavior unchanged today (Apollo 13 doesn't expose Authentic yet), but the routing is ready for when it does.
 
-### Tests
-- 273 → 279 tests passing. Six new tests pin the URL-seed routing contract (Luna 9 → auto-landing, Apollo 13 → survive, unknown seed → freeplay) and the `handleSurviveSuccess` leaderboard mode routing (vanilla on / off / null cases).
+### Architecture
+- **HistoricMission discriminated union.** `kind: "landing" | "survive" | "auto-landing"` on the mission type makes it a compile error for Apollo 13 to forget its survive duration or Luna 9 to skip autopilot setup.
+- **`ERA_COLORS` fully adopted.** CanvasRenderer, FlightRecorder, and HUD consume the era-color module directly. No more `#ffb000` / `#00ccff` string literals in the render path.
+- **Shared localStorage test polyfill.** Deduplicated from three test files (`authentic-regression`, `authentic-integration`, `ghost`) into `tests/helpers/localStorage.ts`.
+- 273 → 279 tests passing. Six new tests pin the URL-seed routing contract (Luna 9 → auto-landing, Apollo 13 → survive, unknown seed → freeplay) and the survive-success leaderboard mode routing. Four new Sprint 5.5 coverage tests cover the master-alarm gate boundary, altitude-blackout boundaries, mission-briefing authentic cache partitioning, and ghost mode-scoped save overwrites. Seeds 1969, 4217, 7001 now pin byte-identical non-historic terrain.
+
+### Deferred
+- Apollo 13 and Luna 9 Authentic variants (era-specific mechanics for the new mission kinds).
+- Leaderboard read hoist out of `renderMenu` hot path (`getBestScore` runs 2N times/frame; minor today, amplifies with mission count).
+- Part B scaffolding dead code: `EllipseState`, `hazardMask`, `ELLIPSE_UPDATE_FRAMES` — populated for Artemis but never read.
+- `/codex review` outside voice on this diff (blocked 2026-04-16 by account limit, reset 2026-04-20).
 
 ## [0.5.9.0] - 2026-04-17 (Sprint 5.5 Part A: Authentic Mode)
 

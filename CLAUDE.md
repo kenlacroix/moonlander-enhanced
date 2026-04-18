@@ -328,7 +328,7 @@ IDLE → FLYING → LANDING_SUCCESS
 
 ---
 
-### Sprint 2.6 — AI Theater Explain Mode ⚠️ Parts A+B shipped (v0.5.8.1 / v0.5.8.2); Part C remaining
+### Sprint 2.6 — AI Theater Explain Mode ✅ COMPLETE (v0.5.8.1 → v0.5.8.3)
 
 *CEO+Eng reviewed 2026-04-15 in SCOPE EXPANSION mode. Plan at `.plans/sprint-2.6-explain-mode.md`. CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-15-sprint-2.6-explain-mode.md`.*
 
@@ -339,14 +339,14 @@ IDLE → FLYING → LANDING_SUCCESS
 **Part B — Reward breakdown overlay ✅ COMPLETE (v0.5.8.2, PR #29)**
 - [x] Reward breakdown overlay: per-episode component totals (terminal, proximity, descent, speed, angle penalty, approach, time tax) via `calculateRewardBreakdown()`, toggled with EXPLAIN button. Preference persists via `localStorage["moonlander-explain-mode"]`.
 
-**Part C — Tutorial + polish (remaining)**
-- [ ] First-run 3-card inline tutorial (localStorage `moonlander-ai-theater-tour-seen`), dismissible, never reappears
-- [ ] `?` keyboard toggle for compact vs expanded mode (localStorage-persisted)
-- [ ] E1: RANDOM badge flashes on exploratory actions (makes epsilon concrete)
-- [ ] E2: Hover tooltips on state-vector bars (raw value + human-readable label)
-- [ ] E3: First-landing glow on algorithm card (3 sec on first success)
+**Part C — Tutorial + compact toggle + polish ✅ COMPLETE (v0.5.8.3, PR #31)**
+- [x] First-run 3-card inline tutorial (localStorage `moonlander-ai-theater-tour-seen`), dismissible, never reappears
+- [x] `?` keyboard toggle for compact vs expanded mode (localStorage-persisted)
+- [x] E1: RANDOM badge flashes on exploratory actions (makes epsilon concrete)
+- [x] E2: Hover tooltips on state-vector bars (raw value + human-readable label)
+- [x] E3: First-landing glow on algorithm card (3 sec on first success)
 
-**Part C also natural home for deferred findings from Parts A+B** (tracked in TODOS.md):
+**Deferred from Part C** (tracked in TODOS.md):
 - Transfer DQN breakdown on non-Moon worlds (Part B found that on Europa/Jupiter/etc. the transfer-DQN slot isn't captured in the overlay)
 - `REWARD_COMPONENT_KEYS` single source of truth (drift hazard across 3 call sites)
 - Codex second opinion on Parts A+B (blocked 2026-04-16 by account limit, reset 2026-04-20)
@@ -437,10 +437,11 @@ IDLE → FLYING → LANDING_SUCCESS
 - [x] `MissionChatter.ts` — event-triggered radio callouts during descent (altitude 1000m/200m, fuel 15%/5%, drift, landing, crash); rule-based offline fallback
 - [x] Regression test pinning non-historic terrain determinism (seeds 1969, 4217, 7001 produce byte-identical output when `specialFeature` unset)
 
-**Part B — Specialized mission types (~7h human / ~55 min CC, follow-up PR):**
-- [ ] Apollo 13 "Survive" — non-landing loop-around mission, simplified 2D return-trajectory scoring via `missionMode === "survive"` branch, with `MAX_FLIGHT_DURATION` timeout
-- [ ] Luna 9 (1966 Soviet first soft landing) — `missionMode === "auto-landing"`, autopilot-driven, player spectates
-- [ ] Luna-9 lander type entry
+**Part B — Specialized mission types ✅ COMPLETE (v0.5.9.1, PR #34)**
+- [x] Apollo 13 "Survive" — non-landing loop-around mission via `missionMode === "survive"` branch, with `MAX_FLIGHT_DURATION` timeout and fuel-preserving score
+- [x] Luna 9 (1966 Soviet first soft landing) — `missionMode === "auto-landing"`, autopilot force-engaged on launch with `[P]` toggle gated off for the flight
+- [x] Luna-9 lander type entry + `src/data/lunaMissions.ts`
+- [x] Pre-ship /qa pass fixed two SHOULD-FIX items: embed/share URL routing through `selectMission` (so `?seed=<luna9>&embed=1` engages the autopilot), and `handleSurviveSuccess` honors `currentFlight.authenticMode` for leaderboard slot routing
 
 **Deferred (backlog):**
 - [ ] Apollo 12, 14, 16; Luna 16 (sample return); Chang'e 3/4/5; SLIM 2024; Chandrayaan-3
@@ -449,6 +450,39 @@ IDLE → FLYING → LANDING_SUCCESS
 - [ ] Polish bundle: NASA crew photos, historical landing quotes, Apollo DSKY HUD skin, era-appropriate audio tint, lunar-contact beep
 
 **Exit question:** Would a space nerd share this with every space nerd they know?
+
+---
+
+### Sprint 5.5 — Authentic Mode on historic missions ✅ COMPLETE (v0.5.9.0 + v0.5.9.1 polish)
+
+*CEO-reviewed 2026-04-16, Codex-challenged. Plan at `.plans/sprint-5.5-authentic-mode.md`. Shipped as a standalone PR between Sprint 5 Part A and Part B.*
+
+**Part A — Authentic Mode foundations ✅ COMPLETE (v0.5.9.0, PR #32)**
+- [x] Per-mission Authentic toggle (default OFF, byte-identical to vanilla when off)
+- [x] Apollo 11 signature moments: 1202 program alarm (400ms thrust lockout, WCAG-compliant 2.5 Hz strobe) with skip-on-collision grace; altitude blackout under 50 AGL via true AGL (not world-frame)
+- [x] Apollo 15/17: one-shot master-alarm audio cue at 150 AGL (advisory, no input lockout)
+- [x] Artemis III: hazard-aware landing ellipse (slope-aware red/green fusion)
+- [x] Era captions + era colors: `AUTHENTIC 1969 TECH` in DSKY amber, `AUTHENTIC 2028 TECH` in cyan
+- [x] Pre-launch 3-card tutorial overlay on first mission flip (3s auto-dismiss)
+- [x] AUTHENTIC corner badge on share cards (era-colored)
+- [x] Dual-track leaderboard (`{seed}-{mode}` keyed, legacy migration lazy on first read)
+- [x] Era-flavored mission briefings via `eraOneLiner` field on MissionFacts
+- [x] `prefers-reduced-motion` support (steady banner instead of strobe)
+- [x] Ghost replays partition by mode (authentic ghosts don't overwrite vanilla bests)
+
+**Part B — Polish + coverage + QA fixes ✅ COMPLETE (v0.5.9.1, PR #34)**
+Shipped alongside Sprint 5 Part B in the same PR.
+- [x] Fill 4 test coverage gaps: master-alarm gate boundary, `isAltitudeBlackedOut` boundaries, MissionBriefing authentic cache-key partitioning, ghost mode-scoped save overwrite
+- [x] `CanvasRenderer` + `FlightRecorder` + `HUD` consume `ERA_COLORS` instead of `#ffb000` / `#00ccff` literals
+- [x] Shared localStorage test polyfill at `tests/helpers/localStorage.ts`
+- [x] Non-historic terrain determinism pin (seeds 1969, 4217, 7001)
+
+**Deferred (tracked in TODOS.md):**
+- [ ] Standalone hazard ribbon overlay (fused into landing ellipse today; revisit after playtest)
+- [ ] Authentic variants for deferred historic missions (Luna 9, Apollo 12/14/16, Chang'e, SLIM, etc.)
+- [ ] Hoist leaderboard reads out of `renderMenu` hot path
+
+**Exit question:** Does flipping Authentic ON feel like stepping into the era, not just adding difficulty?
 
 ---
 
