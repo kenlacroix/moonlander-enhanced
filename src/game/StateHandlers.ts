@@ -1,5 +1,6 @@
-import { APOLLO_MISSIONS } from "../data/apolloMissions";
+import { APOLLO_13, APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
+import { LUNA_MISSIONS } from "../data/lunaMissions";
 import {
 	computeHistoricYourValue,
 	generateFlightReport,
@@ -43,9 +44,13 @@ const TITLE_OPTION_COUNT = 7;
 /**
  * Historic missions, grouped by era for the mission-select grouping.
  * Order matters: this array order is what the menu cycles through.
+ * 1960s Soviet first, then 1960s-70s Apollo (including Apollo 13's
+ * non-landing survive mission), then 2020s Artemis.
  */
 export const HISTORIC_MISSIONS: HistoricMission[] = [
+	...LUNA_MISSIONS,
 	...APOLLO_MISSIONS,
+	APOLLO_13,
 	...ARTEMIS_MISSIONS,
 ];
 
@@ -245,7 +250,14 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.status = "menu";
 		return;
 	}
-	if (input.toggleAutopilot && game.status === "playing")
+	// Auto-landing missions (Luna 9) force autopilot on for the full
+	// flight; the player is a spectator. Gate the toggle off so P-key
+	// can't disengage the pilot mid-descent.
+	if (
+		input.toggleAutopilot &&
+		game.status === "playing" &&
+		game.missionMode !== "auto-landing"
+	)
 		game.autopilot.toggle();
 	if (input.toggleAnnotations && game.status === "playing")
 		game.autopilot.toggleAnnotations();
@@ -317,7 +329,7 @@ export function getMenuMissions(
 	return MISSIONS;
 }
 
-function selectMission(game: Game, mission: Mission): void {
+export function selectMission(game: Game, mission: Mission): void {
 	game.activeMission = mission;
 	game.setSeed(mission.seed);
 	// Default to "landing" for everything; historic missions opt into
@@ -338,6 +350,13 @@ function selectMission(game: Game, mission: Mission): void {
 		game.currentFlight = null;
 	}
 	game.reset();
+	// Sprint 5 Part B — auto-landing missions force the autopilot on; the
+	// player spectates. Must run AFTER reset() because reset() sets
+	// autopilot.enabled=false. handlePostFlightInput also gates the toggle
+	// off in auto-landing mode so the player can't disengage mid-flight.
+	if (isHistoricMission(mission) && mission.kind === "auto-landing") {
+		game.autopilot.enabled = true;
+	}
 	game.llm.fetchBriefing(
 		game,
 		mission,

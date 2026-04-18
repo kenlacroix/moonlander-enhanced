@@ -2,12 +2,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
 	ALARM_LOCKOUT_FRAMES,
 	ALTITUDE_ALARM_GATE_PX,
+	ALTITUDE_BLACKOUT_AGL_PX,
 	type AuthenticState,
 	applyAuthenticFilter,
 	buildAuthenticState,
 	type FlightConfig,
 	isAltitudeBlackedOut,
 	loadAuthenticPreference,
+	MASTER_ALARM_GATE_PX,
 	saveAuthenticPreference,
 	updateAuthentic,
 } from "../src/game/AuthenticMode";
@@ -17,31 +19,9 @@ import type { Mission } from "../src/game/Missions";
 import type { TerrainData } from "../src/game/Terrain";
 import type { InputState } from "../src/systems/Input";
 import { FIXED_TIMESTEP } from "../src/utils/constants";
+import { installLocalStoragePolyfill } from "./helpers/localStorage";
 
-// Node's default vitest environment has no localStorage. Install a minimal
-// in-memory polyfill for any test that exercises the preference API.
-beforeAll(() => {
-	if (
-		typeof (globalThis as { localStorage?: Storage }).localStorage ===
-		"undefined"
-	) {
-		const store = new Map<string, string>();
-		(globalThis as { localStorage: Storage }).localStorage = {
-			getItem: (k) => store.get(k) ?? null,
-			setItem: (k, v) => {
-				store.set(k, String(v));
-			},
-			removeItem: (k) => {
-				store.delete(k);
-			},
-			clear: () => store.clear(),
-			key: (i) => Array.from(store.keys())[i] ?? null,
-			get length() {
-				return store.size;
-			},
-		};
-	}
-});
+beforeAll(installLocalStoragePolyfill);
 
 /**
  * Sprint 5.5 Part A — IRON RULE regression tests.
@@ -338,6 +318,192 @@ describe("Sprint 5.5 — CRITICAL regression tests", () => {
 		const headlessTerrain = null as unknown as TerrainData;
 		const fakeLander = { x: 0, y: 0 } as unknown as LanderState;
 		expect(isAltitudeBlackedOut(null, fakeLander, headlessTerrain)).toBe(false);
+	});
+
+	/**
+	 * Apollo 15/17 MASTER ALARM — altitude-gated single-fire advisory. Fires
+	 * exactly once when AGL crosses into (0, MASTER_ALARM_GATE_PX), never fires
+	 * again after DONE, never injects input (unlike 1202). Guards all four
+	 * boundary conditions that live in updateAuthentic's masterAlarm branch.
+	 */
+	describe("Apollo 15/17 master alarm", () => {
+		const apollo15 = {
+			id: 515,
+			era: "1960s-70s-apollo",
+			kind: "landing",
+			seed: 15_1971,
+		} as unknown as Mission;
+
+		const flatTerrain = {
+			points: [
+				{ x: 0, y: 700 },
+				{ x: 5000, y: 700 },
+			],
+			pads: [],
+		} as unknown as TerrainData;
+
+		function landerAtAgl(aglPx: number): LanderState {
+			return {
+				x: 100,
+				y: 700 - aglPx,
+				vx: 0,
+				vy: 0,
+				angle: 0,
+				fuel: 1000,
+				thrusting: false,
+				status: "flying",
+			} as unknown as LanderState;
+		}
+
+		it("does not fire when terrain is null (headless / pre-flight)", () => {
+			const state = buildAuthenticState(apollo15, 15_1971, false);
+			expect(state?.masterAlarm?.state).toBe("IDLE");
+			expect(updateAuthentic(state, landerAtAgl(100), null)).toBeNull();
+			expect(state?.masterAlarm?.state).toBe("IDLE");
+		});
+
+		it("does not fire above the gate (AGL > MASTER_ALARM_GATE_PX)", () => {
+			const state = buildAuthenticState(apollo15, 15_1971, false);
+			const lander = landerAtAgl(MASTER_ALARM_GATE_PX + 10);
+			expect(updateAuthentic(state, lander, flatTerrain)).toBeNull();
+			expect(state?.masterAlarm?.state).toBe("IDLE");
+		});
+
+		it("does not fire when lander is at or below ground (AGL <= 0)", () => {
+			const state = buildAuthenticState(apollo15, 15_1971, false);
+			// AGL = 0 (lander exactly on the terrain surface)
+			expect(updateAuthentic(state, landerAtAgl(0), flatTerrain)).toBeNull();
+			// AGL negative (penetrating terrain — crash frame)
+			expect(updateAuthentic(state, landerAtAgl(-10), flatTerrain)).toBeNull();
+			expect(state?.masterAlarm?.state).toBe("IDLE");
+		});
+
+		it("fires exactly once when AGL crosses into (0, MASTER_ALARM_GATE_PX)", () => {
+			const state = buildAuthenticState(apollo15, 15_1971, false);
+			const insideGate = landerAtAgl(MASTER_ALARM_GATE_PX - 10);
+			expect(updateAuthentic(state, insideGate, flatTerrain)).toBe(
+				"master-alarm-fired",
+			);
+			expect(state?.masterAlarm?.state).toBe("DONE");
+			// Second tick inside the gate must not fire again.
+			expect(updateAuthentic(state, insideGate, flatTerrain)).toBeNull();
+			// A later tick back above the gate must still not fire — DONE is terminal.
+			const outsideGate = landerAtAgl(MASTER_ALARM_GATE_PX + 50);
+			expect(updateAuthentic(state, outsideGate, flatTerrain)).toBeNull();
+		});
+
+		it("does not alter input (advisory only — unlike 1202)", () => {
+			const state = buildAuthenticState(apollo15, 15_1971, false);
+			const lander = landerAtAgl(MASTER_ALARM_GATE_PX - 10);
+			updateAuthentic(state, lander, flatTerrain);
+			expect(state?.masterAlarm?.state).toBe("DONE");
+			// After the master alarm fires, filter must still pass input through
+			// unchanged — master alarm is audio-only, no thrust lockout.
+			const input = { ...THRUST_INPUT };
+			expect(applyAuthenticFilter(input, state)).toBe(input);
+		});
+	});
+
+	/**
+	 * Altitude blackout positive-path boundaries. Complements the null/empty
+	 * sanity test above by walking the AGL range around ALTITUDE_BLACKOUT_AGL_PX.
+	 * Per AuthenticMode.ts:197 the blackout condition is
+	 * `aglPx > 0 && aglPx < ALTITUDE_BLACKOUT_AGL_PX` — strict inequalities on
+	 * both sides, so AGL=0 and AGL=THRESHOLD are both false.
+	 */
+	describe("isAltitudeBlackedOut boundaries", () => {
+		const apollo11 = {
+			id: 511,
+			era: "1960s-70s-apollo",
+			kind: "landing",
+			seed: 11_1969,
+		} as unknown as Mission;
+		const artemis = {
+			id: 2028,
+			era: "2020s-artemis",
+			kind: "landing",
+			seed: 2028,
+		} as unknown as Mission;
+
+		const flatTerrain = {
+			points: [
+				{ x: 0, y: 700 },
+				{ x: 5000, y: 700 },
+			],
+			pads: [],
+		} as unknown as TerrainData;
+
+		function landerAtAgl(aglPx: number): LanderState {
+			return {
+				x: 100,
+				y: 700 - aglPx,
+			} as unknown as LanderState;
+		}
+
+		it("returns true for AGL strictly between 0 and ALTITUDE_BLACKOUT_AGL_PX", () => {
+			const state = buildAuthenticState(apollo11, 11_1969, false);
+			expect(isAltitudeBlackedOut(state, landerAtAgl(1), flatTerrain)).toBe(
+				true,
+			);
+			expect(
+				isAltitudeBlackedOut(
+					state,
+					landerAtAgl(Math.floor(ALTITUDE_BLACKOUT_AGL_PX / 2)),
+					flatTerrain,
+				),
+			).toBe(true);
+			expect(
+				isAltitudeBlackedOut(
+					state,
+					landerAtAgl(ALTITUDE_BLACKOUT_AGL_PX - 1),
+					flatTerrain,
+				),
+			).toBe(true);
+		});
+
+		it("returns false at the threshold (AGL === ALTITUDE_BLACKOUT_AGL_PX)", () => {
+			const state = buildAuthenticState(apollo11, 11_1969, false);
+			expect(
+				isAltitudeBlackedOut(
+					state,
+					landerAtAgl(ALTITUDE_BLACKOUT_AGL_PX),
+					flatTerrain,
+				),
+			).toBe(false);
+		});
+
+		it("returns false above the threshold", () => {
+			const state = buildAuthenticState(apollo11, 11_1969, false);
+			expect(
+				isAltitudeBlackedOut(
+					state,
+					landerAtAgl(ALTITUDE_BLACKOUT_AGL_PX + 100),
+					flatTerrain,
+				),
+			).toBe(false);
+		});
+
+		it("returns false at AGL === 0 and below (ground / subsurface)", () => {
+			const state = buildAuthenticState(apollo11, 11_1969, false);
+			expect(isAltitudeBlackedOut(state, landerAtAgl(0), flatTerrain)).toBe(
+				false,
+			);
+			expect(isAltitudeBlackedOut(state, landerAtAgl(-5), flatTerrain)).toBe(
+				false,
+			);
+		});
+
+		it("returns false for artemis era even when AGL is inside the band", () => {
+			// Blackout is an Apollo-era effect only (no analog instruments on Artemis).
+			const state = buildAuthenticState(artemis, 2028, false);
+			expect(
+				isAltitudeBlackedOut(
+					state,
+					landerAtAgl(Math.floor(ALTITUDE_BLACKOUT_AGL_PX / 2)),
+					flatTerrain,
+				),
+			).toBe(false);
+		});
 	});
 });
 

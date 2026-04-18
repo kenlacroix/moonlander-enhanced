@@ -15,6 +15,12 @@ export const CANVAS_HEIGHT = 720;
 export const FIXED_TIMESTEP = 1 / 60; // 16.67ms physics step
 export const MAX_DELTA = 0.05; // 50ms cap — prevents physics explosion on tab refocus
 
+// Hard cap on flight duration. Primarily a safety net for Apollo 13 "survive"
+// missions: even if the target survival window is never reached (bad physics
+// corner, infinite hover, etc.), the flight force-terminates. Mirrors
+// MAX_STEPS_PER_EPISODE from the training path.
+export const MAX_FLIGHT_DURATION = 300; // seconds (5 minutes)
+
 // Terrain generation
 export const TERRAIN_POINTS = 200; // number of terrain vertices across the map
 export const TERRAIN_ROUGHNESS = 0.6; // midpoint displacement roughness (0-1)

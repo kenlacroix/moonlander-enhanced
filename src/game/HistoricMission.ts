@@ -70,17 +70,25 @@ export interface LandingMission extends BaseHistoricMission {
 	moments: MissionMoment[];
 }
 
+/**
+ * Non-landing "get home" mission (Apollo 13 model). Success = stay flying
+ * for at least `survivalDurationSec` of game time, fail = crash or hit the
+ * MAX_FLIGHT_DURATION hard timeout. Score is fuel-preserving rather than
+ * landing-precision, since the whole point is that you never land.
+ */
 export interface SurviveMission extends BaseHistoricMission {
 	kind: "survive";
-	// Loop-around / non-landing return-trajectory mission. Part B will
-	// add scoring fields here (target altitude + earth-intercept window).
-	// Stubbed in Part A so the type union is complete.
+	survivalDurationSec: number;
 }
 
+/**
+ * Autopilot-driven spectator mission (Luna 9 model). The player doesn't
+ * fly — the autopilot does, the player watches history replay. Lander
+ * still subject to normal landing physics; `selectMission` force-enables
+ * `autopilot` and gates off the toggle so the player can't disengage.
+ */
 export interface AutoLandingMission extends BaseHistoricMission {
 	kind: "auto-landing";
-	// Spectator mission. Autopilot drives. Part B will add the descent
-	// profile config; stubbed here so missionMode routing compiles.
 }
 
 export type HistoricMission =

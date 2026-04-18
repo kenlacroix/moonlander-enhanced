@@ -7,6 +7,7 @@
  * One-tap save to camera roll on mobile.
  */
 
+import { ERA_COLORS } from "../game/AuthenticMode";
 import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
 import {
@@ -420,7 +421,10 @@ function renderCard(ctx: CanvasRenderingContext2D, r: FlightReport): void {
 	// above the footer watermark, clear of the landing grade
 	// (upper-right) and mission name (left).
 	if (r.authenticEra) {
-		const color = r.authenticEra === "apollo" ? "#ffb000" : "#00ccff";
+		const color =
+			r.authenticEra === "apollo"
+				? ERA_COLORS.APOLLO_AMBER
+				: ERA_COLORS.ARTEMIS_CYAN;
 		const label =
 			r.authenticEra === "apollo" ? "AUTHENTIC 1969" : "AUTHENTIC 2028";
 		const badgeW = 132;

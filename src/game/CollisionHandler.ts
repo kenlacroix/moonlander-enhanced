@@ -3,7 +3,7 @@ import {
 	checkLandingAchievements,
 } from "../systems/Achievements";
 import { addScore } from "../systems/Leaderboard";
-import { STARTING_FUEL } from "../utils/constants";
+import { SCORE_FUEL_MULTIPLIER, STARTING_FUEL } from "../utils/constants";
 import type { Game } from "./Game";
 import { isHistoricMission } from "./HistoricMission";
 import { CAMPAIGN, saveCampaignProgress } from "./Missions";
@@ -110,6 +110,45 @@ function checkAchievements(game: Game): void {
 		game.achievementToast = newBadges[0];
 		game.achievementToastTimer = 4;
 	}
+}
+
+/**
+ * Apollo 13 Survive mode success. Flight has reached `survivalDurationSec`
+ * without crashing — the crew made it home. Reuses the lander-landed
+ * audio / ghost / leaderboard wiring, but doesn't go through
+ * `handleCollisionResult` because there's no pad (and dust-burst on a
+ * survive success would look wrong). Score is fuel-preserving: base
+ * payout + fuel-remaining bonus, since the whole story is "conserve
+ * consumables to get home."
+ */
+export function handleSurviveSuccess(game: Game): void {
+	game.status = "landed";
+	const fuelBonus = Math.floor(game.lander.fuel * SCORE_FUEL_MULTIPLIER);
+	game.score = 500 + fuelBonus;
+	game.audio.setThruster(false);
+	game.audio.playSuccess();
+	game.audio.soundtrack.onLanded();
+	game.ghostRecorder.save(game.score);
+	game.lastRank = addScore(
+		game.seed,
+		game.score,
+		game.telemetry.getDuration(),
+		game.currentFlight?.authenticMode ? "authentic" : "vanilla",
+	);
+}
+
+/**
+ * Apollo 13 Survive hard timeout (MAX_FLIGHT_DURATION). Treated as a
+ * failure: the crew ran out of consumables / didn't make the intercept
+ * window in time. Re-uses crashed-status visuals + audio for a familiar
+ * "mission failed" end-of-flight presentation.
+ */
+export function handleSurviveTimeout(game: Game): void {
+	game.status = "crashed";
+	game.particles.emitExplosion(game.lander.x, game.lander.y);
+	game.audio.setThruster(false);
+	game.audio.playCrash();
+	game.audio.soundtrack.onCrashed();
 }
 
 function handleRelayAfterCollision(game: Game): void {
