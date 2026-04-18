@@ -1106,7 +1106,11 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.save();
 
 		const boxW = 640;
-		const startY = CANVAS_HEIGHT / 2 + 130;
+		// Sits below the altitude telemetry chart (chart spans
+		// CANVAS_HEIGHT/2 + 60 to CANVAS_HEIGHT/2 + 185). Previous value
+		// was +130 which overlapped the chart by 55px and obscured the
+		// descent curve behind the "FLIGHT ANALYSIS" panel.
+		const startY = CANVAS_HEIGHT / 2 + 195;
 		const paddingX = 20;
 		const paddingY = 14;
 		const lineHeight = 18;

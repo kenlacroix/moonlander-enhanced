@@ -88,6 +88,13 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 		sprite.height = CANVAS_HEIGHT;
 		app.stage.addChild(sprite);
 
+		// Paint the initial black background once so the canvas shows
+		// something before any game frames run. Without this, the title
+		// screen (which doesn't touch the gameplay layer) starts with a
+		// blank/default-colored GL canvas peeking through the
+		// transparent-cleared UI overlay.
+		app.renderer.render(app.stage);
+
 		return new WebGLGameplayRenderer(
 			canvas,
 			offscreen,
