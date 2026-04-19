@@ -97,7 +97,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Canvas 2D has no GPU resources to release.
 	}
 
-
 	setRetroSkin(skin: RetroVectorSkin | null): void {
 		this.retro = skin;
 	}
@@ -127,6 +126,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		terrain: TerrainData,
 		offset: { x: number; y: number },
 		palette?: Required<TerrainPalette>,
+		hiddenPadRevealed = false,
 	): void {
 		const ctx = this.ctx;
 		const points = terrain.points;
@@ -166,6 +166,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Landing pads
 		this.beaconPhase += 0.03;
 		for (const pad of terrain.pads) {
+			if (pad.hidden && !hiddenPadRevealed) continue;
 			this.drawPad(ctx, pad, palette?.accent);
 		}
 
@@ -177,23 +178,34 @@ export class CanvasRenderer implements IGameplayRenderer {
 		pad: LandingPad,
 		accentOverride?: string,
 	): void {
+		// Sprint 7.1 PR 1.5 — hidden pads render in gold (base + beacon)
+		// and at slightly stronger shadowBlur so post-reveal they read as
+		// "different" at a glance from normal pads.
+		const surfaceColor = pad.hidden ? "#c0b060" : COLOR_PAD;
+		const beaconColor = pad.hidden
+			? "#ffcc33"
+			: (accentOverride ?? COLOR_PAD_BEACON);
+		const beaconShadow = pad.hidden ? 12 : 10;
+		const beaconPulseRate = pad.hidden ? 6 : 4;
+
 		// Pad surface
-		ctx.fillStyle = COLOR_PAD;
+		ctx.fillStyle = surfaceColor;
 		ctx.fillRect(pad.x, pad.y - 2, pad.width, 4);
 
-		// Score marker
-		ctx.fillStyle = COLOR_PAD;
+		// Score marker — hidden pads show the effective multiplier so
+		// the 3× bonus is visible the moment the pad appears.
+		ctx.fillStyle = surfaceColor;
 		ctx.font = '12px "Courier New", monospace';
 		ctx.textAlign = "center";
-		ctx.fillText(`${pad.points}x`, pad.x + pad.width / 2, pad.y - 14);
+		const marker = pad.hidden ? "3x!" : `${pad.points}x`;
+		ctx.fillText(marker, pad.x + pad.width / 2, pad.y - 14);
 
 		// Blinking beacons on pad edges (palette-aware accent)
-		const beaconOn = Math.sin(this.beaconPhase * 4) > 0;
+		const beaconOn = Math.sin(this.beaconPhase * beaconPulseRate) > 0;
 		if (beaconOn) {
-			const beaconColor = accentOverride ?? COLOR_PAD_BEACON;
 			ctx.fillStyle = beaconColor;
 			ctx.shadowColor = beaconColor;
-			ctx.shadowBlur = 10;
+			ctx.shadowBlur = beaconShadow;
 			ctx.beginPath();
 			ctx.arc(pad.x + 4, pad.y - 2, 3, 0, Math.PI * 2);
 			ctx.fill();

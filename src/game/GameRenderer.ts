@@ -81,6 +81,7 @@ export interface GameRenderState {
 	readonly wind: WindState | null;
 	readonly fuelLeakActive: boolean;
 	readonly adaptiveLabel: string | null;
+	readonly hiddenPadRevealed: boolean;
 	readonly score: number;
 	readonly lastRank: number | null;
 	readonly llmText: string;
@@ -320,7 +321,12 @@ export class GameRenderer {
 		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
 		const terrainOffset =
 			wobble !== 0 ? { x: offset.x, y: offset.y + wobble } : offset;
-		this.gameplay.drawTerrain(state.terrain, terrainOffset, palette);
+		this.gameplay.drawTerrain(
+			state.terrain,
+			terrainOffset,
+			palette,
+			state.hiddenPadRevealed,
+		);
 		this.gameplay.drawParticles(state.particles.particles, offset);
 		if (state.ghostPlayer?.isActive()) {
 			this.gameplay.drawGhost(state.ghostPlayer.lander, offset);
@@ -440,9 +446,7 @@ export class GameRenderer {
 				// mixed with the score. The "continue" hint gets its own
 				// prominent line below so campaign players don't lose the
 				// next-mission path in a run-on sentence.
-				const secondary = isTouch
-					? ""
-					: "G ghost  |  F report";
+				const secondary = isTouch ? "" : "G ghost  |  F report";
 				const subtitleRight = secondary ? `  |  ${secondary}` : "";
 				this.renderer.drawMessage(
 					title,
@@ -627,7 +631,12 @@ export class GameRenderer {
 			state.activeMission?.sunAngle,
 			palette,
 		);
-		this.gameplay.drawTerrain(state.terrain, offset, palette);
+		this.gameplay.drawTerrain(
+			state.terrain,
+			offset,
+			palette,
+			state.hiddenPadRevealed,
+		);
 		this.gameplay.drawParticles(state.particles.particles, offset);
 		this.gameplay.drawLander(state.lander, offset);
 		this.renderer.drawHUD(state.lander, 0, null, false, false);

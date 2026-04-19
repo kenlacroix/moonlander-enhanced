@@ -49,6 +49,11 @@ import { GameLoop } from "./GameLoop";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
 import { type GravityPreset, getDefaultPreset } from "./GravityPresets";
 import { createGravityStorm, shouldSpawnGravityStorm } from "./GravityStorm";
+import {
+	findHiddenPad,
+	isHiddenPadRevealed,
+	maybeGenerateHiddenPad,
+} from "./HiddenPad";
 import { isHistoricMission } from "./HistoricMission";
 import { createLander, type LanderState } from "./Lander";
 import { getLanderType } from "./LanderTypes";
@@ -164,6 +169,11 @@ export class Game {
 	achievementToast: Achievement | null = null;
 	gravityPreset: GravityPreset = getDefaultPreset();
 	achievementToastTimer = 0;
+	/** Sprint 7.1 PR 1.5 — hidden pad reveal latch. Starts false on every
+	 * flight, flips true the frame the lander first crosses the reveal
+	 * AGL. A one-shot dust-plume burst fires on that transition; the
+	 * renderer only draws the gold hidden pad while this is true. */
+	hiddenPadRevealed = false;
 	private embedMode: boolean;
 	private currentInput: InputState = {} as InputState;
 
@@ -431,6 +441,13 @@ export class Game {
 			this.adaptiveLabel = null;
 		}
 		this.terrain = generateTerrain(this.seed_, diff);
+		const hiddenPad = maybeGenerateHiddenPad(
+			this.activeMission,
+			this.terrain,
+			this.seed_,
+		);
+		if (hiddenPad) this.terrain.pads.push(hiddenPad);
+		this.hiddenPadRevealed = false;
 		this.lander = createLander(
 			WORLD_WIDTH / 2,
 			diff?.spawnY ?? 80,
@@ -541,6 +558,26 @@ export class Game {
 			(input) => this.ghostRecorder.record(input),
 		);
 		if (!result) {
+			// Sprint 7.1 PR 1.5 — hidden-pad reveal latch. Fires a one-shot
+			// dust plume on the frame the lander first crosses the reveal
+			// AGL so the player sees the pad "appear out of the dust"
+			// rather than pop in. Check runs only before the pad is
+			// revealed so we emit exactly once per flight.
+			if (!this.hiddenPadRevealed) {
+				const hidden = findHiddenPad(this.terrain);
+				if (
+					hidden &&
+					isHiddenPadRevealed(hidden, this.lander.x, this.lander.y)
+				) {
+					this.hiddenPadRevealed = true;
+					this.particles_.emitDust(
+						hidden.x + hidden.width / 2,
+						hidden.y,
+						hidden.width,
+					);
+				}
+			}
+
 			// Sprint 5 Part B — Apollo 13 "survive" mission terminates on
 			// a time condition rather than a pad touch. Ran after physics
 			// so any collision this frame takes precedence (a crash on the
@@ -567,6 +604,7 @@ export class Game {
 			result.score,
 			result.padY,
 			result.padWidth,
+			result.hiddenPad,
 		);
 	}
 

@@ -23,6 +23,11 @@ export interface PhysicsResult {
 	score: number;
 	padY: number;
 	padWidth: number;
+	/** Sprint 7.1 PR 1.5 — true when the pad touched was a hidden pad.
+	 * CollisionHandler applies a 3× multiplier + HIDDEN PAD BONUS toast.
+	 * The score here is the unmultiplied base; multiplication happens
+	 * in CollisionHandler where the toast fires. */
+	hiddenPad: boolean;
 }
 
 export class PhysicsManager {
@@ -104,6 +109,7 @@ export class PhysicsManager {
 				score,
 				padY: result.onPad.y,
 				padWidth: result.onPad.width,
+				hiddenPad: result.onPad.hidden === true,
 			};
 		}
 
@@ -115,6 +121,7 @@ export class PhysicsManager {
 			score: 0,
 			padY: 0,
 			padWidth: 0,
+			hiddenPad: false,
 		};
 	}
 

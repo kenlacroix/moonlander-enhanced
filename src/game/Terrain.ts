@@ -16,6 +16,19 @@ export interface LandingPad {
 	y: number;
 	width: number;
 	points: number; // score multiplier — narrower pad = more points
+	/**
+	 * Sprint 7.1 PR 1.5 — hidden-pad flag. When true:
+	 *   - Renderer hides the pad (no surface marker, no beacon, no
+	 *     score label) until the lander drops below the reveal AGL
+	 *     threshold (see `src/game/HiddenPad.ts`).
+	 *   - On landing, `CollisionHandler` applies a 3x score multiplier
+	 *     and fires the HIDDEN PAD BONUS toast.
+	 *   - Historic missions (Apollo/Artemis/Luna/Apollo 13) NEVER
+	 *     contain hidden pads — the `HiddenPad.ts` generator gates on
+	 *     `isHistoricMission(mission)` and returns null for them so
+	 *     the scoring-margin share card stays historically honest.
+	 */
+	hidden?: boolean;
 }
 
 export interface TerrainData {

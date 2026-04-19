@@ -1,5 +1,5 @@
-import { AdvancedBloomFilter } from "pixi-filters";
 import { Application, Sprite, Texture } from "pixi.js";
+import { AdvancedBloomFilter } from "pixi-filters";
 import type { AlienState } from "../game/Alien";
 import type { Artifact } from "../game/Artifacts";
 import type { Camera } from "../game/Camera";
@@ -142,13 +142,7 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 			{ once: true },
 		);
 
-		return new WebGLGameplayRenderer(
-			canvas,
-			offscreen,
-			backing,
-			app,
-			sprite,
-		);
+		return new WebGLGameplayRenderer(canvas, offscreen, backing, app, sprite);
 	}
 
 	clear(): void {
@@ -167,8 +161,9 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 		terrain: TerrainData,
 		offset: Offset,
 		palette?: Required<import("./palette").TerrainPalette>,
+		hiddenPadRevealed?: boolean,
 	): void {
-		this.backing.drawTerrain(terrain, offset, palette);
+		this.backing.drawTerrain(terrain, offset, palette, hiddenPadRevealed);
 	}
 
 	drawLander(lander: LanderState, offset: Offset): void {
