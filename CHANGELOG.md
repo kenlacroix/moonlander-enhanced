@@ -2,6 +2,20 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.9.4] - 2026-04-19 (Sprint 6 Part C: punchier crashes, per-mission sun)
+
+### Added
+- **Per-mission sun in the skybox.** Each historic mission now carries a `sunAngle` — degrees from vertical — that positions a glowing sun disc on an arc across the left side of the sky. Apollo 11 (20°) sits high-left, Apollo 15 (40°) mid-left, Apollo 17 (65°) lower-left, Artemis III (85°) grazing the left horizon for polar-morning feel, Luna 9 (-25°) mirrors to the right of center. Each mission now has visually distinct lighting identity without changing gameplay.
+- **Impact flash on crash.** A brief full-frame whiteout fades over ~30 frames (0.5 s) after any fatal impact: pad crashes, survive-mission timeouts, and AI replay crashes. Cinematic feedback to pair with the kinetic shake.
+
+### Changed
+- **Crash shake magnitude: 15 → 40.** The old value registered as a subtle jiggle; the new one reads as "something just went wrong." Decay rate unchanged (0.9/frame) so it settles in the same time.
+- **Survive-mission timeouts now shake + flash on failure.** Apollo 13 aborting the intercept window gets the same kinetic + photic treatment as pad crashes instead of fading out quietly.
+
+### Architecture
+- `Camera.flash(amount)` / `Camera.tickFlash()` on the existing Camera class, sibling to `shake()`. GameRenderer draws a white rect at alpha = flashAmount on the UI canvas after all gameplay rendering, covering both backends.
+- `IGameplayRenderer.drawBackground` now takes an optional sunAngle parameter. CanvasRenderer and WebGLGameplayRenderer pipe it through to `Background.draw`. Undefined falls back to 30° default for freeplay missions.
+
 ## [0.5.9.3] - 2026-04-19 (Sprint 6 Part B: scene-wide bloom)
 
 ### Added

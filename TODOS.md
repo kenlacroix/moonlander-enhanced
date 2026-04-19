@@ -231,6 +231,9 @@ Remaining items after cherry-picks ship:
 
 ## Completed
 
+### Sprint 6 Part C — Mission sun + crash feedback
+**Completed:** v0.5.9.4 (2026-04-19). Per-mission sun discs in the skybox (Apollo 11 / 15 / 17 / Artemis III / Luna 9 each get their own angle), bigger crash shake (15 → 40), bright impact flash (0.6 α fading over 30 frames) on pad crashes, survive-timeouts, and AI-replay crashes. Closes out Sprint 6's "WebGL visual upgrade" arc.
+
 ### Sprint 6 Part B — Scene-wide bloom + Canvas default + tablet/UX fixes
 **Completed:** v0.5.9.3 (2026-04-19). `AdvancedBloomFilter` attached to the texture-sprite pipeline; every bright pixel in the scene glows on the WebGL path. Canvas 2D became the default backend with WebGL opt-in via `?renderer=webgl` (real-world testing showed WebGL context loss on tablets where TF.js grabs a second context). Plus a bundle of fixes from hands-on play testing: title-screen box clipping, altitude-chart vs FLIGHT-ANALYSIS overlap, campaign-progression CTA visibility, AI-Training main-thread yields to avoid Firefox "page is slow" warnings.
 

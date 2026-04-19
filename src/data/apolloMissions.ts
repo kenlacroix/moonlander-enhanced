@@ -19,6 +19,7 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		description: "Sea of Tranquility, July 20 1969. Land like Armstrong.",
 		kind: "landing",
 		era: "1960s-70s-apollo",
+		sunAngle: 20,
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 800,
@@ -71,6 +72,7 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		description: "Hadley Rille at the foot of the Apennines. Watch the canyon.",
 		kind: "landing",
 		era: "1960s-70s-apollo",
+		sunAngle: 40,
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,
@@ -111,6 +113,7 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		description: "Final Apollo landing. Valley between two mountain massifs.",
 		kind: "landing",
 		era: "1960s-70s-apollo",
+		sunAngle: 65,
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,

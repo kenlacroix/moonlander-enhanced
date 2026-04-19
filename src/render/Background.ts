@@ -54,7 +54,11 @@ export class Background {
 		return { stars, speed };
 	}
 
-	draw(ctx: CanvasRenderingContext2D, cameraX: number): void {
+	draw(
+		ctx: CanvasRenderingContext2D,
+		cameraX: number,
+		sunAngleDeg?: number,
+	): void {
 		// Draw star layers with parallax
 		for (const layer of this.layers) {
 			for (const star of layer.stars) {
@@ -111,6 +115,54 @@ export class Background {
 		ctx.fillStyle = earthGrad;
 		ctx.beginPath();
 		ctx.arc(earthX, earthY, earthRadius, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.restore();
+
+		// Sprint 6 Part C — mission-specific sun. Lives on the left
+		// half of the sky so it doesn't overlap Earth (which is fixed
+		// top-right). Angle 0 = overhead-ish (top-center-left), angle
+		// 90 = horizon (far left). Negative angles push further right
+		// but stay clear of Earth's corner. Apollo 11 (20°) sits high-
+		// left, Apollo 17 (65°) mid-left, Artemis III (85°) grazing
+		// the left horizon for polar-morning feel, Luna 9 (-25°)
+		// mirrors to the right of center. Subtle camera parallax
+		// (0.005×) keeps the sun near-fixed while the lander scrolls.
+		const angle = sunAngleDeg ?? 30;
+		ctx.save();
+		const rad = (angle * Math.PI) / 180;
+		const sunX = CANVAS_WIDTH / 2 - Math.sin(rad) * 500 - cameraX * 0.005;
+		const sunY = 90 + Math.abs(Math.sin(rad)) * 60;
+		const sunRadius = 14;
+		// Outer halo
+		const halo = ctx.createRadialGradient(
+			sunX,
+			sunY,
+			sunRadius * 0.7,
+			sunX,
+			sunY,
+			sunRadius * 4,
+		);
+		halo.addColorStop(0, "rgba(255, 240, 200, 0.35)");
+		halo.addColorStop(1, "rgba(255, 240, 200, 0)");
+		ctx.fillStyle = halo;
+		ctx.beginPath();
+		ctx.arc(sunX, sunY, sunRadius * 4, 0, Math.PI * 2);
+		ctx.fill();
+		// Solid sun disc
+		const disc = ctx.createRadialGradient(
+			sunX - 2,
+			sunY - 2,
+			1,
+			sunX,
+			sunY,
+			sunRadius,
+		);
+		disc.addColorStop(0, "#ffffff");
+		disc.addColorStop(0.7, "#ffeec0");
+		disc.addColorStop(1, "#ffcc66");
+		ctx.fillStyle = disc;
+		ctx.beginPath();
+		ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
 		ctx.fill();
 		ctx.restore();
 	}
