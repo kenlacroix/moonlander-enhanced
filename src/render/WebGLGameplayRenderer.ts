@@ -1,3 +1,4 @@
+import { AdvancedBloomFilter } from "pixi-filters";
 import { Application, Sprite, Texture } from "pixi.js";
 import type { AlienState } from "../game/Alien";
 import type { Artifact } from "../game/Artifacts";
@@ -86,6 +87,28 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 		const sprite = new Sprite(texture);
 		sprite.width = CANVAS_WIDTH;
 		sprite.height = CANVAS_HEIGHT;
+
+		// Sprint 6 Part B — scene-wide bloom. The texture-sprite
+		// pipeline lets us attach one filter to one sprite and have
+		// every bright pixel in the rendered frame glow: pad beacons,
+		// thruster exhaust, the lander's bright edges, and explosion
+		// particles all light up for free.
+		//
+		// Threshold 0.5 means "only pixels brighter than mid-grey
+		// bloom." Beacons (#00ff88) and thruster colors (bright
+		// orange/yellow) sit well above the bar; the dark grey terrain
+		// and black sky stay clean. Intensity 0.8 gives a visible
+		// halo without washing the frame out. Bloom scale 1 keeps the
+		// glow radius tight so bloom stays readable at gameplay speed.
+		const bloom = new AdvancedBloomFilter({
+			threshold: 0.5,
+			bloomScale: 1.0,
+			brightness: 1.0,
+			blur: 8,
+			quality: 4,
+		});
+		sprite.filters = [bloom];
+
 		app.stage.addChild(sprite);
 
 		// Paint the initial black background once so the canvas shows

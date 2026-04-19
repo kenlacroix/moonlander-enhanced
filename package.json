@@ -1,6 +1,6 @@
 {
 	"name": "moonlander-enhanced",
-	"version": "0.5.9.2",
+	"version": "0.5.9.3",
 	"description": "A browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game",
 	"type": "module",
 	"scripts": {
@@ -30,6 +30,7 @@
 	},
 	"dependencies": {
 		"@tensorflow/tfjs": "^4.22.0",
+		"pixi-filters": "^6.1.5",
 		"pixi.js": "^8.18.1"
 	}
 }
