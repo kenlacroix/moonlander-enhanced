@@ -1,3 +1,4 @@
+import type { TerrainPalette } from "../render/palette";
 import type { DifficultyConfig } from "./Terrain";
 
 /** Fixed mission definitions with deterministic seeds */
@@ -17,6 +18,17 @@ export interface Mission {
 	 * missions omit this and render with a default mid-morning angle.
 	 */
 	sunAngle?: number;
+	/**
+	 * Sprint 7.1 — per-mission visual skin (terrain, sky, starfield
+	 * color + density). Optional; falls back to the archetype's default
+	 * bias (when the mission has `difficulty.archetype` set), which
+	 * falls back to the system default (byte-identical to v0.6.0.0).
+	 * Set this on missions that want a specific curated look — Apollo
+	 * 17's warm afternoon tan, Artemis III's polar-midnight blue,
+	 * Luna 9's austere darker-grey. Freeplay missions usually omit it
+	 * so freeplay terrain keeps its pre-Sprint-7.1 appearance.
+	 */
+	palette?: TerrainPalette;
 }
 
 /** Free-play missions — all use default difficulty */
@@ -38,6 +50,9 @@ export const MISSIONS: Mission[] = [
 		name: "COPERNICUS CRATER",
 		seed: 7331,
 		description: "Rough terrain. Narrow pads.",
+		difficulty: {
+			archetype: "crater-field",
+		},
 	},
 	{
 		id: 4,

@@ -20,6 +20,15 @@ export const LUNA_MISSIONS: AutoLandingMission[] = [
 		kind: "auto-landing",
 		era: "1960s-soviet",
 		sunAngle: -25,
+		// Sprint 7.1 — Oceanus Procellarum is a maria, historically smooth,
+		// but pocked with secondary craters. crater-field archetype plus
+		// a darker austere grey palette evokes the first-ever spacecraft
+		// photos from Luna 9 (low-contrast, eerie).
+		palette: {
+			terrain: "#787878",
+			terrainEdge: "#989898",
+			sky: "#000000",
+		},
 		difficulty: {
 			landerType: "luna-9",
 			startingFuel: 500,
@@ -28,6 +37,7 @@ export const LUNA_MISSIONS: AutoLandingMission[] = [
 			padMaxWidth: 130,
 			padCount: 1,
 			roughness: 0.35,
+			archetype: "crater-field",
 		},
 		facts: {
 			craftName: "Luna 9",

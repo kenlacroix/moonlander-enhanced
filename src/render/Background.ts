@@ -10,6 +10,7 @@ import {
 	STAR_LAYER_3_SPEED,
 } from "../utils/constants";
 import { createRng } from "../utils/math";
+import type { TerrainPalette } from "./palette";
 
 interface Star {
 	x: number;
@@ -58,10 +59,33 @@ export class Background {
 		ctx: CanvasRenderingContext2D,
 		cameraX: number,
 		sunAngleDeg?: number,
+		palette?: Required<TerrainPalette>,
 	): void {
-		// Draw star layers with parallax
+		// Sprint 7.1 — palette-aware sky tint. Render behind everything
+		// else, on top of the clear(). When palette is undefined, skip
+		// (system default is already black from clear()); this keeps
+		// freeplay output byte-identical to v0.6.0.0.
+		if (palette && palette.sky !== "#000000") {
+			ctx.fillStyle = palette.sky;
+			ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		}
+
+		// Sprint 7.1 — palette-aware starfield tint + density.
+		const starTint = palette?.starTint ?? "#ffffff";
+		const densityMult = palette?.starDensity ?? 1.0;
+
+		// Draw star layers with parallax. Density < 1 skips some stars;
+		// density > 1 draws each star multiple times with offsets (so
+		// polar missions can have more stars without needing more
+		// stored star data).
 		for (const layer of this.layers) {
 			for (const star of layer.stars) {
+				// Skip fraction for density < 1. Deterministic via
+				// star.x (seeded at construction) so the same star
+				// always renders or doesn't.
+				if (densityMult < 1 && (star.x * 1000) % 1 > densityMult) {
+					continue;
+				}
 				const sx =
 					((((star.x - cameraX * layer.speed) % (CANVAS_WIDTH * 3)) +
 						CANVAS_WIDTH * 3) %
@@ -70,10 +94,25 @@ export class Background {
 				if (sx < -10 || sx > CANVAS_WIDTH + 10) continue;
 
 				ctx.globalAlpha = star.brightness;
-				ctx.fillStyle = "#ffffff";
+				ctx.fillStyle = starTint;
 				ctx.beginPath();
 				ctx.arc(sx, star.y, star.size / 2, 0, Math.PI * 2);
 				ctx.fill();
+
+				// Density > 1 draws additional offset ghosts of each
+				// star to fake higher star count without restructuring.
+				if (densityMult > 1.01) {
+					const extras = Math.floor(densityMult - 1) + 1;
+					for (let e = 0; e < extras; e++) {
+						const extraX = sx + ((star.y * 37 * (e + 1)) % 40) - 20;
+						const extraY =
+							(star.y + (star.x * 13 * (e + 1)) % 30 - 15 + CANVAS_HEIGHT) %
+							CANVAS_HEIGHT;
+						ctx.beginPath();
+						ctx.arc(extraX, extraY, star.size / 2.5, 0, Math.PI * 2);
+						ctx.fill();
+					}
+				}
 			}
 		}
 		ctx.globalAlpha = 1;

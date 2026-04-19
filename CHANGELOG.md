@@ -2,6 +2,38 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.0.1] - 2026-04-19 (Sprint 7.1 PR 1: palettes + archetypes + mission variety)
+
+Addresses user feedback from hands-on play testing: "all the levels feel about the same." After this PR, historic missions read as distinct places.
+
+### Added
+- **Per-mission terrain palette.** New optional `palette` field on Mission. Each historic mission now has a curated palette:
+  - Apollo 11 (Tranquility): classic grey on black
+  - Apollo 15 (Hadley): blue-grey for the Apennines
+  - Apollo 17 (Taurus-Littrow): warm tan on dawn-red sky (late afternoon Dec 1972)
+  - Artemis III (Shackleton): cold blue-grey on polar-midnight with 2x starfield density + blue-tinted stars
+  - Luna 9 (Ocean of Storms): austere darker grey
+- **5 terrain archetypes.** New optional `archetype` field on DifficultyConfig. `rolling` (default, no-op), `crater-field`, `spires`, `mesa`, `flats`. Archetypes run after midpoint displacement and pad placement, before any `specialFeature`. Pad-safe (never carve a hole on a pad). Deterministic per seed.
+  - Artemis III gets `mesa` (matches Shackleton's raised-plateau terrain)
+  - Luna 9 gets `crater-field` (matches the pocked maria)
+  - COPERNICUS CRATER freeplay gets `crater-field` (name literally matches)
+  - Apollo 11/15/17 explicitly set `archetype: "rolling"` (no-op, but documents intent and triggers the mission-select glyph)
+- **Archetype glyphs on mission-select.** Small unicode character prepended to mission names in archetype bias color: `○` rolling, `●` crater-field, `▲` spires, `■` mesa, `≈` flats. Reads at a glance so players know Apollo 11's character before launching.
+
+### Architecture
+- New `src/render/palette.ts` module — `TerrainPalette` interface + `resolvePalette(mission, archetype)` hierarchy resolver (mission > archetype-default > system-default).
+- New `src/game/terrain/archetypes.ts` module — 5 archetype generators + shared `findFreeColumnsBetweenPads` / `isOnOrNearPad` helpers. Dispatched from `generateTerrain` after pad placement.
+- `IGameplayRenderer.drawBackground` + `drawTerrain` signatures extended with optional `palette` parameter. Both Canvas and WebGL backends pipe it through.
+- `Background.draw` reads sky tint, star tint, and density multiplier from the palette. Density > 1 draws offset star ghosts; density < 1 deterministically skips some stars (phase-stable via star.x seed).
+
+### Tests
+- 279 → 310 passing tests (+31). Each archetype has 4-5 tests: differs-from-undefined, deterministic, pad-landability preserved, plus archetype-specific assertions (e.g., `flats` reduces terrain variance).
+- **Regression pin expanded per eng review:** All 10 `MISSIONS[]` freeplay seeds verified byte-identical with `archetype: undefined`, `archetype: "rolling"`, and `difficulty: {}`. All Apollo 11/15/17 seeds same. Guards against subtle dispatch branch drift silently regressing terrain for every mission at once.
+- `TEST_SEED = 1234` unit tests for 5 archetype generators (4-5 assertions each) + 3 helper tests for `isOnOrNearPad` / `findFreeColumnsBetweenPads`.
+
+### Deferred to Sprint 7.1 PR 1.5 (next PR)
+Hidden-pad reveal with gold visual + triple score + HIDDEN PAD BONUS toast, per-archetype audio motif, RANDOM MISSION title-screen option + generator, share URL encoding, ghost schema v2. These need more cross-system plumbing (scoring, particles, pad rendering, audio, UI) than fit cleanly in PR 1's palette+archetype scope. PR 1 ships the foundational vocabulary; PR 1.5 builds on it.
+
 ## [0.6.0.0] - 2026-04-19 (v0.6 milestone — Sprint 6 complete, backlog polish)
 
 ### Changed
