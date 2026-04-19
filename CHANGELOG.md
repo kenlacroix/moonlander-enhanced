@@ -2,6 +2,17 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.0.0] - 2026-04-19 (v0.6 milestone — Sprint 6 complete, backlog polish)
+
+### Changed
+- **Version bump to v0.6** marking Sprint 6 "WebGL Visual Upgrade" as complete. Three parts shipped this sprint: Part A foundation (v0.5.9.2), Part B bloom (v0.5.9.3), Part C mission sun + crash feedback (v0.5.9.4).
+
+### Removed
+- **Dead Sprint 5.5 Part B scaffolding.** `EllipseState`, `hazardMask`, and `ELLIPSE_UPDATE_FRAMES` were populated by `buildAuthenticState` for Artemis missions but never read by any renderer — the Artemis landing-ellipse visual was deferred indefinitely. Kept the scaffolding during Sprint 5.5 in case Part B used it soon; Sprint 6 made different architectural choices, so the scaffolding is pure cost now. Removed three declarations, one assignment, and the state field. Tests + typecheck clean.
+
+### Notes
+- The TODOS.md "hoist leaderboard reads out of renderMenu hot path" item turned out to be based on outdated information. The Leaderboard module already caches its parsed data in an in-memory variable that survives across `getBestScore` calls (added in Sprint 5.5). Actual per-frame cost is ~20 cache lookups, not 20 localStorage round-trips. Removed from TODOS as obsolete.
+
 ## [0.5.9.4] - 2026-04-19 (Sprint 6 Part C: punchier crashes, per-mission sun)
 
 ### Added

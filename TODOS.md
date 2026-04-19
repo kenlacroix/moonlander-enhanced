@@ -10,8 +10,6 @@ Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current sc
 Tracked from Pre-Landing Review against main on `sprint-5.5/authentic-mode` — accepted as defer, listed here so they don't get lost.
 
 - **Run /codex review on the Sprint 5.5 diff once account reset window reopens** — adversarial 2nd opinion was blocked 2026-04-16 (account limit, reset 2026-04-20). Sprint is now shippable but the outside-voice pass hasn't happened.
-- **Hoist leaderboard reads out of render hot path** — `renderMenu` currently calls `getBestScore` 2N times/frame (vanilla + authentic for each historic mission), each triggering a full localStorage JSON.parse. Small N so fine in practice; amplifies with mission growth. ~10 min CC.
-- **Dead code from Part B scaffolding** — `EllipseState`, `hazardMask` on `AuthenticState`, `ELLIPSE_UPDATE_FRAMES`. Populated by `buildAuthenticState` for Artemis but never read. Keep if Part B is close; drop if deferring indefinitely.
 
 ### Add a favicon
 Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but produces a console error on every page load.
@@ -230,6 +228,9 @@ Remaining items after cherry-picks ship:
 ---
 
 ## Completed
+
+### v0.6.0.0 milestone + backlog polish
+**Completed:** v0.6.0.0 (2026-04-19). MINOR bump marking Sprint 6 complete (Parts A+B+C shipped this session). Removed dead Part B scaffolding (`EllipseState`, `hazardMask`, `ELLIPSE_UPDATE_FRAMES`) that was populated but never consumed. Noted that the "hoist leaderboard reads out of renderMenu hot path" TODO was based on outdated info — Sprint 5.5's in-memory cache already makes repeated `getBestScore` calls O(1), not O(localStorage).
 
 ### Sprint 6 Part C — Mission sun + crash feedback
 **Completed:** v0.5.9.4 (2026-04-19). Per-mission sun discs in the skybox (Apollo 11 / 15 / 17 / Artemis III / Luna 9 each get their own angle), bigger crash shake (15 → 40), bright impact flash (0.6 α fading over 30 frames) on pad crashes, survive-timeouts, and AI-replay crashes. Closes out Sprint 6's "WebGL visual upgrade" arc.

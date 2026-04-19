@@ -11,7 +11,6 @@ export const ALARM_SEED_OFFSET = 200;
 export const ALARM_LOCKOUT_FRAMES = 24;
 export const ALTITUDE_ALARM_GATE_PX = 150;
 export const ALTITUDE_BLACKOUT_AGL_PX = 50;
-export const ELLIPSE_UPDATE_FRAMES = 15;
 export const MASTER_ALARM_GATE_PX = 150;
 
 export const ERA_COLORS = {
@@ -32,17 +31,10 @@ export interface MasterAlarmState {
 	state: "IDLE" | "DONE";
 }
 
-export interface EllipseState {
-	lastUpdateFrame: number;
-	touchdown: { x: number; y: number } | null;
-}
-
 export interface AuthenticState {
 	era: AuthenticEra;
 	alarm?: AlarmState;
 	masterAlarm?: MasterAlarmState;
-	ellipse?: EllipseState;
-	hazardMask?: Uint8Array;
 	/**
 	 * One-shot HUD banner state. Set on first frame the lander drops below
 	 * the AGL blackout threshold; counts down so the message disappears on
@@ -94,9 +86,10 @@ export function buildAuthenticState(
 		state.masterAlarm = { state: "IDLE" };
 	}
 
-	if (era === "artemis") {
-		state.ellipse = { lastUpdateFrame: -1, touchdown: null };
-	}
+	// Artemis-era landing ellipse scaffolding was never wired to a
+	// renderer; removed in v0.6.0.0 polish pass. If a future sprint
+	// brings back per-era visual features, the hook is a new optional
+	// field on AuthenticState, populated here conditionally on era.
 
 	return state;
 }
