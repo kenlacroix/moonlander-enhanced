@@ -11,6 +11,7 @@ import { APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
 import type { IGameplayRenderer } from "../render/IGameplayRenderer";
+import { resolvePalette } from "../render/palette";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
 import { getBestScore, getBestTime } from "../systems/Leaderboard";
@@ -304,15 +305,22 @@ export class GameRenderer {
 		const offset = state.camera.getOffset();
 
 		this.clearGameplayFrame();
+		// Sprint 7.1 — resolve the palette once per frame and pass
+		// to both Background and terrain draw.
+		const palette = resolvePalette(
+			state.activeMission,
+			state.activeMission?.difficulty?.archetype,
+		);
 		this.gameplay.drawBackground(
 			state.camera,
 			state.activeMission?.sunAngle,
+			palette,
 		);
 		// Apply cosmetic terrain wobble during gravity storms
 		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
 		const terrainOffset =
 			wobble !== 0 ? { x: offset.x, y: offset.y + wobble } : offset;
-		this.gameplay.drawTerrain(state.terrain, terrainOffset);
+		this.gameplay.drawTerrain(state.terrain, terrainOffset, palette);
 		this.gameplay.drawParticles(state.particles.particles, offset);
 		if (state.ghostPlayer?.isActive()) {
 			this.gameplay.drawGhost(state.ghostPlayer.lander, offset);
@@ -610,11 +618,16 @@ export class GameRenderer {
 	renderAgentReplay(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
 		this.clearGameplayFrame();
+		const palette = resolvePalette(
+			state.activeMission,
+			state.activeMission?.difficulty?.archetype,
+		);
 		this.gameplay.drawBackground(
 			state.camera,
 			state.activeMission?.sunAngle,
+			palette,
 		);
-		this.gameplay.drawTerrain(state.terrain, offset);
+		this.gameplay.drawTerrain(state.terrain, offset, palette);
 		this.gameplay.drawParticles(state.particles.particles, offset);
 		this.gameplay.drawLander(state.lander, offset);
 		this.renderer.drawHUD(state.lander, 0, null, false, false);

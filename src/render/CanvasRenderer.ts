@@ -24,6 +24,21 @@ import { degToRad } from "../utils/math";
 import { Background } from "./Background";
 import { HUD } from "./HUD";
 import type { IGameplayRenderer } from "./IGameplayRenderer";
+import type { TerrainArchetype, TerrainPalette } from "./palette";
+
+/** Sprint 7.1 — small unicode glyphs displayed next to mission names
+ * on the mission-select screen so players can distinguish archetypes
+ * at a glance. Colors match the archetype's default palette bias. */
+const ARCHETYPE_GLYPHS: Record<
+	TerrainArchetype,
+	{ glyph: string; color: string; dimColor: string }
+> = {
+	rolling: { glyph: "○", color: "#9a9a9a", dimColor: "#555555" },
+	"crater-field": { glyph: "●", color: "#c07058", dimColor: "#7a4a3a" },
+	spires: { glyph: "▲", color: "#8a94a2", dimColor: "#5a6270" },
+	mesa: { glyph: "■", color: "#c8b898", dimColor: "#a89878" },
+	flats: { glyph: "≈", color: "#bbbbbb", dimColor: "#6a6a6a" },
+};
 
 /**
  * Canvas 2D renderer. Implements both the gameplay-layer interface
@@ -100,14 +115,27 @@ export class CanvasRenderer implements IGameplayRenderer {
 		this.retro?.drawScanlines(this.ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 	}
 
-	drawBackground(camera: Camera, sunAngle?: number): void {
-		this.background.draw(this.ctx, camera.x, sunAngle);
+	drawBackground(
+		camera: Camera,
+		sunAngle?: number,
+		palette?: Required<TerrainPalette>,
+	): void {
+		this.background.draw(this.ctx, camera.x, sunAngle, palette);
 	}
 
-	drawTerrain(terrain: TerrainData, offset: { x: number; y: number }): void {
+	drawTerrain(
+		terrain: TerrainData,
+		offset: { x: number; y: number },
+		palette?: Required<TerrainPalette>,
+	): void {
 		const ctx = this.ctx;
 		const points = terrain.points;
 		if (points.length < 2) return;
+
+		// Sprint 7.1 palette: fall back to system defaults when undefined
+		// so freeplay missions with no palette still render as v0.6.0.0.
+		const terrainColor = palette?.terrain ?? COLOR_TERRAIN;
+		const terrainEdgeColor = palette?.terrainEdge ?? COLOR_TERRAIN_EDGE;
 
 		ctx.save();
 		ctx.translate(offset.x, offset.y);
@@ -122,7 +150,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.lineTo(points[points.length - 1].x, CANVAS_HEIGHT + 200);
 		ctx.lineTo(points[0].x, CANVAS_HEIGHT + 200);
 		ctx.closePath();
-		ctx.fillStyle = COLOR_TERRAIN;
+		ctx.fillStyle = terrainColor;
 		ctx.fill();
 
 		// Terrain edge highlight
@@ -131,20 +159,24 @@ export class CanvasRenderer implements IGameplayRenderer {
 		for (let i = 1; i < points.length; i++) {
 			ctx.lineTo(points[i].x, points[i].y);
 		}
-		ctx.strokeStyle = COLOR_TERRAIN_EDGE;
+		ctx.strokeStyle = terrainEdgeColor;
 		ctx.lineWidth = 2;
 		ctx.stroke();
 
 		// Landing pads
 		this.beaconPhase += 0.03;
 		for (const pad of terrain.pads) {
-			this.drawPad(ctx, pad);
+			this.drawPad(ctx, pad, palette?.accent);
 		}
 
 		ctx.restore();
 	}
 
-	private drawPad(ctx: CanvasRenderingContext2D, pad: LandingPad): void {
+	private drawPad(
+		ctx: CanvasRenderingContext2D,
+		pad: LandingPad,
+		accentOverride?: string,
+	): void {
 		// Pad surface
 		ctx.fillStyle = COLOR_PAD;
 		ctx.fillRect(pad.x, pad.y - 2, pad.width, 4);
@@ -155,11 +187,12 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.textAlign = "center";
 		ctx.fillText(`${pad.points}x`, pad.x + pad.width / 2, pad.y - 14);
 
-		// Blinking beacons on pad edges
+		// Blinking beacons on pad edges (palette-aware accent)
 		const beaconOn = Math.sin(this.beaconPhase * 4) > 0;
 		if (beaconOn) {
-			ctx.fillStyle = COLOR_PAD_BEACON;
-			ctx.shadowColor = COLOR_PAD_BEACON;
+			const beaconColor = accentOverride ?? COLOR_PAD_BEACON;
+			ctx.fillStyle = beaconColor;
+			ctx.shadowColor = beaconColor;
 			ctx.shadowBlur = 10;
 			ctx.beginPath();
 			ctx.arc(pad.x + 4, pad.y - 2, 3, 0, Math.PI * 2);
@@ -637,6 +670,22 @@ export class CanvasRenderer implements IGameplayRenderer {
 					CANVAS_WIDTH / 2 - 300,
 					y + 6,
 				);
+			}
+
+			// Sprint 7.1 — archetype glyph. Small unicode character
+			// prepended to the mission name in archetype bias color.
+			// Players recognize terrain character at a glance (Apollo 11
+			// rolling vs Luna 9 crater-field vs Artemis III mesa) before
+			// picking. When the mission has no archetype set, no glyph
+			// renders.
+			const archetype = m.difficulty?.archetype;
+			if (archetype && !isLocked) {
+				const glyphInfo = ARCHETYPE_GLYPHS[archetype];
+				if (glyphInfo) {
+					ctx.fillStyle = isSelected ? glyphInfo.color : glyphInfo.dimColor;
+					ctx.font = 'bold 16px "Courier New", monospace';
+					ctx.fillText(glyphInfo.glyph, CANVAS_WIDTH / 2 - 245, y + 6);
+				}
 			}
 
 			// Mission name

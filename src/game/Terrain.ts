@@ -9,6 +9,7 @@ import {
 	WORLD_WIDTH,
 } from "../utils/constants";
 import { createRng, lerp, type Vec2, vec2 } from "../utils/math";
+import { applyArchetype } from "./terrain/archetypes";
 
 export interface LandingPad {
 	x: number;
@@ -42,6 +43,23 @@ export interface DifficultyConfig {
 	 * - "valley": tall walls raised at world edges, central plain preserved (Apollo 17 / Taurus-Littrow flavor)
 	 */
 	specialFeature?: "rille" | "valley";
+	/**
+	 * Sprint 7.1 — terrain archetype dispatch. Selects the post-midpoint-
+	 * displacement processor used to give the mission its geometric
+	 * character. Undefined falls through to the default (no extra
+	 * processing, byte-identical to v0.6.0.0 midpoint displacement).
+	 * `rolling` is a no-op value that also bypasses dispatch — use it
+	 * when a mission needs an explicit archetype tag for palette or UX
+	 * purposes but doesn't want the geometry touched. Archetype applies
+	 * before `specialFeature`, so Apollo 15 (archetype=rolling +
+	 * specialFeature=rille) keeps both behaviors.
+	 */
+	archetype?:
+		| "rolling"
+		| "crater-field"
+		| "spires"
+		| "mesa"
+		| "flats";
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */
@@ -103,10 +121,17 @@ export function generateTerrain(
 	// Place landing pads
 	const pads = placeLandingPads(points, rng, difficulty);
 
-	// Optional historic-mission flavor pass. Runs after pads so it can
-	// avoid touching pad zones. Gated on specialFeature being set so
-	// terrain output is byte-identical to pre-Sprint-5 behavior when
-	// the feature isn't requested (regression test pins this).
+	// Sprint 7.1 — optional archetype post-pass. Runs after pads so it
+	// can avoid touching pad zones. `rolling` and `undefined` are
+	// no-ops (bypass dispatch entirely), preserving v0.6.0.0 output
+	// exactly. The regression pin for MISSIONS[] seeds + Apollo 11/15/17
+	// depends on that no-op path.
+	applyArchetype(difficulty?.archetype, points, pads, rng);
+
+	// Optional historic-mission flavor pass. Runs after pads AND after
+	// archetype so "rolling + rille" stays identical to v0.5.x behavior
+	// and a mission could in principle combine archetype + specialFeature
+	// (e.g. crater-field + rille) if a future mission opts in.
 	if (difficulty?.specialFeature) {
 		applySpecialFeature(points, pads, rng, difficulty.specialFeature);
 	}

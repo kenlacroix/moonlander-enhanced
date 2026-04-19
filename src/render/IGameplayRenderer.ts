@@ -4,6 +4,7 @@ import type { Camera } from "../game/Camera";
 import type { LanderState } from "../game/Lander";
 import type { Particle } from "../game/Particles";
 import type { TerrainData } from "../game/Terrain";
+import type { TerrainPalette } from "./palette";
 
 export interface Offset {
 	x: number;
@@ -34,9 +35,18 @@ export interface IGameplayRenderer {
 	/** Draws stars, Earth, and (when supplied) a mission-specific sun
 	 * disc. Sprint 6 Part C passes sunAngle in degrees from vertical
 	 * so the skybox reads differently per mission. Undefined falls
-	 * back to a default mid-morning angle. */
-	drawBackground(camera: Camera, sunAngle?: number): void;
-	drawTerrain(terrain: TerrainData, offset: Offset): void;
+	 * back to a default mid-morning angle. Sprint 7.1 passes an
+	 * optional resolved palette for sky tint and starfield density. */
+	drawBackground(
+		camera: Camera,
+		sunAngle?: number,
+		palette?: Required<TerrainPalette>,
+	): void;
+	drawTerrain(
+		terrain: TerrainData,
+		offset: Offset,
+		palette?: Required<TerrainPalette>,
+	): void;
 	drawLander(lander: LanderState, offset: Offset): void;
 	drawGhost(lander: LanderState, offset: Offset): void;
 	drawParticles(particles: Particle[], offset: Offset): void;

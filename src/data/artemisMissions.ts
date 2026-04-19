@@ -14,6 +14,18 @@ export const ARTEMIS_MISSIONS: LandingMission[] = [
 		kind: "landing",
 		era: "2020s-artemis",
 		sunAngle: 85,
+		// Sprint 7.1 — mesa archetype: Shackleton's rim is a raised-
+		// plateau environment, terrain-wise. Polar palette: cold blue-grey
+		// shadow terrain under polar-midnight sky (grazing sun at 85°
+		// leaves most of the scene in low-angle reflection, not direct
+		// light). 2x starfield density since the polar sky is clearer.
+		palette: {
+			terrain: "#4a5058",
+			terrainEdge: "#6a7078",
+			sky: "#020a14",
+			starDensity: 2.0,
+			starTint: "#e0e8ff",
+		},
 		difficulty: {
 			landerType: "artemis-lm",
 			startingFuel: 1300,
@@ -22,6 +34,7 @@ export const ARTEMIS_MISSIONS: LandingMission[] = [
 			padMaxWidth: 95,
 			padCount: 1,
 			roughness: 0.55,
+			archetype: "mesa",
 		},
 		facts: {
 			craftName: "Starship HLS",

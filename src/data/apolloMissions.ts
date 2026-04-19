@@ -20,6 +20,14 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		kind: "landing",
 		era: "1960s-70s-apollo",
 		sunAngle: 20,
+		// Sprint 7.1 palette: classic grey, matches Apollo era photography.
+		// Archetype intentionally omitted — Sea of Tranquility is rolling
+		// and archetype=undefined keeps terrain byte-identical to v0.5.7.0.
+		palette: {
+			terrain: "#9a9a9a",
+			terrainEdge: "#bbbbbb",
+			sky: "#000000",
+		},
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 800,
@@ -27,6 +35,10 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			padMinWidth: 80,
 			padMaxWidth: 110,
 			padCount: 1,
+			// Sprint 7.1: rolling is a no-op dispatch, so terrain stays
+			// byte-identical to v0.5.7.0. Explicit so the mission-select
+			// glyph renders and readers see the archetype intent.
+			archetype: "rolling",
 		},
 		facts: {
 			craftName: "Eagle",
@@ -73,6 +85,14 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		kind: "landing",
 		era: "1960s-70s-apollo",
 		sunAngle: 40,
+		// Sprint 7.1 palette: slightly cooler grey to suggest the
+		// Apennine mountains, keeping the existing rille specialFeature
+		// untouched (archetype: rolling = no geometry change).
+		palette: {
+			terrain: "#8a8a92",
+			terrainEdge: "#a8a8b2",
+			sky: "#000000",
+		},
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,
@@ -81,6 +101,7 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			padMaxWidth: 100,
 			padCount: 1,
 			specialFeature: "rille",
+			archetype: "rolling",
 		},
 		facts: {
 			craftName: "Falcon",
@@ -114,6 +135,15 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		kind: "landing",
 		era: "1960s-70s-apollo",
 		sunAngle: 65,
+		// Sprint 7.1 palette: warm tan suggests late-afternoon December
+		// 1972 lighting (Apollo 17 landed near lunar sunrise with long
+		// shadows over tan regolith). Sky tinted near-black with warm
+		// undertone so it reads as "dawn" rather than pure black.
+		palette: {
+			terrain: "#a89878",
+			terrainEdge: "#c8b898",
+			sky: "#1a0e05",
+		},
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,
@@ -122,6 +152,7 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 			padMaxWidth: 100,
 			padCount: 1,
 			specialFeature: "valley",
+			archetype: "rolling",
 		},
 		facts: {
 			craftName: "Challenger",
