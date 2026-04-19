@@ -495,14 +495,19 @@ Shipped alongside Sprint 5 Part B in the same PR.
 - [x] `?renderer=canvas` URL override for debugging / parity checks
 - [x] Dual-canvas DOM (WebGL underneath, Canvas 2D UI on top, transparent-cleared UI canvas in WebGL mode)
 
-**Part B — Shader effects (~90min CC)**
-- [ ] Bloom/glow shader on thruster plume and landing pad beacons
-- [ ] Heat distortion shader behind engine bell
-- [ ] Normal mapping on terrain surface
+**Part B — Bloom (v0.5.9.3, PR tbd)**
+- [x] Scene-wide bloom via `AdvancedBloomFilter` on the texture-sprite pipeline. Threshold 0.5, scale 1.0, blur 8, quality 4. Every bright pixel (lander hull, Earth, beacons, thruster exhaust, explosion particles, fuel bar, descent-stage artifact) glows. UI stays crisp on the separate Canvas 2D overlay.
+- [x] Canvas 2D became the default backend; WebGL is opt-in via `?renderer=webgl` until the remaining Part C effects + real-world rollout testing justify flipping back.
 
-**Part C — Lighting + polish (~45min CC)**
+**Deferred from Part B (complex + scope-expanding):**
+- [ ] Heat distortion behind engine bell — needs localization to the plume area. Incompatible with the current texture-sprite approach without a secondary sprite or clipping region.
+- [ ] Normal mapping on terrain surface — needs terrain to render as its own PixiJS primitive with lighting, not as part of the blitted sprite. Significant refactor.
+
+**Part C — Dynamic lighting + polish (~45min CC)**
 - [ ] Dynamic sun lighting per mission
 - [ ] Screen shake on crash
+- [ ] Heat distortion (if a tractable approach emerges)
+- [ ] Normal mapping (if the primitive-pipeline rework proves worthwhile)
 
 **Exit question:** Does the WebGL version make you go "whoa" compared to Canvas?
 

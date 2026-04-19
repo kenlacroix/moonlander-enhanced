@@ -231,6 +231,9 @@ Remaining items after cherry-picks ship:
 
 ## Completed
 
+### Sprint 6 Part B — Scene-wide bloom + Canvas default + tablet/UX fixes
+**Completed:** v0.5.9.3 (2026-04-19). `AdvancedBloomFilter` attached to the texture-sprite pipeline; every bright pixel in the scene glows on the WebGL path. Canvas 2D became the default backend with WebGL opt-in via `?renderer=webgl` (real-world testing showed WebGL context loss on tablets where TF.js grabs a second context). Plus a bundle of fixes from hands-on play testing: title-screen box clipping, altitude-chart vs FLIGHT-ANALYSIS overlap, campaign-progression CTA visibility, AI-Training main-thread yields to avoid Firefox "page is slow" warnings.
+
 ### Sprint 6 Part A — WebGL foundation
 **Completed:** v0.5.9.2 (2026-04-18). `IGameplayRenderer` extract + PixiJS v8 `WebGLGameplayRenderer` (texture-sprite approach) + automatic Canvas fallback + `?renderer=canvas` debug override + dual-canvas DOM. Parts B (shader effects) and C (lighting + screen shake) remain in the active roadmap.
 

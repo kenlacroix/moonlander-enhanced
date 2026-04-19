@@ -2,6 +2,25 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.5.9.3] - 2026-04-19 (Sprint 6 Part B: scene-wide bloom)
+
+### Added
+- **Scene-wide bloom on the WebGL backend.** Add `?renderer=webgl` to any URL to see it. Every bright pixel in the rendered frame now glows: the lander's bright hull picks up a soft white halo, Earth pulses in the top-right like an atmospheric body, the starfield sparkles, the descent-stage artifact glows amber. Thruster exhaust, pad beacons, and explosion particles bloom too. UI text (HUD, menus, briefings, flight analysis) stays crisp because it lives on a separate Canvas 2D overlay that doesn't go through the shader pipeline.
+- **`pixi-filters`** added as a runtime dependency (v6.1.5). Lands the `AdvancedBloomFilter` used here; future parts will draw on the same library for heat distortion and other post-effects.
+
+### Changed
+- **Post-landing continue CTA.** The old "R next mission" hint was buried in a run-on subtitle with score and ghost controls. Now there's a dedicated call-to-action box at the bottom of the screen: `PRESS R → NEXT MISSION` (highlighted green) on campaign missions with a next mission queued, `PRESS R → CAMPAIGN COMPLETE` on the finale, `PRESS R → MISSION SELECT` for free play. Caught from user feedback that campaign progression was unclear.
+- **Title screen selection box sizing.** Old selection box (40px tall) clipped the descenders (g, y, p, q) in the option descriptions, making the box look "too small for the words." Box is now 46px tall with rowSpacing bumped to 50 so adjacent boxes keep a 4px gap.
+- **Altitude chart and FLIGHT ANALYSIS panel no longer overlap.** The crash-analysis panel used to draw on top of the telemetry chart's descent curve. Moved the panel below the chart (startY + 195 → + 55px clearance) so the chart reads cleanly.
+
+### Fixed
+- **WebGL context loss no longer strands the player.** If the browser revokes the WebGL context mid-flight (common on mobile/tablet where TF.js and PixiJS compete for contexts), the renderer now auto-reloads into Canvas 2D mode with a logged warning. Transparent recovery.
+- **AI Training no longer pins the main thread on weak backends.** Training loop now yields to the event loop every 25 steps within an episode (was: only between 5-episode batches). Episodes still complete fast on desktop but browsers no longer fire the "page is slow" warning on tablet. Also logs the active TF.js backend (`webgl` vs `cpu`) at RLAgent init for future diagnosis.
+
+### Architecture
+- Canvas 2D is now the **default** gameplay backend. WebGL is opt-in via `?renderer=webgl` until Sprint 6 Part C + real-world testing give us a clearer rollout story. The WebGL pipeline shipped in Part A is intact and fully functional — it just waits for a user gesture to enable.
+- Bloom attaches as a single `AdvancedBloomFilter` to the texture-sprite that receives the rendered frame. Scene-wide effect via one filter declaration; no per-draw-call plumbing needed.
+
 ## [0.5.9.2] - 2026-04-18 (Sprint 6 Part A: WebGL foundation)
 
 ### Added
