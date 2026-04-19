@@ -93,7 +93,9 @@ New title-screen option: `RANDOM MISSION`. Click → `MissionGenerator.generate(
 
 ### Delight: hidden pad
 
-At lander AGL < 100px, a dust plume effect reveals a pre-generated hidden pad. If the player lands on the hidden pad, score × 3 + `HIDDEN PAD BONUS` toast. Pad location is deterministic from seed. **Excluded from historic missions** (see Risk #3 below).
+At lander AGL < 100px, a dust plume effect reveals a pre-generated hidden pad. If the player lands on the hidden pad, score × 3 + `HIDDEN PAD BONUS` toast. Pad location is deterministic from seed. **Excluded from historic missions** (see Gap #5 below).
+
+**Centralization (eng review):** All hidden-pad behavior lives in a single `src/game/HiddenPad.ts` module exposing one function `maybeGenerateHiddenPad(mission, terrain, rng)`. That function is the ONLY place that checks `isHistoricMission(mission)`. The pad-renderer, particle-spawner, and score-multiplier all read from the same pre-generated output. DRY exemption gate.
 
 ### Per-archetype palette bias
 
@@ -120,6 +122,8 @@ Web Audio synth only. No new assets.
 ### Share URL encoding
 
 `?seed=X&cfg=<base64>` where `cfg` encodes a minimal `{archetype, palette}` struct. Decoded config applies on load. **2KB cap** on decoded size (security). Unknown values fall back to defaults silently (see Gap #1 below).
+
+**Precedence vs existing `?custom=` param (Terrain Editor):** `?custom=` wins. If both `?custom=` and `?cfg=` appear in a URL, the custom-terrain path takes priority and `?cfg=` is silently ignored. Rationale: Terrain Editor is deliberate user-authored content; `?cfg=` is pretty-wrapping over a generated mission. Stealing custom-drawn terrain with a generated config would feel wrong. (Eng review decision.)
 
 ## Mission assignment (final)
 
@@ -212,7 +216,7 @@ Five gaps surfaced by the adversarial plan review. All resolved:
 
 ### Regression pin (hard requirement)
 
-`tests/terrain-regression.test.ts`: seeds 1969, 4217, 7001 with `archetype: undefined` + `palette: undefined` produce **byte-identical** terrain to v0.6.0.0. Kills the sprint if it fails.
+`tests/terrain-regression.test.ts`: **all 10 `MISSIONS[]` freeplay seeds** with `archetype: undefined` + `palette: undefined` produce byte-identical terrain to v0.6.0.0. **Plus Apollo 11/15/17 seeds** which explicitly stay `archetype: "rolling"` — a code path that routes through the new dispatch but must produce the same output as the pre-dispatch direct call. Kills the sprint if any seed shifts. (Eng review raised from 3 sample seeds to full pin: a subtle branch bug in the `archetype undefined OR archetype === "rolling"` dispatch logic could silently regress 7 freeplay missions + 3 Apollo missions at once, invalidating everyone's saved ghosts and leaderboard times. Cost of the expanded pin is ~10 extra assertions; cost of a missed regression is much higher.)
 
 ## Data migration
 
@@ -260,19 +264,24 @@ Can a new player, shown 5 seconds of gameplay from each of 3 random missions, co
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | EXPANSION mode, 5/5 expansions accepted; 5 adversarial gaps surfaced and resolved |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | Codex CLI unavailable; Claude adversarial subagent substituted (5 gaps, all resolved) |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | Not yet run — required before implementation |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Recommended before implementation (UI scope includes RANDOM MISSION button, hidden-pad visual, archetype visual cues on mission-select) |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | EXPANSION mode; 5/5 expansions accepted; 5 adversarial gaps surfaced and resolved |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | Codex CLI unavailable on this machine; Claude adversarial subagent substituted |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 0 critical gaps; 2 refinements raised (regression pin scope expanded, URL precedence nailed down, hidden-pad exemption centralized) |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Recommended before implementation (UI scope includes RANDOM MISSION button, hidden-pad visual, archetype indicators on mission-select) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Optional — no external dev surface |
 
-**OUTSIDE VOICE (Claude subagent, substituted for Codex):** Found 5 gaps the CEO review missed:
-1. Leaderboard collision — resolved by excluding Random from leaderboard
-2. Ghost replay determinism — resolved by schema v2 + legacy flag
-3. DQN weight key collision — resolved by disabling weight load for Random
-4. Daily Challenge reproducibility — resolved by hash-derived archetype
-5. Hidden-pad vs historic margin scoring — resolved by exempting historic missions
+**OUTSIDE VOICE (Claude subagent, substituted for Codex, during CEO review):** Found 5 gaps the CEO review missed:
+1. Leaderboard collision → exclude Random from leaderboard
+2. Ghost replay determinism → schema v2 + legacy flag
+3. DQN weight key collision → disable weight load for Random
+4. Daily Challenge reproducibility → hash-derived archetype
+5. Hidden-pad vs historic margin scoring → exempt historic missions
+
+**ENG REVIEW additions (2 refinements on top of CEO-approved scope):**
+- Regression pin expanded from 3 sample seeds to ALL 10 `MISSIONS[]` seeds + Apollo 11/15/17 (caught: subtle dispatch branch drift could silently regress 10 missions)
+- Share URL precedence nailed down: `?custom=` wins over `?cfg=` when both present (Terrain Editor content is user-authored, deserves priority)
+- Hidden-pad exemption check centralized in a single `HiddenPad.ts` module (one `isHistoricMission()` gate, DRY)
 
 **UNRESOLVED:** 0 decisions.
 
-**VERDICT:** CEO CLEARED — ready for /plan-eng-review. Recommended: run /plan-eng-review next to lock architecture + test plan before implementation.
+**VERDICT:** CEO + ENG CLEARED — ready to implement. Design review still recommended before PR 1 (UI scope for RANDOM MISSION button + hidden-pad visual); can run in parallel with PR 1 coding.
