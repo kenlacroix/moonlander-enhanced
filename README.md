@@ -2,7 +2,7 @@
 
 A browser-based, AI-enhanced reimagining of the 1979 Atari Moon Lander. Runs entirely in the browser. No install, no backend.
 
-Current version: **v0.5.9.3** (see [`CHANGELOG.md`](./CHANGELOG.md)).
+Current version: **v0.5.9.4** (see [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ## What's interesting
 
@@ -43,7 +43,7 @@ Opens at `http://localhost:5173`. No API keys needed for core gameplay. Optional
 
 ## Status
 
-Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint. Sprint 5 Part A (Historic Missions foundations + Apollo landings + Artemis) shipped at v0.5.7.0. Sprint 2.7 (Smarter DQN) at v0.5.8.0. Sprint 2.6 (AI Theater Explain Mode) Parts A+B+C at v0.5.8.1–v0.5.8.3. Sprint 5.5 Part A (Authentic Mode) at v0.5.9.0. Sprint 5 Part B (Apollo 13 Survive + Luna 9 auto-landing) plus Sprint 5.5 polish at v0.5.9.1. Sprint 6 Part A (WebGL rendering pipeline + Canvas fallback) at v0.5.9.2. Sprint 6 Part B (scene-wide bloom, opt-in via `?renderer=webgl`) at v0.5.9.3. Next up: Sprint 6 Part C (dynamic sun lighting, screen shake, revisit heat distortion and normal mapping).
+Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint. Sprint 5 Part A (Historic Missions foundations + Apollo landings + Artemis) shipped at v0.5.7.0. Sprint 2.7 (Smarter DQN) at v0.5.8.0. Sprint 2.6 (AI Theater Explain Mode) Parts A+B+C at v0.5.8.1–v0.5.8.3. Sprint 5.5 Part A (Authentic Mode) at v0.5.9.0. Sprint 5 Part B (Apollo 13 Survive + Luna 9 auto-landing) plus Sprint 5.5 polish at v0.5.9.1. Sprint 6 Part A (WebGL rendering pipeline + Canvas fallback) at v0.5.9.2. Sprint 6 Part B (scene-wide bloom, opt-in via `?renderer=webgl`) at v0.5.9.3. Sprint 6 Part C (per-mission sun in the skybox, bigger crash shake, impact flash) at v0.5.9.4. Sprint 6 closes out the WebGL visual-upgrade arc; next up: probably Sprint 7 (WebRTC peer-to-peer multiplayer) or polish toward v0.6.
 
 ## License
 

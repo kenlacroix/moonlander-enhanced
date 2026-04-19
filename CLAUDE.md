@@ -503,11 +503,16 @@ Shipped alongside Sprint 5 Part B in the same PR.
 - [ ] Heat distortion behind engine bell — needs localization to the plume area. Incompatible with the current texture-sprite approach without a secondary sprite or clipping region.
 - [ ] Normal mapping on terrain surface — needs terrain to render as its own PixiJS primitive with lighting, not as part of the blitted sprite. Significant refactor.
 
-**Part C — Dynamic lighting + polish (~45min CC)**
-- [ ] Dynamic sun lighting per mission
-- [ ] Screen shake on crash
-- [ ] Heat distortion (if a tractable approach emerges)
-- [ ] Normal mapping (if the primitive-pipeline rework proves worthwhile)
+**Part C — Mission sun + impact feedback ✅ COMPLETE (v0.5.9.4, PR tbd)**
+- [x] Per-mission sun angle rendered as a glowing disc in the skybox. Historic missions carry mission-accurate angles (Apollo 11: 20°, Apollo 15: 40°, Apollo 17: 65°, Artemis III: 85° polar morning, Luna 9: -25°). Freeplay falls back to a 30° default.
+- [x] Impact flash on crash (bright whiteout fades over 30 frames)
+- [x] Screen shake upgraded 15 → 40 for crashes and survive-timeouts. Was already wired — this pass made it *feel* like a crash rather than a bump.
+
+**Deferred indefinitely (would require renderer rework):**
+- [ ] Real per-polygon terrain shading from sun angle — needs terrain as its own PixiJS primitive
+- [ ] Heat distortion behind engine bell — needs localized filter sprite
+- [ ] Normal-mapped terrain surface — same rework as terrain shading
+These move to a future "Sprint 6.5 — renderer primitive rework" if the visual payoff justifies the architectural cost, or stay deferred if bloom + mission sun + flash turn out to be enough "whoa".
 
 **Exit question:** Does the WebGL version make you go "whoa" compared to Canvas?
 

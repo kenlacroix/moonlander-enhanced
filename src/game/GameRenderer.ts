@@ -304,7 +304,10 @@ export class GameRenderer {
 		const offset = state.camera.getOffset();
 
 		this.clearGameplayFrame();
-		this.gameplay.drawBackground(state.camera);
+		this.gameplay.drawBackground(
+			state.camera,
+			state.activeMission?.sunAngle,
+		);
 		// Apply cosmetic terrain wobble during gravity storms
 		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
 		const terrainOffset =
@@ -502,6 +505,19 @@ export class GameRenderer {
 			);
 		}
 
+		// Sprint 6 Part C — crash flash. Drawn on the UI canvas so it
+		// covers both the gameplay (WebGL or Canvas) and UI layers.
+		// tickFlash advances the decay; the flash is a brief whiteout
+		// that fades across ~8 frames after impact.
+		if (state.camera.flashAmount > 0) {
+			const ctx = this.renderer.ctx;
+			ctx.save();
+			ctx.fillStyle = `rgba(255, 255, 255, ${state.camera.flashAmount})`;
+			ctx.fillRect(0, 0, 1280, 720);
+			ctx.restore();
+			state.camera.tickFlash();
+		}
+
 		this.presentFrame();
 	}
 
@@ -594,7 +610,10 @@ export class GameRenderer {
 	renderAgentReplay(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
 		this.clearGameplayFrame();
-		this.gameplay.drawBackground(state.camera);
+		this.gameplay.drawBackground(
+			state.camera,
+			state.activeMission?.sunAngle,
+		);
 		this.gameplay.drawTerrain(state.terrain, offset);
 		this.gameplay.drawParticles(state.particles.particles, offset);
 		this.gameplay.drawLander(state.lander, offset);

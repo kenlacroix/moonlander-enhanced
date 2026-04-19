@@ -19,6 +19,7 @@ export const LUNA_MISSIONS: AutoLandingMission[] = [
 			"First-ever soft landing on another celestial body. Watch the autopilot fly.",
 		kind: "auto-landing",
 		era: "1960s-soviet",
+		sunAngle: -25,
 		difficulty: {
 			landerType: "luna-9",
 			startingFuel: 500,

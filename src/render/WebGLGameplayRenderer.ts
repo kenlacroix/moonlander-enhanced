@@ -155,8 +155,8 @@ export class WebGLGameplayRenderer implements IGameplayRenderer {
 		this.backing.clear();
 	}
 
-	drawBackground(camera: Camera): void {
-		this.backing.drawBackground(camera);
+	drawBackground(camera: Camera, sunAngle?: number): void {
+		this.backing.drawBackground(camera, sunAngle);
 	}
 
 	drawTerrain(terrain: TerrainData, offset: Offset): void {

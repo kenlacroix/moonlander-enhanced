@@ -8,6 +8,11 @@ export class Camera {
 	targetY = 0;
 	shakeAmount = 0;
 	shakeDecay = 0.9;
+	/** Bright white flash triggered on crash. 1.0 = full white overlay,
+	 * 0 = no flash. Decays each frame. Sprint 6 Part C cinematic touch:
+	 * impact feels punchier when the screen briefly whites out. */
+	flashAmount = 0;
+	flashDecay = 0.88;
 
 	/** Follow a target position with smooth interpolation */
 	follow(targetX: number, targetY: number, dt: number): void {
@@ -27,6 +32,23 @@ export class Camera {
 	/** Add screen shake (e.g. on crash) */
 	shake(amount: number): void {
 		this.shakeAmount = amount;
+	}
+
+	/** Add impact flash (e.g. on crash). 0.6 is a readable full-screen
+	 * whiteout that fades in ~8 frames. */
+	flash(amount: number): void {
+		this.flashAmount = amount;
+	}
+
+	/** Advance the flash decay. Called once per rendered frame. Separate
+	 * from getOffset() so the flash runs during post-flight status when
+	 * the camera no longer follows. */
+	tickFlash(): void {
+		if (this.flashAmount > 0.01) {
+			this.flashAmount *= this.flashDecay;
+		} else {
+			this.flashAmount = 0;
+		}
 	}
 
 	/** Get the current offset including shake */

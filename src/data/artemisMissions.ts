@@ -13,6 +13,7 @@ export const ARTEMIS_MISSIONS: LandingMission[] = [
 			"South polar landing near Shackleton crater. Permanent shadows, harsh slopes.",
 		kind: "landing",
 		era: "2020s-artemis",
+		sunAngle: 85,
 		difficulty: {
 			landerType: "artemis-lm",
 			startingFuel: 1300,

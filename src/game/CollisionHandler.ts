@@ -46,7 +46,13 @@ export function handleCollisionResult(
 	} else {
 		game.status = "crashed";
 		game.particles.emitExplosion(game.lander.x, game.lander.y);
-		game.camera.shake(15);
+		// Sprint 6 Part C — impact feedback: bigger shake + brief flash.
+		// The old shake(15) was visible but thin; crash is the single
+		// most punishing moment of a run, and cinematic impact leans on
+		// both kinetic (shake) and photic (flash) cues. Survive-timeout
+		// picks up the same treatment a few lines below for consistency.
+		game.camera.shake(40);
+		game.camera.flash(0.6);
 		game.audio.setThruster(false);
 		game.audio.playCrash();
 		game.audio.soundtrack.onCrashed();
@@ -146,6 +152,12 @@ export function handleSurviveSuccess(game: Game): void {
 export function handleSurviveTimeout(game: Game): void {
 	game.status = "crashed";
 	game.particles.emitExplosion(game.lander.x, game.lander.y);
+	// Match the pad-crash kinetic treatment so a survive timeout feels
+	// like a real failure, not a quiet fade-out. Apollo 13 aborting
+	// intercept deserves at least as much screen presence as an
+	// auger-into-the-dust mistake.
+	game.camera.shake(40);
+	game.camera.flash(0.6);
 	game.audio.setThruster(false);
 	game.audio.playCrash();
 	game.audio.soundtrack.onCrashed();

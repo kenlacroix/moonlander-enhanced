@@ -100,8 +100,8 @@ export class CanvasRenderer implements IGameplayRenderer {
 		this.retro?.drawScanlines(this.ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 	}
 
-	drawBackground(camera: Camera): void {
-		this.background.draw(this.ctx, camera.x);
+	drawBackground(camera: Camera, sunAngle?: number): void {
+		this.background.draw(this.ctx, camera.x, sunAngle);
 	}
 
 	drawTerrain(terrain: TerrainData, offset: { x: number; y: number }): void {

@@ -7,6 +7,16 @@ export interface Mission {
 	seed: number;
 	description: string;
 	difficulty?: DifficultyConfig;
+	/**
+	 * Sun angle from vertical, in degrees. Positive is to the right of
+	 * center, negative to the left. Drives the sun disc position in
+	 * the skybox so each mission gets its own lighting identity.
+	 * Apollo 11 had a low morning sun (~20°); Apollo 17 landed with
+	 * long afternoon shadows (~65°); Artemis III targets polar
+	 * regions where the sun grazes the horizon (~85°). Freeplay
+	 * missions omit this and render with a default mid-morning angle.
+	 */
+	sunAngle?: number;
 }
 
 /** Free-play missions — all use default difficulty */

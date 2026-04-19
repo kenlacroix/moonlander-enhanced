@@ -52,7 +52,8 @@ export function stepAgentReplay(game: Game, dt: number): void {
 		} else {
 			game.lander.status = "crashed";
 			game.particles.emitExplosion(game.lander.x, game.lander.y);
-			game.camera.shake(15);
+			game.camera.shake(40);
+			game.camera.flash(0.6);
 			game.audio.playCrash();
 		}
 		restartTimer = 0;

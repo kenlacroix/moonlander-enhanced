@@ -31,7 +31,11 @@ export interface IGameplayRenderer {
 	readonly canvas: HTMLCanvasElement;
 
 	clear(): void;
-	drawBackground(camera: Camera): void;
+	/** Draws stars, Earth, and (when supplied) a mission-specific sun
+	 * disc. Sprint 6 Part C passes sunAngle in degrees from vertical
+	 * so the skybox reads differently per mission. Undefined falls
+	 * back to a default mid-morning angle. */
+	drawBackground(camera: Camera, sunAngle?: number): void;
 	drawTerrain(terrain: TerrainData, offset: Offset): void;
 	drawLander(lander: LanderState, offset: Offset): void;
 	drawGhost(lander: LanderState, offset: Offset): void;
