@@ -2,27 +2,6 @@ import { CanvasRenderer } from "./CanvasRenderer";
 import type { IGameplayRenderer } from "./IGameplayRenderer";
 import { WebGLGameplayRenderer } from "./WebGLGameplayRenderer";
 
-/**
- * Conservative mobile/tablet detection. Signals we check, in order
- * of reliability:
- *  1. `navigator.maxTouchPoints > 1` — most touch-primary devices
- *     (iPads, Android tablets, touch laptops). Modern iPadOS lies
- *     about being "Macintosh" in UA, but maxTouchPoints is honest.
- *  2. `Mobi|Android|iPhone|iPad` in UA — classic check.
- * One hit is enough. Desktop browsers with touch displays get picked
- * up by #1 too — acceptable false-positive, since the Canvas path
- * works fine on them.
- */
-function isMobileOrTablet(): boolean {
-	if (typeof navigator === "undefined") return false;
-	const touchPoints =
-		typeof navigator.maxTouchPoints === "number"
-			? navigator.maxTouchPoints
-			: 0;
-	if (touchPoints > 1) return true;
-	const ua = navigator.userAgent || "";
-	return /Mobi|Android|iPhone|iPad/i.test(ua);
-}
 
 /**
  * Result of renderer selection. `backend` is reported so the HUD /
@@ -36,54 +15,52 @@ export interface RendererSelection {
 }
 
 /**
- * Select a gameplay renderer at startup. Tries WebGL first; on any
- * failure (WebGL context unavailable, driver reset, PixiJS init throws)
- * falls back to Canvas 2D so the game is always playable. The caller
- * is expected to pass two distinct canvases: `glCanvas` for the WebGL
- * backend, `canvasFallback` for the Canvas 2D backend. On fallback,
- * `glCanvas` is left untouched and should be hidden by the caller.
+ * Select a gameplay renderer at startup.
  *
- * `?renderer=canvas` URL parameter forces the Canvas 2D path. Useful
- * for debugging, for users on hardened configs where WebGL init
- * succeeds but later breaks, and for /qa parity checks.
+ * **Default is Canvas 2D.** Sprint 6 Part A shipped a WebGL pipeline
+ * (IGameplayRenderer + PixiJS v8 + auto-fallback), but in real-world
+ * testing WebGL hits context-loss issues on tablets and other
+ * browsers that cap concurrent WebGL contexts per tab — TF.js
+ * grabbing a context for AI Training / AI Theater bumps PixiJS off.
+ * Canvas has no such cap, and Part A's visual output is identical
+ * to the WebGL path anyway (the "whoa" effects ship in Part B). So
+ * Canvas is the shipped default until Part B's shader work lands and
+ * we revisit the rollout story.
+ *
+ * Opt into WebGL per-session with `?renderer=webgl`. The factory
+ * will try WebGL, and if PixiJS init or the WebGL context fail it
+ * still falls back to Canvas so the game is always playable. The
+ * WebGL canvas also self-handles `webglcontextlost` by reloading
+ * into Canvas mode.
+ *
+ * `?renderer=canvas` is a no-op under the new default but kept for
+ * explicitness and so saved share-URLs that carry it keep working.
  */
 export async function createGameplayRenderer(
 	glCanvas: HTMLCanvasElement,
 	canvasFallback: HTMLCanvasElement,
 ): Promise<RendererSelection> {
 	const params = new URLSearchParams(window.location.search);
-	const forceCanvas = params.get("renderer") === "canvas";
-	if (forceCanvas) {
-		console.info("[renderer] Canvas 2D forced by ?renderer=canvas");
+	const optInWebGL = params.get("renderer") === "webgl";
+
+	if (!optInWebGL) {
+		// Default path — ship Canvas. Everything Part A does visually
+		// is equivalent between backends. Part B's shaders will make
+		// WebGL the headline.
 		return {
 			gameplay: new CanvasRenderer(canvasFallback),
 			backend: "canvas",
 		};
 	}
 
-	// Mobile/tablet heuristic: pre-emptively pick Canvas. Most phones
-	// and tablets cap concurrent WebGL contexts per tab at 1-2. The
-	// game would succeed at PixiJS init but then TF.js (AI Training,
-	// AI Theater) grabs another context and kicks PixiJS off, leaving
-	// the gameplay layer frozen. Canvas has no such cap. Users who
-	// want to override can append ?renderer=webgl manually.
-	const forceWebGL = params.get("renderer") === "webgl";
-	if (!forceWebGL && isMobileOrTablet()) {
-		console.info(
-			"[renderer] Mobile/tablet detected — defaulting to Canvas 2D to avoid WebGL context contention with TF.js. Override with ?renderer=webgl",
-		);
-		return {
-			gameplay: new CanvasRenderer(canvasFallback),
-			backend: "canvas",
-		};
-	}
-
-	// Cheap pre-flight: does the browser expose a WebGL context at all?
-	// Avoids paying the PixiJS async init cost on browsers where WebGL
-	// is disabled (Lynx, textmode, hardened configs).
+	// Opt-in WebGL. Cheap pre-flight: does the browser expose a WebGL
+	// context at all? Avoids paying the PixiJS async init cost on
+	// browsers where WebGL is disabled (Lynx, textmode, hardened configs).
 	const probe = glCanvas.getContext("webgl2") ?? glCanvas.getContext("webgl");
 	if (!probe) {
-		console.warn("[renderer] WebGL unavailable — using Canvas 2D fallback");
+		console.warn(
+			"[renderer] ?renderer=webgl requested but WebGL unavailable — using Canvas 2D",
+		);
 		return {
 			gameplay: new CanvasRenderer(canvasFallback),
 			backend: "canvas",
@@ -92,6 +69,7 @@ export async function createGameplayRenderer(
 
 	try {
 		const gameplay = await WebGLGameplayRenderer.create(glCanvas);
+		console.info("[renderer] WebGL enabled via ?renderer=webgl");
 		return { gameplay, backend: "webgl" };
 	} catch (err) {
 		console.warn(
