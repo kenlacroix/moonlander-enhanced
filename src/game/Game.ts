@@ -477,6 +477,11 @@ export class Game {
 			? createGravityStorm(this.seed_)
 			: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
+		// Sprint 7.1 PR 1.5 — hand the archetype to the soundtrack before
+		// start(), so the next flight's drone / shimmer / tension profile
+		// reflects the terrain type. Default/rolling keeps the legacy
+		// tritone mix byte-identical to v0.6.0.0.
+		this.audio.soundtrack.setArchetype(diff?.archetype);
 		this.audio.soundtrack.start();
 		const ghostRun = loadGhostForSeed(this.seed_, ghostMode);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
