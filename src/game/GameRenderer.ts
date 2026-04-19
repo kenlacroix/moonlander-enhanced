@@ -10,6 +10,7 @@ import type { TrainingLoop } from "../ai/TrainingLoop";
 import { APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
+import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
 import { getBestScore, getBestTime } from "../systems/Leaderboard";
@@ -125,10 +126,60 @@ export interface GameRenderState {
 }
 
 export class GameRenderer {
-	constructor(private renderer: CanvasRenderer) {}
+	constructor(
+		private renderer: CanvasRenderer,
+		private gameplay: IGameplayRenderer,
+	) {}
 
 	setRetroSkin(skin: Parameters<CanvasRenderer["setRetroSkin"]>[0]): void {
 		this.renderer.setRetroSkin(skin);
+	}
+
+	/** True when the previous rendered frame drew the gameplay layer.
+	 * Used to wipe the WebGL canvas one time on transition from a
+	 * gameplay screen to a UI-only screen (title / menu / training),
+	 * after which the canvas stays black and no texture uploads
+	 * happen until the next gameplay frame. */
+	private lastFrameDrewGameplay = false;
+	/** Frame counter used to throttle the training screen's redraw.
+	 * Training runs the RL agent on the main thread; every rAF spent
+	 * redrawing the reward chart is time the agent doesn't spend
+	 * learning. 6x throttle gives a 10 Hz chart refresh, which is
+	 * still visually live, at 1/6 the draw cost. */
+	private trainingFrameTick = 0;
+
+	/** Full clear for gameplay screens: both layers get wiped, and the
+	 * gameplay-drawn flag is set so presentFrame() knows to commit. */
+	private clearGameplayFrame(): void {
+		this.gameplay.clear();
+		if (this.gameplay !== this.renderer) {
+			this.renderer.clear();
+		}
+		this.lastFrameDrewGameplay = true;
+	}
+
+	/** UI-only clear for screens that don't touch the gameplay layer
+	 * (title, menu, training). Clears the UI layer every frame so the
+	 * UI stays responsive, but the gameplay layer only gets wiped once
+	 * on transition from gameplay → UI. Saves ~3.7 MB per frame of
+	 * texture upload on those screens. */
+	private clearUIFrame(): void {
+		if (this.lastFrameDrewGameplay) {
+			this.gameplay.clear();
+			this.gameplay.present();
+			this.lastFrameDrewGameplay = false;
+		}
+		// The UI clear happens even when gameplay === renderer — the
+		// canvas has to be cleared every frame for the UI to redraw.
+		this.renderer.clear();
+	}
+
+	/** Commit the gameplay layer's frame. No-op on Canvas (draws are
+	 * immediate); WebGL uploads the dirty texture and submits.
+	 * Called only when the gameplay layer actually changed this
+	 * frame, which is every frame on gameplay screens. */
+	private presentFrame(): void {
+		this.gameplay.present();
 	}
 
 	private drawAIGhostTrail(
@@ -161,6 +212,37 @@ export class GameRenderer {
 		ctx.fill();
 		ctx.restore();
 		ctx.globalAlpha = 1;
+	}
+
+	/** Prominent post-landing call-to-action pinned to the bottom of
+	 * the screen so it reads as the primary next action instead of
+	 * being buried in the score line's run-on sentence. */
+	private drawContinueCTA(text: string, highlighted: boolean): void {
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		ctx.font = 'bold 16px "Courier New", monospace';
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		const y = 720 - 48;
+		const padX = 18;
+		const metrics = ctx.measureText(text);
+		const w = metrics.width + padX * 2;
+		const h = 32;
+		const x = 1280 / 2 - w / 2;
+		// Highlighted (next-mission available) gets a brighter border
+		// so the eye catches it over the "mission select" fallback.
+		const border = highlighted ? "#00ff88" : "rgba(255,255,255,0.55)";
+		const fill = highlighted ? "#00ff88" : "#ffffff";
+		ctx.fillStyle = "rgba(0,0,0,0.75)";
+		ctx.strokeStyle = border;
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.roundRect(x, y - h / 2, w, h, 5);
+		ctx.fill();
+		ctx.stroke();
+		ctx.fillStyle = fill;
+		ctx.fillText(text, 1280 / 2, y + 1);
+		ctx.restore();
 	}
 
 	private drawChatterCaption(text: string): void {
@@ -221,29 +303,29 @@ export class GameRenderer {
 	render(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
 
-		this.renderer.clear();
-		this.renderer.drawBackground(state.camera);
+		this.clearGameplayFrame();
+		this.gameplay.drawBackground(state.camera);
 		// Apply cosmetic terrain wobble during gravity storms
 		const wobble = state.gravityStorm?.wobbleOffset ?? 0;
 		const terrainOffset =
 			wobble !== 0 ? { x: offset.x, y: offset.y + wobble } : offset;
-		this.renderer.drawTerrain(state.terrain, terrainOffset);
-		this.renderer.drawParticles(state.particles.particles, offset);
+		this.gameplay.drawTerrain(state.terrain, terrainOffset);
+		this.gameplay.drawParticles(state.particles.particles, offset);
 		if (state.ghostPlayer?.isActive()) {
-			this.renderer.drawGhost(state.ghostPlayer.lander, offset);
+			this.gameplay.drawGhost(state.ghostPlayer.lander, offset);
 		}
 		if (state.artifacts.length > 0) {
-			this.renderer.drawArtifacts(state.artifacts, offset);
+			this.gameplay.drawArtifacts(state.artifacts, offset);
 		}
 		if (state.alien) {
-			this.renderer.drawAlien(
+			this.gameplay.drawAlien(
 				state.alien,
 				state.lander.x,
 				state.lander.y,
 				offset,
 			);
 		}
-		this.renderer.drawLander(state.lander, offset);
+		this.gameplay.drawLander(state.lander, offset);
 
 		if (state.forkReplay?.forked) {
 			this.drawAIGhostTrail(state.forkReplay, offset);
@@ -333,9 +415,6 @@ export class GameRenderer {
 				const isCampaignNext =
 					state.gameMode === "campaign" &&
 					state.selectedMission < CAMPAIGN.length - 1;
-				const nextHint = isCampaignNext ? "next mission" : "mission select";
-				const ghostHint = isTouch ? "" : "  |  G ghost  |  F report";
-				const hint = isTouch ? "Tap top to continue" : `R ${nextHint}`;
 				const title =
 					state.gameMode === "campaign"
 						? "MISSION COMPLETE"
@@ -346,10 +425,27 @@ export class GameRenderer {
 						: state.lastRank
 							? `  #${state.lastRank}`
 							: "";
+				// Ghost + report are secondary — keep them in the subtitle
+				// mixed with the score. The "continue" hint gets its own
+				// prominent line below so campaign players don't lose the
+				// next-mission path in a run-on sentence.
+				const secondary = isTouch
+					? ""
+					: "G ghost  |  F report";
+				const subtitleRight = secondary ? `  |  ${secondary}` : "";
 				this.renderer.drawMessage(
 					title,
-					`Score: ${state.score}${rankText}  |  ${hint}${ghostHint}`,
+					`Score: ${state.score}${rankText}${subtitleRight}`,
 				);
+				// Primary call-to-action: where does R take you?
+				const ctaText = isTouch
+					? "TAP TOP TO CONTINUE"
+					: isCampaignNext
+						? "PRESS R  →  NEXT MISSION"
+						: state.gameMode === "campaign"
+							? "PRESS R  →  CAMPAIGN COMPLETE"
+							: "PRESS R  →  MISSION SELECT";
+				this.drawContinueCTA(ctaText, isCampaignNext);
 			} else {
 				const crashHint = state.input.isTouchDevice
 					? "Tap top to continue"
@@ -405,10 +501,12 @@ export class GameRenderer {
 				state.achievementToastTimer,
 			);
 		}
+
+		this.presentFrame();
 	}
 
 	renderTitle(state: GameRenderState): void {
-		this.renderer.clear();
+		this.clearUIFrame();
 		this.renderer.drawTitle(
 			state.titleSelection,
 			state.campaignCompleted.size,
@@ -441,7 +539,7 @@ export class GameRenderer {
 				};
 			}
 		}
-		this.renderer.clear();
+		this.clearUIFrame();
 		// Dual-track leaderboard: when on historic missions, also pull the
 		// Authentic best score for each seed so the row can show both.
 		const authenticBestScores =
@@ -473,7 +571,15 @@ export class GameRenderer {
 	}
 
 	renderTraining(state: GameRenderState): void {
-		this.renderer.clear();
+		// Throttle to 10 Hz (every 6 rAF ticks at 60 Hz). The training
+		// loop runs the RL agent on the same thread as rendering, so
+		// every rAF spent redrawing the reward chart is main-thread
+		// time the agent could have used for a forward pass. 10 Hz is
+		// still live-feeling for a reward curve that updates once per
+		// episode anyway.
+		this.trainingFrameTick = (this.trainingFrameTick + 1) % 6;
+		if (this.trainingFrameTick !== 0) return;
+		this.clearUIFrame();
 		const history = state.trainingLoop?.agent.getRewardHistory() ?? [];
 		const stats = state.latestTrainingStats;
 		this.renderer.drawTrainingUI(
@@ -487,11 +593,11 @@ export class GameRenderer {
 
 	renderAgentReplay(state: GameRenderState): void {
 		const offset = state.camera.getOffset();
-		this.renderer.clear();
-		this.renderer.drawBackground(state.camera);
-		this.renderer.drawTerrain(state.terrain, offset);
-		this.renderer.drawParticles(state.particles.particles, offset);
-		this.renderer.drawLander(state.lander, offset);
+		this.clearGameplayFrame();
+		this.gameplay.drawBackground(state.camera);
+		this.gameplay.drawTerrain(state.terrain, offset);
+		this.gameplay.drawParticles(state.particles.particles, offset);
+		this.gameplay.drawLander(state.lander, offset);
 		this.renderer.drawHUD(state.lander, 0, null, false, false);
 
 		if (state.lander.status === "landed") {
@@ -507,5 +613,6 @@ export class GameRenderer {
 		} else {
 			this.renderer.drawMessage("", "AI AGENT PLAYING  |  ESC for menu");
 		}
+		this.presentFrame();
 	}
 }

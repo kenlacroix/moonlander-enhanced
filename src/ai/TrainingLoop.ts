@@ -5,6 +5,16 @@ import { RLAgent, type TrainingStats } from "./RLAgent";
 const MAX_STEPS_PER_EPISODE = 1500;
 const TRAINING_SEED = 1969;
 
+/** Yield to the event loop every this many steps inside an episode.
+ * chooseAction's dataSync() is a synchronous GPU readback (or CPU
+ * compute on the Firefox-on-tablet fallback backend). Without
+ * periodic yields, ~50 consecutive reads chain into a Long Task and
+ * Firefox fires "this page is slowing down your browser". Yielding
+ * every 25 steps is frequent enough to stay under the 50 ms Long
+ * Task threshold on a weak tablet CPU while still training
+ * meaningfully fast on desktop. */
+const STEPS_PER_YIELD = 25;
+
 export type TrainingState = "idle" | "training" | "paused";
 
 export interface TrainingConfig {
@@ -18,7 +28,10 @@ export class TrainingLoop {
 	state: TrainingState = "idle";
 	stats: TrainingStats[] = [];
 	config: TrainingConfig = {
-		episodesPerBatch: 5,
+		// One episode per batch before yielding. Previously 5, which
+		// pinned the main thread for multiple episodes at a time on
+		// weaker hardware. Rendering, input, and rAF all waited.
+		episodesPerBatch: 1,
 		speedMultiplier: 1,
 		seed: TRAINING_SEED,
 	};
@@ -82,6 +95,14 @@ export class TrainingLoop {
 
 			if (result.done) break;
 			if (steps % 4 === 0) await this.agent.trainBatch();
+			// Yield to the event loop periodically so rAF, input
+			// dispatch, and paint can run. Without this, a long
+			// episode (1500 steps × ~1 ms chooseAction on a slow
+			// backend) ties up the main thread for 1-2 seconds and
+			// Firefox flags the tab as unresponsive.
+			if (steps % STEPS_PER_YIELD === 0) {
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
 		}
 
 		this.agent.endEpisode(totalReward);

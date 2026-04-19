@@ -23,25 +23,40 @@ import {
 import { degToRad } from "../utils/math";
 import { Background } from "./Background";
 import { HUD } from "./HUD";
+import type { IGameplayRenderer } from "./IGameplayRenderer";
 
-export class CanvasRenderer {
+/**
+ * Canvas 2D renderer. Implements both the gameplay-layer interface
+ * (IGameplayRenderer, so it can be swapped with WebGLGameplayRenderer)
+ * and the UI-layer draw calls (drawHUD, drawTitle, drawMenu, etc. —
+ * these stay Canvas-only forever since text/layout in WebGL is pure
+ * cost for zero visual win).
+ *
+ * `transparentClear`: when WebGL is the active gameplay backend, this
+ * renderer is used as the UI overlay. It must clear transparently so
+ * the WebGL layer shows through underneath. When Canvas is the active
+ * gameplay backend (WebGL fallback), this renderer does everything,
+ * so clear() fills opaque black like before.
+ */
+export class CanvasRenderer implements IGameplayRenderer {
 	readonly canvas: HTMLCanvasElement;
 	readonly ctx: CanvasRenderingContext2D;
 	private background: Background;
 	private hud: HUD;
 	private beaconPhase = 0;
 	private retro: RetroVectorSkin | null = null;
+	private transparentClear = false;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
 		// Set canvas to fixed game resolution
 		canvas.width = CANVAS_WIDTH;
 		canvas.height = CANVAS_HEIGHT;
-
-		// Scale CSS size to fit window while maintaining aspect ratio
-		this.fitToWindow();
-		window.addEventListener("resize", () => this.fitToWindow());
-
+		// CSS sizing lives in main.ts so both the UI canvas and the
+		// WebGL canvas resize in lockstep. The offscreen canvas that
+		// backs WebGLGameplayRenderer also goes through this
+		// constructor but is never attached to the DOM, so sizing
+		// there would be a no-op regardless.
 		const ctx = canvas.getContext("2d");
 		if (!ctx) throw new Error("Canvas 2D context not available");
 		this.ctx = ctx;
@@ -50,26 +65,38 @@ export class CanvasRenderer {
 		this.hud = new HUD();
 	}
 
-	private fitToWindow(): void {
-		const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
-		const windowAspect = window.innerWidth / window.innerHeight;
-		if (windowAspect > aspect) {
-			this.canvas.style.height = "100vh";
-			this.canvas.style.width = `${window.innerHeight * aspect}px`;
-		} else {
-			this.canvas.style.width = "100vw";
-			this.canvas.style.height = `${window.innerWidth / aspect}px`;
-		}
+	setTransparentClear(transparent: boolean): void {
+		this.transparentClear = transparent;
 	}
+
+	present(): void {
+		// Canvas 2D draws are immediate — there's no frame to commit.
+	}
+
+	resize(_width: number, _height: number): void {
+		// Fixed-resolution canvas — resize is handled via CSS in fitToWindow.
+		// Part C may use this to support DPR scaling.
+	}
+
+	destroy(): void {
+		// Canvas 2D has no GPU resources to release.
+	}
+
 
 	setRetroSkin(skin: RetroVectorSkin | null): void {
 		this.retro = skin;
 	}
 
 	clear(): void {
-		this.ctx.fillStyle = "#000000";
-		this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-		// Apply scanline overlay in retro mode
+		if (this.transparentClear) {
+			this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		} else {
+			this.ctx.fillStyle = "#000000";
+			this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		}
+		// Apply scanline overlay in retro mode (always — the retro skin
+		// intentionally overlays the scanlines across the final frame,
+		// including when WebGL is drawing gameplay underneath).
 		this.retro?.drawScanlines(this.ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 	}
 
@@ -492,7 +519,14 @@ export class CanvasRenderer {
 			"Apollo, Artemis. Real missions. Real margins.",
 		];
 
-		const rowSpacing = 46;
+		// Each row carries two text lines: the 22px bold option name (baseline y+8,
+		// descender bottom ~y+12) and the 13px description (baseline y+26,
+		// descender bottom ~y+29). Old box (y-14, height 40 → ends at y+26)
+		// clipped the description descenders because the box bottom edge sat
+		// exactly on the baseline. New box is 46 tall (ends at y+32), clear of
+		// descenders with 3px of margin. rowSpacing bumped to 50 so adjacent
+		// boxes have a 4px gap and don't visually fuse into one strip.
+		const rowSpacing = 50;
 		const firstRowY =
 			CANVAS_HEIGHT / 2 - 20 - ((options.length - 5) * rowSpacing) / 2;
 		for (let i = 0; i < options.length; i++) {
@@ -501,10 +535,10 @@ export class CanvasRenderer {
 
 			if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
+				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 40);
+				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
@@ -1079,7 +1113,11 @@ export class CanvasRenderer {
 		ctx.save();
 
 		const boxW = 640;
-		const startY = CANVAS_HEIGHT / 2 + 130;
+		// Sits below the altitude telemetry chart (chart spans
+		// CANVAS_HEIGHT/2 + 60 to CANVAS_HEIGHT/2 + 185). Previous value
+		// was +130 which overlapped the chart by 55px and obscured the
+		// descent curve behind the "FLIGHT ANALYSIS" panel.
+		const startY = CANVAS_HEIGHT / 2 + 195;
 		const paddingX = 20;
 		const paddingY = 14;
 		const lineHeight = 18;

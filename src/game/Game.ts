@@ -11,6 +11,7 @@ import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
 import { MissionChatter } from "../api/MissionChatter";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
 import { CanvasRenderer } from "../render/CanvasRenderer";
+import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import { type Achievement, loadAchievements } from "../systems/Achievements";
 import { Audio } from "../systems/Audio";
 import {
@@ -74,6 +75,12 @@ export type { GameStatus } from "./GameRenderer";
 export class Game {
 	private canvasRenderer: CanvasRenderer;
 	private gameRenderer: GameRenderer;
+	/** Sprint 6 Part A — gameplay draws (terrain, lander, particles,
+	 * alien, ghost, artifacts) dispatch through this. WebGL when the
+	 * backend initialized cleanly, Canvas 2D otherwise. UI draws
+	 * (HUD, menus, briefings) always stay on canvasRenderer. */
+	readonly gameplayRenderer: IGameplayRenderer;
+	readonly rendererBackend: "webgl" | "canvas";
 	private gameLoop: GameLoop;
 	physics = new PhysicsManager();
 	llm: LLMIntegration;
@@ -200,13 +207,31 @@ export class Game {
 
 	constructor(
 		canvas: HTMLCanvasElement,
+		gameplayRenderer: IGameplayRenderer,
+		rendererBackend: "webgl" | "canvas",
 		urlSeed?: number,
 		embedMode = false,
 		customTerrain?: string,
 	) {
 		this.embedMode = embedMode;
-		this.canvasRenderer = new CanvasRenderer(canvas);
-		this.gameRenderer = new GameRenderer(this.canvasRenderer);
+		this.rendererBackend = rendererBackend;
+		this.gameplayRenderer = gameplayRenderer;
+		// WebGL mode: gameplayRenderer is WebGLGameplayRenderer on its own
+		// GL canvas; CanvasRenderer is a fresh UI overlay on the 2D canvas,
+		// clearing transparently so the WebGL layer shows through.
+		// Canvas fallback: gameplayRenderer IS the CanvasRenderer bound to
+		// the same 2D canvas. Reuse it as both gameplay and UI renderer
+		// instead of double-constructing.
+		if (rendererBackend === "webgl") {
+			this.canvasRenderer = new CanvasRenderer(canvas);
+			this.canvasRenderer.setTransparentClear(true);
+		} else {
+			this.canvasRenderer = gameplayRenderer as CanvasRenderer;
+		}
+		this.gameRenderer = new GameRenderer(
+			this.canvasRenderer,
+			this.gameplayRenderer,
+		);
 		this.llm = new LLMIntegration(() => this.llmConfig);
 		this.audio = new Audio();
 		this.input = new Input();
