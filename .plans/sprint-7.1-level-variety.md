@@ -91,11 +91,28 @@ New title-screen option: `RANDOM MISSION`. Click → `MissionGenerator.generate(
 
 **LLM fallback:** on any failure (no API key, timeout >5s, parse error, refusal), use a seeded template bank: `[archetype] + [noun] → "Crater Hevelius", "Ridge Aristarchus", "Plateau Copernicus"`. Narrative template: `"Drift ${x}, ${place}. ${fuelWord} propellant. Watch the ${hazard}."`
 
+**`GENERATING` state (0-5s while LLM runs; design review decision):**
+- Full-screen dark overlay (`rgba(0,0,0,0.85)`) that blocks menu input (prevents double-click during async LLM call).
+- Center-screen text `GENERATING YOUR MISSION...` in DSKY amber (`ERA_COLORS.APOLLO_AMBER`) at 24px bold Courier.
+- Pulsing dot animation: 3 dots below the text, phase-offset sin waves on alpha (same pattern as existing fuel-warning HUD blink).
+- Overlay fades 200ms on mission-ready or on fallback. Fallback case paints the briefing banner with a subtle `[offline]` suffix in the top-right corner of the briefing box so user knows the narrative is seed-template not LLM.
+- On total failure (no seed-template result either), overlay shows `GENERATION FAILED — retrying...` and retries up to 3 times before aborting to title. Final abort shows briefly then returns to title screen.
+
 ### Delight: hidden pad
 
 At lander AGL < 100px, a dust plume effect reveals a pre-generated hidden pad. If the player lands on the hidden pad, score × 3 + `HIDDEN PAD BONUS` toast. Pad location is deterministic from seed. **Excluded from historic missions** (see Gap #5 below).
 
 **Centralization (eng review):** All hidden-pad behavior lives in a single `src/game/HiddenPad.ts` module exposing one function `maybeGenerateHiddenPad(mission, terrain, rng)`. That function is the ONLY place that checks `isHistoricMission(mission)`. The pad-renderer, particle-spawner, and score-multiplier all read from the same pre-generated output. DRY exemption gate.
+
+**Visual distinction (design review decision):**
+
+The hidden pad renders in **gold** instead of the standard green (`COLOR_PAD_BEACON`):
+- Pad base: `#c0b060` (matte gold)
+- Beacon color: `#ffcc33` (bright gold, pulses at 1.5x the standard beacon phase frequency so it reads as "more alive")
+- Glow (Canvas `shadowBlur`): 12px vs standard 8px, adding visual weight
+- On reveal: a short burst of extra gold-tinted dust particles (`#ffcc33` alpha-fading) around the pad edges, emitted once by `HiddenPad.ts`
+
+The different color reads universally as "bonus/valuable" without needing a textual label, keeping the game's visual language intact (no floating text on pads). Works identically in Canvas and WebGL (the bloom pass makes the gold glow even stronger in WebGL).
 
 ### Per-archetype palette bias
 
@@ -107,6 +124,17 @@ Each archetype has a default palette hint:
 - `rolling` → `{terrain: "#9a9a9a", sky: "#000000"}` (default)
 
 Mission-specific palette overrides the archetype default. Archetype default overrides the system default (`COLOR_TERRAIN` / `COLOR_TERRAIN_EDGE`). One unified helper: `resolvePalette(mission, archetype)`.
+
+**Archetype glyph on mission-select (design review decision):**
+
+Each archetype row on the mission-select screen gets a small glyph character prepended to the mission name, rendered in the archetype's bias color:
+- `rolling` → `○` in `#9a9a9a`
+- `crater-field` → `●` in `#7a4a3a`
+- `spires` → `▲` in `#5a6270`
+- `mesa` → `■` in `#a89878`
+- `flats` → `≈` in `#9a9a9a`
+
+Rendered left of the mission name at the existing left margin, same size as the name text. No row-height or layout impact. Readable at a glance, cheap to draw (one `fillText` per row). Touch-UI compatible (no hover dependency).
 
 ### Per-archetype audio motif
 
@@ -266,8 +294,8 @@ Can a new player, shown 5 seconds of gameplay from each of 3 random missions, co
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | EXPANSION mode; 5/5 expansions accepted; 5 adversarial gaps surfaced and resolved |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | Codex CLI unavailable on this machine; Claude adversarial subagent substituted |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 0 critical gaps; 2 refinements raised (regression pin scope expanded, URL precedence nailed down, hidden-pad exemption centralized) |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Recommended before implementation (UI scope includes RANDOM MISSION button, hidden-pad visual, archetype indicators on mission-select) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 0 critical gaps; 2 refinements raised (regression pin expanded, URL precedence nailed down, hidden-pad exemption centralized) |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | 6/10 → 9/10; 3 decisions added (GENERATING overlay, archetype glyph, gold hidden-pad) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Optional — no external dev surface |
 
 **OUTSIDE VOICE (Claude subagent, substituted for Codex, during CEO review):** Found 5 gaps the CEO review missed:
@@ -282,6 +310,11 @@ Can a new player, shown 5 seconds of gameplay from each of 3 random missions, co
 - Share URL precedence nailed down: `?custom=` wins over `?cfg=` when both present (Terrain Editor content is user-authored, deserves priority)
 - Hidden-pad exemption check centralized in a single `HiddenPad.ts` module (one `isHistoricMission()` gate, DRY)
 
+**DESIGN REVIEW additions (3 visual decisions, plan score 6/10 → 9/10):**
+- `GENERATING YOUR MISSION...` full-screen overlay with DSKY-amber text + pulsing dots during the LLM call; blocks input to prevent double-generate; fades on ready; `[offline]` suffix on briefing box if LLM fell back
+- Archetype glyph on mission-select (`○ rolling`, `● crater-field`, `▲ spires`, `■ mesa`, `≈ flats`) in archetype bias color, prepended to mission name
+- Hidden pad rendered in gold (`#c0b060` base, `#ffcc33` beacon pulsing at 1.5× standard phase, 12px shadowBlur) — reads as "bonus" without floating text, keeps visual language intact
+
 **UNRESOLVED:** 0 decisions.
 
-**VERDICT:** CEO + ENG CLEARED — ready to implement. Design review still recommended before PR 1 (UI scope for RANDOM MISSION button + hidden-pad visual); can run in parallel with PR 1 coding.
+**VERDICT:** CEO + ENG + DESIGN CLEARED — ready to implement. All three reviews converge on the same plan; no remaining ambiguity.
