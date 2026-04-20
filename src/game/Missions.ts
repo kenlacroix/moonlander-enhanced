@@ -217,14 +217,43 @@ export function getDailyDateLabel(date: Date = new Date()): string {
 	return `${y}-${m}-${d}`;
 }
 
-/** Synthesize today's daily-challenge mission. */
+/** Synthesize today's daily-challenge mission.
+ *
+ * Sprint 7.1 PR 1.5 — derives an archetype from the UTC date so every
+ * player gets the same archetype on the same day. Pure function of the
+ * date, no RNG call per-render. Cycles `rolling → crater-field →
+ * spires → mesa → flats` so every archetype shows up roughly every 5
+ * days. `rolling` keeps the pre-7.1 default look for ~20% of days.
+ */
+const DAILY_ARCHETYPE_CYCLE = [
+	"rolling",
+	"crater-field",
+	"spires",
+	"mesa",
+	"flats",
+] as const;
+
+export function getDailyArchetype(
+	date: Date = new Date(),
+): (typeof DAILY_ARCHETYPE_CYCLE)[number] {
+	// Days-since-epoch (UTC) → modulo cycle length. Stable across TZs.
+	const daysSinceEpoch = Math.floor(date.getTime() / 86_400_000);
+	return DAILY_ARCHETYPE_CYCLE[
+		((daysSinceEpoch % DAILY_ARCHETYPE_CYCLE.length) +
+			DAILY_ARCHETYPE_CYCLE.length) %
+			DAILY_ARCHETYPE_CYCLE.length
+	];
+}
+
 export function getDailyMission(date: Date = new Date()): Mission {
 	const seed = getDailySeed(date);
+	const archetype = getDailyArchetype(date);
 	return {
 		id: 0,
 		name: "DAILY CHALLENGE",
 		seed,
 		description: `UTC ${getDailyDateLabel(date)} — same terrain for everyone, today only.`,
+		difficulty: { archetype },
 	};
 }
 

@@ -37,9 +37,11 @@ import {
 	type Mission,
 } from "./Missions";
 import { getTerrainHeightAt } from "./Physics";
+import { generateRandomMission } from "./RandomMission";
 import { createRelayState } from "./RelayMode";
+import { buildShareUrl } from "../utils/shareUrl";
 
-const TITLE_OPTION_COUNT = 7;
+const TITLE_OPTION_COUNT = 8;
 
 /**
  * Historic missions, grouped by era for the mission-select grouping.
@@ -76,6 +78,14 @@ export function updateTitle(game: Game, input: InputState): void {
 			game.gameMode = "historic";
 			game.selectedMission = 0;
 			game.status = "menu";
+		} else if (game.titleSelection === 7) {
+			// Sprint 7.1 PR 1.5 — roll a fresh Random Mission and drop
+			// straight into flight. Offline briefing is prerendered on the
+			// mission object so no GENERATING overlay is needed for the
+			// no-API-key path; the LLM call still runs in the background
+			// for players who configured a key.
+			game.gameMode = "freeplay";
+			startRandomMission(game);
 		} else {
 			game.gameMode = game.titleSelection === 0 ? "freeplay" : "campaign";
 			game.selectedMission = 0;
@@ -367,7 +377,11 @@ export function selectMission(game: Game, mission: Mission): void {
 		game.missionChatter.start(mission.facts, game.getLLMConfig());
 	}
 	if (game.gameMode === "ai-theater") {
-		game.aiTheater.start(mission.seed, game.gravityPreset);
+		game.aiTheater.start(
+			mission.seed,
+			game.gravityPreset,
+			mission.difficulty?.archetype,
+		);
 		game.aiTheater.setWatchBestHandler(() => {
 			startAgentReplay(game, mission.seed);
 		});
@@ -438,7 +452,31 @@ function updateURL(seed: number | null): void {
 	const url = new URL(window.location.href);
 	if (seed !== null) url.searchParams.set("seed", String(seed));
 	else url.searchParams.delete("seed");
+	// Clear any stale ?cfg= from a previous Random Mission so the new
+	// seed-only URL doesn't silently decode back into the old random.
+	url.searchParams.delete("cfg");
 	window.history.replaceState(null, "", url.toString());
+}
+
+/**
+ * Sprint 7.1 PR 1.5 — roll a fresh Random Mission and drop straight
+ * into flight. Updates `?cfg=` in the URL so the current flight is
+ * immediately shareable. Leaderboard is bypassed (see CollisionHandler).
+ */
+export function startRandomMission(game: Game): void {
+	const mission = generateRandomMission();
+	game.gameMode = "freeplay";
+	selectMission(game, mission);
+	// Replace `?seed=N` with `?cfg=<encoded>` so copy-URL actually shares
+	// the rolled archetype (not just the seed, which a fresh re-roll on
+	// someone else's browser would pair with a different archetype).
+	const cfg = buildShareUrl({
+		seed: mission.seed,
+		archetype: mission.difficulty?.archetype,
+	});
+	if (cfg) {
+		window.history.replaceState(null, "", cfg);
+	}
 }
 
 /**

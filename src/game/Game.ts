@@ -28,6 +28,7 @@ import {
 	type EditorState,
 } from "../ui/TerrainEditor";
 import { MAX_FLIGHT_DURATION, WORLD_WIDTH } from "../utils/constants";
+import type { ShareConfig } from "../utils/shareUrl";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
 import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
@@ -49,6 +50,11 @@ import { GameLoop } from "./GameLoop";
 import { GameRenderer, type GameStatus } from "./GameRenderer";
 import { type GravityPreset, getDefaultPreset } from "./GravityPresets";
 import { createGravityStorm, shouldSpawnGravityStorm } from "./GravityStorm";
+import {
+	findHiddenPad,
+	isHiddenPadRevealed,
+	maybeGenerateHiddenPad,
+} from "./HiddenPad";
 import { isHistoricMission } from "./HistoricMission";
 import { createLander, type LanderState } from "./Lander";
 import { getLanderType } from "./LanderTypes";
@@ -164,6 +170,11 @@ export class Game {
 	achievementToast: Achievement | null = null;
 	gravityPreset: GravityPreset = getDefaultPreset();
 	achievementToastTimer = 0;
+	/** Sprint 7.1 PR 1.5 — hidden pad reveal latch. Starts false on every
+	 * flight, flips true the frame the lander first crosses the reveal
+	 * AGL. A one-shot dust-plume burst fires on that transition; the
+	 * renderer only draws the gold hidden pad while this is true. */
+	hiddenPadRevealed = false;
 	private embedMode: boolean;
 	private currentInput: InputState = {} as InputState;
 
@@ -212,6 +223,7 @@ export class Game {
 		urlSeed?: number,
 		embedMode = false,
 		customTerrain?: string,
+		shareConfig?: ShareConfig,
 	) {
 		this.embedMode = embedMode;
 		this.rendererBackend = rendererBackend;
@@ -237,7 +249,11 @@ export class Game {
 		this.input = new Input();
 		this.camera_ = new Camera();
 		this.particles_ = new ParticleSystem();
-		this.seed_ = urlSeed ?? MISSIONS[0].seed;
+		// Sprint 7.1 PR 1.5 — a `?cfg=` payload carries its own seed;
+		// prefer it over any raw `?seed=` parameter (they should agree
+		// in practice, but if a caller mixed them the cfg is the
+		// richer signal).
+		this.seed_ = shareConfig?.seed ?? urlSeed ?? MISSIONS[0].seed;
 		this.llmConfig = loadLLMConfig();
 		this.gameLoop = new GameLoop(
 			() => this.onBeforeFrame(),
@@ -255,6 +271,23 @@ export class Game {
 			} else {
 				this.status = "title";
 			}
+		} else if (shareConfig) {
+			// `?cfg=` carries seed + archetype + palette. Bypass the
+			// historic lookup — a share URL describes a Random Mission or
+			// freeplay variant, not a canonical historic landing.
+			this.gameMode = "freeplay";
+			this.activeMission = {
+				id: 0,
+				name: `SHARED ${shareConfig.seed}`,
+				seed: shareConfig.seed,
+				description: "Shared mission",
+				difficulty: shareConfig.archetype
+					? { archetype: shareConfig.archetype }
+					: undefined,
+				palette: shareConfig.palette,
+			};
+			this.status = "playing";
+			this.reset();
 		} else if (urlSeed && !Number.isNaN(urlSeed)) {
 			// Shared/embed URLs must route historic seeds through selectMission
 			// so auto-landing (Luna 9) gets its autopilot force-enabled and
@@ -431,6 +464,13 @@ export class Game {
 			this.adaptiveLabel = null;
 		}
 		this.terrain = generateTerrain(this.seed_, diff);
+		const hiddenPad = maybeGenerateHiddenPad(
+			this.activeMission,
+			this.terrain,
+			this.seed_,
+		);
+		if (hiddenPad) this.terrain.pads.push(hiddenPad);
+		this.hiddenPadRevealed = false;
 		this.lander = createLander(
 			WORLD_WIDTH / 2,
 			diff?.spawnY ?? 80,
@@ -447,7 +487,7 @@ export class Game {
 		const ghostMode = this.currentFlight?.authenticMode
 			? "authentic"
 			: "vanilla";
-		this.ghostRecorder.start(this.seed_, ghostMode);
+		this.ghostRecorder.start(this.seed_, ghostMode, diff);
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.physics.reset();
@@ -460,6 +500,11 @@ export class Game {
 			? createGravityStorm(this.seed_)
 			: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
+		// Sprint 7.1 PR 1.5 — hand the archetype to the soundtrack before
+		// start(), so the next flight's drone / shimmer / tension profile
+		// reflects the terrain type. Default/rolling keeps the legacy
+		// tritone mix byte-identical to v0.6.0.0.
+		this.audio.soundtrack.setArchetype(diff?.archetype);
 		this.audio.soundtrack.start();
 		const ghostRun = loadGhostForSeed(this.seed_, ghostMode);
 		this.ghostPlayer = ghostRun ? new GhostPlayer(ghostRun) : null;
@@ -541,6 +586,26 @@ export class Game {
 			(input) => this.ghostRecorder.record(input),
 		);
 		if (!result) {
+			// Sprint 7.1 PR 1.5 — hidden-pad reveal latch. Fires a one-shot
+			// dust plume on the frame the lander first crosses the reveal
+			// AGL so the player sees the pad "appear out of the dust"
+			// rather than pop in. Check runs only before the pad is
+			// revealed so we emit exactly once per flight.
+			if (!this.hiddenPadRevealed) {
+				const hidden = findHiddenPad(this.terrain);
+				if (
+					hidden &&
+					isHiddenPadRevealed(hidden, this.lander.x, this.lander.y)
+				) {
+					this.hiddenPadRevealed = true;
+					this.particles_.emitDust(
+						hidden.x + hidden.width / 2,
+						hidden.y,
+						hidden.width,
+					);
+				}
+			}
+
 			// Sprint 5 Part B — Apollo 13 "survive" mission terminates on
 			// a time condition rather than a pad touch. Ran after physics
 			// so any collision this frame takes precedence (a crash on the
@@ -567,6 +632,7 @@ export class Game {
 			result.score,
 			result.padY,
 			result.padWidth,
+			result.hiddenPad,
 		);
 	}
 

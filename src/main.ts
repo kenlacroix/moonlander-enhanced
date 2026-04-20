@@ -1,11 +1,10 @@
 import { Game } from "./game/Game";
 import { createGameplayRenderer } from "./render/createGameplayRenderer";
 import { fitCanvasToWindow } from "./render/fitCanvasToWindow";
+import { readShareConfigFromUrl } from "./utils/shareUrl";
 
 const uiCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
-const glCanvas = document.getElementById(
-	"game-canvas-gl",
-) as HTMLCanvasElement;
+const glCanvas = document.getElementById("game-canvas-gl") as HTMLCanvasElement;
 if (!uiCanvas) {
 	throw new Error("Canvas element #game-canvas not found");
 }
@@ -18,6 +17,10 @@ const params = new URLSearchParams(window.location.search);
 const urlSeed = params.get("seed");
 const embedMode = params.get("embed") === "1";
 const customTerrain = params.get("custom");
+// Sprint 7.1 PR 1.5 — `?cfg=<base64url>` carries a full ShareConfig
+// (seed + archetype + optional palette). Takes precedence over
+// `?seed=` when both are present — the payload is the richer signal.
+const shareConfig = readShareConfigFromUrl();
 
 // Renderer selection is async because PixiJS v8's Application.init is
 // async. Gate Game construction on the result so the constructor
@@ -49,6 +52,7 @@ const customTerrain = params.get("custom");
 		urlSeed ? Number.parseInt(urlSeed, 10) : undefined,
 		embedMode,
 		customTerrain ?? undefined,
+		shareConfig ?? undefined,
 	);
 	game.start();
 })();

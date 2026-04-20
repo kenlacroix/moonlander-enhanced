@@ -5,9 +5,11 @@ import {
 import { addScore } from "../systems/Leaderboard";
 import { SCORE_FUEL_MULTIPLIER, STARTING_FUEL } from "../utils/constants";
 import type { Game } from "./Game";
+import { HIDDEN_PAD_SCORE_MULTIPLIER } from "./HiddenPad";
 import { isHistoricMission } from "./HistoricMission";
 import { CAMPAIGN, saveCampaignProgress } from "./Missions";
 import { normAngle } from "./Physics";
+import { isRandomMission } from "./RandomMission";
 import {
 	advanceRelayLander,
 	isRelayComplete,
@@ -20,21 +22,35 @@ export function handleCollisionResult(
 	score: number,
 	padY: number,
 	padWidth: number,
+	hiddenPad = false,
 ): void {
 	if (landed) {
 		game.status = "landed";
-		game.score = score;
+		// Sprint 7.1 PR 1.5 — hidden-pad payout. Multiplier happens here
+		// (not in PhysicsManager.calculateScore) so the toast + the
+		// bonus land on the same event, and so freeplay leaderboard
+		// entries reflect the full earned score.
+		game.score = hiddenPad ? score * HIDDEN_PAD_SCORE_MULTIPLIER : score;
 		game.particles.emitDust(game.lander.x, padY, padWidth);
 		game.audio.setThruster(false);
 		game.audio.playSuccess();
 		game.audio.soundtrack.onLanded();
 		game.ghostRecorder.save(game.score);
-		game.lastRank = addScore(
-			game.seed,
-			game.score,
-			game.telemetry.getDuration(),
-			game.currentFlight?.authenticMode ? "authentic" : "vanilla",
-		);
+		// Sprint 7.1 PR 1.5 — Random Missions are excluded from the
+		// leaderboard. Their seed space is pseudo-infinite and share-URL
+		// driven; letting them into the board would pollute the
+		// per-seed score slots with one-off rolls the player never
+		// revisits. lastRank stays null for random runs — flight report
+		// hides the RANK field in that case.
+		game.lastRank =
+			game.activeMission && isRandomMission(game.activeMission)
+				? null
+				: addScore(
+						game.seed,
+						game.score,
+						game.telemetry.getDuration(),
+						game.currentFlight?.authenticMode ? "authentic" : "vanilla",
+					);
 		game.llm.scanNearbyArtifact(game, game.artifacts, game.lander.x);
 		game.llm.fetchCommentary(game, game.lander, game.score, true);
 		game.missionChatter.onLanded();
@@ -43,6 +59,18 @@ export function handleCollisionResult(
 			saveCampaignProgress(game.campaignCompleted);
 		}
 		checkAchievements(game);
+		if (hiddenPad) {
+			// Transient toast (not a persistent Achievement unlock) — fires
+			// on every hidden-pad landing. Overrides any achievement toast
+			// that might have queued the same frame so the bonus always
+			// reads as the headline result.
+			game.achievementToast = {
+				id: "hidden-pad-bonus",
+				name: "HIDDEN PAD BONUS",
+				description: `Score × ${HIDDEN_PAD_SCORE_MULTIPLIER}`,
+			};
+			game.achievementToastTimer = 4;
+		}
 	} else {
 		game.status = "crashed";
 		game.particles.emitExplosion(game.lander.x, game.lander.y);

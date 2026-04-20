@@ -97,7 +97,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Canvas 2D has no GPU resources to release.
 	}
 
-
 	setRetroSkin(skin: RetroVectorSkin | null): void {
 		this.retro = skin;
 	}
@@ -127,6 +126,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		terrain: TerrainData,
 		offset: { x: number; y: number },
 		palette?: Required<TerrainPalette>,
+		hiddenPadRevealed = false,
 	): void {
 		const ctx = this.ctx;
 		const points = terrain.points;
@@ -166,6 +166,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// Landing pads
 		this.beaconPhase += 0.03;
 		for (const pad of terrain.pads) {
+			if (pad.hidden && !hiddenPadRevealed) continue;
 			this.drawPad(ctx, pad, palette?.accent);
 		}
 
@@ -177,23 +178,34 @@ export class CanvasRenderer implements IGameplayRenderer {
 		pad: LandingPad,
 		accentOverride?: string,
 	): void {
+		// Sprint 7.1 PR 1.5 — hidden pads render in gold (base + beacon)
+		// and at slightly stronger shadowBlur so post-reveal they read as
+		// "different" at a glance from normal pads.
+		const surfaceColor = pad.hidden ? "#c0b060" : COLOR_PAD;
+		const beaconColor = pad.hidden
+			? "#ffcc33"
+			: (accentOverride ?? COLOR_PAD_BEACON);
+		const beaconShadow = pad.hidden ? 12 : 10;
+		const beaconPulseRate = pad.hidden ? 6 : 4;
+
 		// Pad surface
-		ctx.fillStyle = COLOR_PAD;
+		ctx.fillStyle = surfaceColor;
 		ctx.fillRect(pad.x, pad.y - 2, pad.width, 4);
 
-		// Score marker
-		ctx.fillStyle = COLOR_PAD;
+		// Score marker — hidden pads show the effective multiplier so
+		// the 3× bonus is visible the moment the pad appears.
+		ctx.fillStyle = surfaceColor;
 		ctx.font = '12px "Courier New", monospace';
 		ctx.textAlign = "center";
-		ctx.fillText(`${pad.points}x`, pad.x + pad.width / 2, pad.y - 14);
+		const marker = pad.hidden ? "3x!" : `${pad.points}x`;
+		ctx.fillText(marker, pad.x + pad.width / 2, pad.y - 14);
 
 		// Blinking beacons on pad edges (palette-aware accent)
-		const beaconOn = Math.sin(this.beaconPhase * 4) > 0;
+		const beaconOn = Math.sin(this.beaconPhase * beaconPulseRate) > 0;
 		if (beaconOn) {
-			const beaconColor = accentOverride ?? COLOR_PAD_BEACON;
 			ctx.fillStyle = beaconColor;
 			ctx.shadowColor = beaconColor;
-			ctx.shadowBlur = 10;
+			ctx.shadowBlur = beaconShadow;
 			ctx.beginPath();
 			ctx.arc(pad.x + 4, pad.y - 2, 3, 0, Math.PI * 2);
 			ctx.fill();
@@ -511,26 +523,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 		const ctx = this.ctx;
 		ctx.save();
 
-		// Title
-		ctx.fillStyle = "#00ff88";
-		ctx.font = 'bold 48px "Courier New", monospace';
-		ctx.textAlign = "center";
-		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 120);
-
-		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.font = '14px "Courier New", monospace';
-		// Subtitle at CANVAS_HEIGHT/2 - 100 (not -80) so the FREE PLAY
-		// selection box at y = firstRowY-14 has 20px of breathing room.
-		// Previously, adding the 7th option (HISTORIC MISSIONS) pushed
-		// firstRowY to -66, putting the selection box top at -80 — exactly
-		// where the subtitle sat. Visible in the pre-fix screenshot as
-		// the subtitle text clipping into the top border of FREE PLAY.
-		ctx.fillText(
-			"A LUNAR DESCENT SIMULATOR",
-			CANVAS_WIDTH / 2,
-			CANVAS_HEIGHT / 2 - 100,
-		);
-
 		// Mode options
 		const dailyBestLabel = dailyBestScore ? `  Best: ${dailyBestScore}` : "";
 		const options = [
@@ -541,7 +533,29 @@ export class CanvasRenderer implements IGameplayRenderer {
 			"EDITOR",
 			"DAILY CHALLENGE",
 			"HISTORIC MISSIONS",
+			"RANDOM MISSION",
 		];
+
+		// Title + subtitle position scale up with row count so the FREE
+		// PLAY box always has ~28 px of breathing room under the
+		// subtitle baseline. Sprint 7.1 added the 8th row (RANDOM
+		// MISSION) and the fixed title y started clipping into the
+		// first selection box; anchoring titles relative to firstRowY
+		// keeps the layout stable as options grow.
+		ctx.fillStyle = "#00ff88";
+		ctx.font = 'bold 48px "Courier New", monospace';
+		ctx.textAlign = "center";
+		const extraRows = Math.max(0, options.length - 5);
+		const titleY = CANVAS_HEIGHT / 2 - 120 - (extraRows * 50) / 2;
+		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, titleY);
+
+		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText(
+			"A LUNAR DESCENT SIMULATOR",
+			CANVAS_WIDTH / 2,
+			titleY + 20,
+		);
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
@@ -550,6 +564,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 			"Draw custom terrain. Share with a link.",
 			`Today's seed: ${dailyDateLabel}.${dailyBestLabel}`,
 			"Apollo, Artemis. Real missions. Real margins.",
+			"Roll a procedural terrain. Share the URL.",
 		];
 
 		// Each row carries two text lines: the 22px bold option name (baseline y+8,

@@ -50,6 +50,7 @@ export class AITheater {
 	private totalEpisodes = 0;
 	private currentSeed: number | null = null;
 	private currentPreset: GravityPreset = getDefaultPreset();
+	private currentArchetype: string | undefined = undefined;
 	private currentSlotIdx = 0;
 	private recorder = new EpisodeRecorder(10);
 	private forkHandler: ((episode: RecordedEpisode) => void) | null = null;
@@ -61,9 +62,19 @@ export class AITheater {
 		this.dqn = new RLAgent("dqn");
 	}
 
-	async start(seed: number, preset?: GravityPreset): Promise<void> {
+	async start(
+		seed: number,
+		preset?: GravityPreset,
+		archetype?: string,
+	): Promise<void> {
 		this.currentSeed = seed;
 		this.currentPreset = preset ?? getDefaultPreset();
+		// Sprint 7.1 PR 1.5 — extend the weight key by archetype so a
+		// seed played on crater-field doesn't overwrite the weights
+		// trained for the same seed on rolling. Rolling/undefined
+		// preserves the pre-7.1 key shape, so existing Moon baseline
+		// checkpoints are still found.
+		this.currentArchetype = archetype;
 		const isMoon = this.currentPreset.name === "Moon";
 		const gravity = this.currentPreset.gameGravity;
 		const pg = new PolicyGradientAgent();
@@ -106,7 +117,9 @@ export class AITheater {
 		// resume from the Moon-trained weights (and vice-versa). The transfer
 		// agent is the only thing that should cross worlds, and it explicitly
 		// loads the Moon-keyed baseline below.
-		await this.dqn.loadWeights(this.checkpointKey(seed, this.currentPreset));
+		await this.dqn.loadWeights(
+			this.checkpointKey(seed, this.currentPreset, this.currentArchetype),
+		);
 		if (this.transferDqn) {
 			// Load the canonical Moon baseline. Explicit "moon" suffix so this
 			// key is stable even if the user is currently running on Jupiter.
@@ -127,7 +140,11 @@ export class AITheater {
 		this.abortRequested = true;
 		if (this.currentSeed !== null) {
 			await this.dqn.saveWeights(
-				this.checkpointKey(this.currentSeed, this.currentPreset),
+				this.checkpointKey(
+					this.currentSeed,
+					this.currentPreset,
+					this.currentArchetype,
+				),
 			);
 		}
 		for (const slot of this.slots) {
@@ -321,13 +338,24 @@ export class AITheater {
 	}
 
 	/**
-	 * Compose a checkpoint key from seed + preset name. Keeps per-world DQN
-	 * weights separate in IndexedDB so switching gravity doesn't contaminate
-	 * the fresh policy curve. The canonical Moon baseline lives at
-	 * `${MOON_BASELINE_SEED}-moon`.
+	 * Compose a checkpoint key from seed + preset + archetype name. Keeps
+	 * per-world + per-archetype DQN weights separate in IndexedDB so
+	 * switching gravity or terrain type doesn't contaminate the fresh
+	 * policy curve. The canonical Moon baseline lives at
+	 * `${MOON_BASELINE_SEED}-moon` (no archetype suffix).
+	 *
+	 * Sprint 7.1 PR 1.5 — archetype suffix. Omitted entirely when the
+	 * archetype is undefined or `rolling` so the pre-7.1 Moon baseline
+	 * checkpoint key stays stable across the migration.
 	 */
-	private checkpointKey(seed: number, preset: GravityPreset): string {
-		return `${seed}-${preset.name.toLowerCase()}`;
+	private checkpointKey(
+		seed: number,
+		preset: GravityPreset,
+		archetype?: string,
+	): string {
+		const base = `${seed}-${preset.name.toLowerCase()}`;
+		if (!archetype || archetype === "rolling") return base;
+		return `${base}-${archetype}`;
 	}
 
 	private adjustGameLayout(split: boolean): void {

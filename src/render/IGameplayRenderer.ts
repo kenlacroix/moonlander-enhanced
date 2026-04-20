@@ -46,6 +46,7 @@ export interface IGameplayRenderer {
 		terrain: TerrainData,
 		offset: Offset,
 		palette?: Required<TerrainPalette>,
+		hiddenPadRevealed?: boolean,
 	): void;
 	drawLander(lander: LanderState, offset: Offset): void;
 	drawGhost(lander: LanderState, offset: Offset): void;
