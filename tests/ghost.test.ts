@@ -194,3 +194,103 @@ describe("GhostPlayer", () => {
 		expect(player.lander.y).toBeGreaterThan(startY);
 	});
 });
+
+/**
+ * Sprint 7.1 PR 1.5 — ghost schema v2 tests.
+ *
+ * v2 embeds a DifficultyConfig + carries a `version` field so Random
+ * Mission ghosts replay deterministically. v1 ghosts (no version field)
+ * are migrated on load with `legacy: true` so the UI can warn about
+ * possible desync.
+ */
+describe("Sprint 7.1 — Ghost schema v2", () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it("v2 save writes version + embedded difficulty", () => {
+		const rec = new GhostRecorder();
+		rec.start(1969, "vanilla", {
+			archetype: "crater-field",
+			roughness: 0.5,
+		});
+		rec.record({ thrustUp: true } as InputState);
+		rec.save(100);
+		const loaded = loadGhostForSeed(1969, "vanilla");
+		expect(loaded?.version).toBe(2);
+		expect(loaded?.difficulty?.archetype).toBe("crater-field");
+		expect(loaded?.difficulty?.roughness).toBe(0.5);
+		expect(loaded?.legacy).toBeUndefined();
+	});
+
+	it("v2 save with no difficulty omits the field (freeplay default)", () => {
+		const rec = new GhostRecorder();
+		rec.start(42, "vanilla"); // no difficulty passed
+		rec.record({ thrustUp: true } as InputState);
+		rec.save(100);
+		const loaded = loadGhostForSeed(42, "vanilla");
+		expect(loaded?.version).toBe(2);
+		expect(loaded?.difficulty).toBeUndefined();
+	});
+
+	it("v1 ghost (no version field) loads with legacy=true", () => {
+		// Seed a pre-7.1 ghost directly into localStorage.
+		localStorage.setItem(
+			"moonlander-ghosts",
+			JSON.stringify([{ seed: 777, score: 500, frames: [1, 0, 1] }]),
+		);
+		const loaded = loadGhostForSeed(777, "vanilla");
+		expect(loaded?.score).toBe(500);
+		expect(loaded?.legacy).toBe(true);
+		expect(loaded?.version).toBeUndefined();
+	});
+
+	it("v2 ghost loads without the legacy flag", () => {
+		const rec = new GhostRecorder();
+		rec.start(888, "vanilla", { archetype: "spires" });
+		rec.record({ thrustUp: true } as InputState);
+		rec.save(100);
+		const loaded = loadGhostForSeed(888, "vanilla");
+		expect(loaded?.legacy).toBeUndefined();
+	});
+
+	it("save clears legacy flag when overwriting a v1 slot with a higher score", () => {
+		// Seed a v1 ghost, then beat it with a fresh v2 save.
+		localStorage.setItem(
+			"moonlander-ghosts",
+			JSON.stringify([{ seed: 555, score: 100, frames: [1], mode: "vanilla" }]),
+		);
+		const rec = new GhostRecorder();
+		rec.start(555, "vanilla", { archetype: "mesa" });
+		rec.record({ thrustUp: true } as InputState);
+		rec.save(200);
+		const loaded = loadGhostForSeed(555, "vanilla");
+		expect(loaded?.score).toBe(200);
+		expect(loaded?.version).toBe(2);
+		expect(loaded?.legacy).toBeUndefined();
+		expect(loaded?.difficulty?.archetype).toBe("mesa");
+	});
+
+	it("importing a v1 JSON payload stamps the legacy flag", () => {
+		const raw = JSON.stringify({ seed: 123, score: 321, frames: [0, 1] });
+		const imported = importGhost(raw);
+		expect(imported?.legacy).toBe(true);
+		const loaded = loadGhostForSeed(123, "vanilla");
+		expect(loaded?.legacy).toBe(true);
+	});
+
+	it("importing a v2 JSON payload preserves version + difficulty", () => {
+		const raw = JSON.stringify({
+			version: 2,
+			seed: 456,
+			score: 777,
+			frames: [1, 1, 0],
+			mode: "vanilla",
+			difficulty: { archetype: "flats" },
+		});
+		const imported = importGhost(raw);
+		expect(imported?.version).toBe(2);
+		expect(imported?.legacy).toBeUndefined();
+		expect(imported?.difficulty?.archetype).toBe("flats");
+	});
+});

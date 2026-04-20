@@ -464,7 +464,7 @@ export class Game {
 		const ghostMode = this.currentFlight?.authenticMode
 			? "authentic"
 			: "vanilla";
-		this.ghostRecorder.start(this.seed_, ghostMode);
+		this.ghostRecorder.start(this.seed_, ghostMode, diff);
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.physics.reset();

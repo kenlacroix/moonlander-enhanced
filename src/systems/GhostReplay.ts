@@ -1,6 +1,7 @@
 import type { LanderState } from "../game/Lander";
 import { createLander, updateLander } from "../game/Lander";
 import { getLanderType } from "../game/LanderTypes";
+import type { DifficultyConfig } from "../game/Terrain";
 import { FIXED_TIMESTEP, WORLD_WIDTH } from "../utils/constants";
 import type { InputState } from "./Input";
 
@@ -44,11 +45,38 @@ function unpackInput(frame: InputFrame): InputState {
  */
 export type GhostMode = "vanilla" | "authentic";
 
+/**
+ * Sprint 7.1 PR 1.5 — schema version 2. v1 ghosts have no `version` field
+ * and no `difficulty` (the whole DifficultyConfig was implicit from the
+ * seed + mission lookup). v2 ghosts embed the DifficultyConfig directly
+ * so a Random-Mission run — where the archetype + palette come from a
+ * share URL, not a stable MISSIONS[] entry — replays correctly.
+ *
+ * Version dispatch is intentionally single-field: the loader looks at
+ * `version`, and any missing/older value is treated as v1. When a v1
+ * ghost loads we set `legacy: true` so the replay UI can show a "legacy
+ * ghost" badge — on seeds where terrain generation drifted between
+ * versions, the replay may desync and this flag is the only user-visible
+ * warning we can give.
+ */
+export const GHOST_SCHEMA_VERSION = 2;
+
 export interface GhostRun {
+	/** Schema version. Absent on v1 ghosts; 2 from Sprint 7.1 onward. */
+	version?: number;
 	seed: number;
 	score: number;
 	frames: InputFrame[];
 	mode?: GhostMode;
+	/** Embedded terrain/difficulty config so the ghost can be replayed
+	 * outside the MISSIONS[] table (e.g. Random Missions). Optional on
+	 * v1 ghosts, required on v2. */
+	difficulty?: DifficultyConfig;
+	/** True when this ghost was loaded without a schema version — i.e.
+	 * it predates v2 and its difficulty context is unknown. Consumers
+	 * should flag it in the UI so the player knows the replay may
+	 * desync on terrain changes. */
+	legacy?: boolean;
 }
 
 const STORAGE_KEY = "moonlander-ghosts";
@@ -58,11 +86,20 @@ export class GhostRecorder {
 	private frames: InputFrame[] = [];
 	private seed = 0;
 	private mode: GhostMode = "vanilla";
+	private difficulty: DifficultyConfig | undefined;
 
-	/** Start recording a new run. `mode` defaults to vanilla for non-historic paths. */
-	start(seed: number, mode: GhostMode = "vanilla"): void {
+	/** Start recording a new run. `mode` defaults to vanilla for
+	 * non-historic paths. `difficulty` is embedded in the saved ghost
+	 * (v2 schema) so replays outside MISSIONS[] (Random Missions,
+	 * share-URL decodes) reconstruct the exact terrain. */
+	start(
+		seed: number,
+		mode: GhostMode = "vanilla",
+		difficulty?: DifficultyConfig,
+	): void {
 		this.seed = seed;
 		this.mode = mode;
+		this.difficulty = difficulty;
 		this.frames = [];
 	}
 
@@ -76,10 +113,12 @@ export class GhostRecorder {
 		if (score <= 0 || this.frames.length === 0) return;
 
 		const run: GhostRun = {
+			version: GHOST_SCHEMA_VERSION,
 			seed: this.seed,
 			score,
 			frames: this.frames,
 			mode: this.mode,
+			difficulty: this.difficulty,
 		};
 
 		try {
@@ -90,9 +129,14 @@ export class GhostRecorder {
 
 			if (existing) {
 				if (score > existing.score) {
+					existing.version = run.version;
 					existing.score = run.score;
 					existing.frames = run.frames;
 					existing.mode = run.mode;
+					existing.difficulty = run.difficulty;
+					// Save path rewrites this slot with a fresh v2 ghost, so
+					// the legacy flag is no longer accurate.
+					existing.legacy = undefined;
 				}
 			} else {
 				ghosts.push(run);
@@ -138,11 +182,20 @@ export class GhostPlayer {
 	}
 }
 
+/** Stamp a migration flag on v1 ghosts as they load. Preserves the rest
+ * of the stored shape so save() can still write a fresh v2 ghost into
+ * the same slot without double-migration. */
+function migrateGhost(g: GhostRun): GhostRun {
+	if (g.version === GHOST_SCHEMA_VERSION) return g;
+	return { ...g, legacy: true };
+}
+
 function loadGhosts(): GhostRun[] {
 	try {
 		const data = localStorage.getItem(STORAGE_KEY);
 		if (!data) return [];
-		return JSON.parse(data) as GhostRun[];
+		const raw = JSON.parse(data) as GhostRun[];
+		return raw.map(migrateGhost);
 	} catch {
 		return [];
 	}
@@ -177,11 +230,11 @@ export function exportGhost(
 /** Import a ghost run from JSON string. Returns the imported run or null on error. */
 export function importGhost(json: string): GhostRun | null {
 	try {
-		const run = JSON.parse(json) as GhostRun;
+		const parsed = JSON.parse(json) as GhostRun;
 		if (
-			typeof run.seed !== "number" ||
-			typeof run.score !== "number" ||
-			!Array.isArray(run.frames)
+			typeof parsed.seed !== "number" ||
+			typeof parsed.score !== "number" ||
+			!Array.isArray(parsed.frames)
 		) {
 			return null;
 		}
@@ -189,17 +242,23 @@ export function importGhost(json: string): GhostRun | null {
 		// were exported pre-5.5 or from a non-historic mission. Keeps
 		// imports from silently colonizing an Authentic slot.
 		const runMode: GhostMode =
-			run.mode === "authentic" ? "authentic" : "vanilla";
-		run.mode = runMode;
+			parsed.mode === "authentic" ? "authentic" : "vanilla";
+		// Pre-Sprint-7.1 exports have no version: migrate via the same
+		// shared helper so the `legacy` flag ends up consistent across
+		// the load + import paths.
+		const run = migrateGhost({ ...parsed, mode: runMode });
 		const ghosts = loadGhosts();
 		const existing = ghosts.find(
 			(g) => g.seed === run.seed && (g.mode ?? "vanilla") === runMode,
 		);
 		if (existing) {
 			if (run.score > existing.score) {
+				existing.version = run.version;
 				existing.score = run.score;
 				existing.frames = run.frames;
 				existing.mode = runMode;
+				existing.difficulty = run.difficulty;
+				existing.legacy = run.legacy;
 			}
 		} else {
 			ghosts.push(run);
