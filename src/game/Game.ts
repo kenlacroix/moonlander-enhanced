@@ -28,6 +28,7 @@ import {
 	type EditorState,
 } from "../ui/TerrainEditor";
 import { MAX_FLIGHT_DURATION, WORLD_WIDTH } from "../utils/constants";
+import type { ShareConfig } from "../utils/shareUrl";
 import { stepAgentReplay, updateAgentReplayFrame } from "./AgentReplay";
 import { AITheater, type AITheaterComparison } from "./AITheater";
 import { createAlien, shouldSpawnAlien } from "./Alien";
@@ -222,6 +223,7 @@ export class Game {
 		urlSeed?: number,
 		embedMode = false,
 		customTerrain?: string,
+		shareConfig?: ShareConfig,
 	) {
 		this.embedMode = embedMode;
 		this.rendererBackend = rendererBackend;
@@ -247,7 +249,11 @@ export class Game {
 		this.input = new Input();
 		this.camera_ = new Camera();
 		this.particles_ = new ParticleSystem();
-		this.seed_ = urlSeed ?? MISSIONS[0].seed;
+		// Sprint 7.1 PR 1.5 — a `?cfg=` payload carries its own seed;
+		// prefer it over any raw `?seed=` parameter (they should agree
+		// in practice, but if a caller mixed them the cfg is the
+		// richer signal).
+		this.seed_ = shareConfig?.seed ?? urlSeed ?? MISSIONS[0].seed;
 		this.llmConfig = loadLLMConfig();
 		this.gameLoop = new GameLoop(
 			() => this.onBeforeFrame(),
@@ -265,6 +271,23 @@ export class Game {
 			} else {
 				this.status = "title";
 			}
+		} else if (shareConfig) {
+			// `?cfg=` carries seed + archetype + palette. Bypass the
+			// historic lookup — a share URL describes a Random Mission or
+			// freeplay variant, not a canonical historic landing.
+			this.gameMode = "freeplay";
+			this.activeMission = {
+				id: 0,
+				name: `SHARED ${shareConfig.seed}`,
+				seed: shareConfig.seed,
+				description: "Shared mission",
+				difficulty: shareConfig.archetype
+					? { archetype: shareConfig.archetype }
+					: undefined,
+				palette: shareConfig.palette,
+			};
+			this.status = "playing";
+			this.reset();
 		} else if (urlSeed && !Number.isNaN(urlSeed)) {
 			// Shared/embed URLs must route historic seeds through selectMission
 			// so auto-landing (Luna 9) gets its autopilot force-enabled and
