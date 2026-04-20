@@ -9,6 +9,7 @@ import { HIDDEN_PAD_SCORE_MULTIPLIER } from "./HiddenPad";
 import { isHistoricMission } from "./HistoricMission";
 import { CAMPAIGN, saveCampaignProgress } from "./Missions";
 import { normAngle } from "./Physics";
+import { isRandomMission } from "./RandomMission";
 import {
 	advanceRelayLander,
 	isRelayComplete,
@@ -35,12 +36,21 @@ export function handleCollisionResult(
 		game.audio.playSuccess();
 		game.audio.soundtrack.onLanded();
 		game.ghostRecorder.save(game.score);
-		game.lastRank = addScore(
-			game.seed,
-			game.score,
-			game.telemetry.getDuration(),
-			game.currentFlight?.authenticMode ? "authentic" : "vanilla",
-		);
+		// Sprint 7.1 PR 1.5 — Random Missions are excluded from the
+		// leaderboard. Their seed space is pseudo-infinite and share-URL
+		// driven; letting them into the board would pollute the
+		// per-seed score slots with one-off rolls the player never
+		// revisits. lastRank stays null for random runs — flight report
+		// hides the RANK field in that case.
+		game.lastRank =
+			game.activeMission && isRandomMission(game.activeMission)
+				? null
+				: addScore(
+						game.seed,
+						game.score,
+						game.telemetry.getDuration(),
+						game.currentFlight?.authenticMode ? "authentic" : "vanilla",
+					);
 		game.llm.scanNearbyArtifact(game, game.artifacts, game.lander.x);
 		game.llm.fetchCommentary(game, game.lander, game.score, true);
 		game.missionChatter.onLanded();

@@ -367,7 +367,11 @@ export function selectMission(game: Game, mission: Mission): void {
 		game.missionChatter.start(mission.facts, game.getLLMConfig());
 	}
 	if (game.gameMode === "ai-theater") {
-		game.aiTheater.start(mission.seed, game.gravityPreset);
+		game.aiTheater.start(
+			mission.seed,
+			game.gravityPreset,
+			mission.difficulty?.archetype,
+		);
 		game.aiTheater.setWatchBestHandler(() => {
 			startAgentReplay(game, mission.seed);
 		});
