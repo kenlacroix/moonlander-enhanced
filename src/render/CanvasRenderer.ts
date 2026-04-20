@@ -523,26 +523,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 		const ctx = this.ctx;
 		ctx.save();
 
-		// Title
-		ctx.fillStyle = "#00ff88";
-		ctx.font = 'bold 48px "Courier New", monospace';
-		ctx.textAlign = "center";
-		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 120);
-
-		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.font = '14px "Courier New", monospace';
-		// Subtitle at CANVAS_HEIGHT/2 - 100 (not -80) so the FREE PLAY
-		// selection box at y = firstRowY-14 has 20px of breathing room.
-		// Previously, adding the 7th option (HISTORIC MISSIONS) pushed
-		// firstRowY to -66, putting the selection box top at -80 — exactly
-		// where the subtitle sat. Visible in the pre-fix screenshot as
-		// the subtitle text clipping into the top border of FREE PLAY.
-		ctx.fillText(
-			"A LUNAR DESCENT SIMULATOR",
-			CANVAS_WIDTH / 2,
-			CANVAS_HEIGHT / 2 - 100,
-		);
-
 		// Mode options
 		const dailyBestLabel = dailyBestScore ? `  Best: ${dailyBestScore}` : "";
 		const options = [
@@ -553,7 +533,29 @@ export class CanvasRenderer implements IGameplayRenderer {
 			"EDITOR",
 			"DAILY CHALLENGE",
 			"HISTORIC MISSIONS",
+			"RANDOM MISSION",
 		];
+
+		// Title + subtitle position scale up with row count so the FREE
+		// PLAY box always has ~28 px of breathing room under the
+		// subtitle baseline. Sprint 7.1 added the 8th row (RANDOM
+		// MISSION) and the fixed title y started clipping into the
+		// first selection box; anchoring titles relative to firstRowY
+		// keeps the layout stable as options grow.
+		ctx.fillStyle = "#00ff88";
+		ctx.font = 'bold 48px "Courier New", monospace';
+		ctx.textAlign = "center";
+		const extraRows = Math.max(0, options.length - 5);
+		const titleY = CANVAS_HEIGHT / 2 - 120 - (extraRows * 50) / 2;
+		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, titleY);
+
+		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+		ctx.font = '14px "Courier New", monospace';
+		ctx.fillText(
+			"A LUNAR DESCENT SIMULATOR",
+			CANVAS_WIDTH / 2,
+			titleY + 20,
+		);
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
@@ -562,6 +564,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 			"Draw custom terrain. Share with a link.",
 			`Today's seed: ${dailyDateLabel}.${dailyBestLabel}`,
 			"Apollo, Artemis. Real missions. Real margins.",
+			"Roll a procedural terrain. Share the URL.",
 		];
 
 		// Each row carries two text lines: the 22px bold option name (baseline y+8,
