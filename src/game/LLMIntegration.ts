@@ -24,6 +24,7 @@ import {
 import { isHistoricMission } from "./HistoricMission";
 import type { LanderState } from "./Lander";
 import type { Mission } from "./Missions";
+import { isRandomMission } from "./RandomMission";
 
 /** Mutable handle for LLM methods to write results back to Game state. */
 export interface LLMStateHandle {
@@ -43,13 +44,18 @@ export class LLMIntegration {
 	): void {
 		const config = this.getConfig();
 		const historic = isHistoricMission(mission) ? mission.facts : undefined;
-		// Offline fallback: render the fact sheet directly so historic
-		// missions still get authentic flavor with no API key. Critical
-		// gap from the eng review — must work without an LLM.
-		if (!config) {
-			state.llmText = historic
-				? renderFactSheetBriefing(mission, historic, authentic)
+		// Sprint 7.1 PR 1.5 — random missions carry a prerendered
+		// `offlineBriefing` so the no-API-key path still gets tonal
+		// text (archetype name + coordinates + flavor tag). Historic
+		// missions keep rendering their fact sheet. Plain freeplay
+		// stays blank — there's nothing to say without an LLM.
+		const offlineFallback = historic
+			? renderFactSheetBriefing(mission, historic, authentic)
+			: isRandomMission(mission)
+				? mission.offlineBriefing
 				: "";
+		if (!config) {
+			state.llmText = offlineFallback;
 			return;
 		}
 		state.llmText = "";
@@ -64,11 +70,9 @@ export class LLMIntegration {
 			authentic,
 		)
 			.catch(() => {
-				// API error — fall back to fact sheet for historic, blank
-				// for generic. Either way, game stays playable.
-				if (historic) {
-					state.llmText = renderFactSheetBriefing(mission, historic, authentic);
-				}
+				// API error — fall back to whichever offline renderer
+				// applies to this mission. Either way, game stays playable.
+				state.llmText = offlineFallback;
 			})
 			.finally(() => {
 				state.llmLoading = false;
