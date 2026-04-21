@@ -320,10 +320,16 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 		);
 	}
 	// Sprint 7.2 — visual RCS thrusters on lander corners while RCS is firing.
-	// `rcsFiring` is set by updateLander only when rotate input + rcs > 0; v2
-	// legacy integrator pins it to false so v2 replays render identically.
+	// `rcsFiring` + `rcsFiringDirection` are set by updateLander only when
+	// rotate input + rcs > 0; v2 legacy integrator pins them to false/0 so
+	// v2 replays render identically. Reading direction from lander state
+	// (set by the integrator from input) instead of live input lets this
+	// run from the render path (updateFlightVisuals) without requiring
+	// InputState access, and stays correct on the first rotate frame
+	// (where angularVel is still 0 from the prior tick).
 	if (game.lander.rcsFiring && game.status === "playing") {
-		const direction: -1 | 1 = game.lander.angularVel < 0 ? -1 : 1;
+		const dir = game.lander.rcsFiringDirection;
+		const direction: -1 | 1 = dir === -1 ? -1 : 1;
 		game.particles.emitRCS(
 			game.lander.x,
 			game.lander.y,

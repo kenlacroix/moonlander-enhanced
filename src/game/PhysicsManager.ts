@@ -4,6 +4,7 @@ import {
 	LANDER_HEIGHT,
 	MAX_LANDING_ANGLE,
 	MAX_LANDING_SPEED,
+	PHYSICS_V3,
 	SCORE_ANGLE_BONUS,
 	SCORE_FUEL_MULTIPLIER,
 	SCORE_SPEED_BONUS,
@@ -72,7 +73,10 @@ export class PhysicsManager {
 		// Sprint 7.2 — integrator dispatch. v2 ghost replays set
 		// lander.physicsVersion = 2 on spawn (see GhostReplay.ts) so their
 		// replay uses the frozen v2 integrator. New flights default to 3.
-		if (lander.physicsVersion === 2) {
+		// PHYSICS_V3 is a global kill switch — flip to false in
+		// constants.ts to revert every flight (not just v2 replays) to v2
+		// physics, e.g. if a post-ship regression needs a hotfix revert.
+		if (lander.physicsVersion === 2 || !PHYSICS_V3) {
 			updateLanderLegacy(lander, resolvedInput, dt, gameGravity);
 		} else {
 			updateLander(lander, resolvedInput, dt, gameGravity);

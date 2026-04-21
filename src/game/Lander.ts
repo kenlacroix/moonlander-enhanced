@@ -38,6 +38,14 @@ export interface LanderState {
 	/** Sprint 7.2 — true while rotate-left or rotate-right is consuming RCS.
 	 * Rendered as corner puffs in the particle system. Always false under v2. */
 	rcsFiring: boolean;
+	/** Sprint 7.2 — which direction the RCS is firing this frame.
+	 *  -1 = rotateLeft (counter-clockwise torque → right-front quadrant puffs)
+	 *  +1 = rotateRight (clockwise torque → left-front quadrant puffs)
+	 *   0 = not firing
+	 * Stored on the lander so the render path can pick the correct corner
+	 * without having to peek at the input system (which varies per tick
+	 * vs. per-frame and isn't always in scope). Always 0 under v2. */
+	rcsFiringDirection: -1 | 0 | 1;
 	status: LanderStatus;
 	landerType: LanderType;
 	physicsVersion: PhysicsVersion;
@@ -62,6 +70,7 @@ export function createLander(
 		rcs: STARTING_RCS * (landerType.rcsMultiplier ?? 1),
 		thrusting: false,
 		rcsFiring: false,
+		rcsFiringDirection: 0,
 		status: "flying",
 		landerType,
 		physicsVersion,
@@ -99,15 +108,18 @@ export function updateLander(
 	// Rotation — RCS-gated, momentum-preserving. Release the rotate key and the
 	// lander keeps spinning at its built-up angular velocity (vacuum, no drag).
 	lander.rcsFiring = false;
+	lander.rcsFiringDirection = 0;
 	if (input.rotateLeft && lander.rcs > 0) {
 		lander.angularVel -= ANGULAR_ACCEL * rcsMult * dt;
 		lander.rcs = Math.max(0, lander.rcs - RCS_BURN_RATE * dt);
 		lander.rcsFiring = true;
+		lander.rcsFiringDirection = -1;
 	}
 	if (input.rotateRight && lander.rcs > 0) {
 		lander.angularVel += ANGULAR_ACCEL * rcsMult * dt;
 		lander.rcs = Math.max(0, lander.rcs - RCS_BURN_RATE * dt);
 		lander.rcsFiring = true;
+		lander.rcsFiringDirection = 1;
 	}
 	// Clamp angular velocity so a pathological autopilot or malformed input
 	// can't spin the integrator into runaway floating-point territory.
@@ -171,6 +183,7 @@ export function updateLanderLegacy(
 	// circumstance. Pin to 0 so downstream reads stay consistent.
 	lander.angularVel = 0;
 	lander.rcsFiring = false;
+	lander.rcsFiringDirection = 0;
 
 	// Thrust
 	lander.thrusting = input.thrustUp && lander.fuel > 0;

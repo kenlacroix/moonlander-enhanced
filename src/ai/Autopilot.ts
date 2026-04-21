@@ -3,6 +3,8 @@ import { getTerrainHeightAt, normAngle } from "../game/Physics";
 import type { LandingPad, TerrainData } from "../game/Terrain";
 import type { InputState } from "../systems/Input";
 import {
+	ANGULAR_ACCEL,
+	FIXED_TIMESTEP,
 	GRAVITY,
 	LANDER_HEIGHT,
 	MAX_LANDING_SPEED,
@@ -159,9 +161,10 @@ export class Autopilot {
 			// Inner loop: bang-bang with deadband. Deadband is the smallest ω
 			// change one frame of RCS produces at this lander's rcsMultiplier —
 			// ANGULAR_ACCEL * rcsMult * FIXED_TIMESTEP. Rounding up slightly
-			// so we don't chatter at the edge.
+			// so we don't chatter at the edge. Imports the source-of-truth
+			// constants so the autopilot stays in sync if physics are retuned.
 			const rcsMult = lander.landerType.rcsMultiplier ?? 1;
-			const DEADBAND = 180 * rcsMult * (1 / 60) * 1.2; // ~3.6 °/s for baseline
+			const DEADBAND = ANGULAR_ACCEL * rcsMult * FIXED_TIMESTEP * 1.2;
 
 			// RCS-starvation graceful degrade: when RCS is below 5 units we can
 			// only afford a handful of burns before we're done. Widen the
