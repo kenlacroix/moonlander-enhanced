@@ -494,6 +494,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		authenticState: AuthenticState | null = null,
 		terrain: TerrainData | null = null,
 		isPlaying = true,
+		rcsTutorialFramesRemaining = 0,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -510,6 +511,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 			authenticState,
 			terrain,
 			isPlaying,
+			rcsTutorialFramesRemaining,
 		);
 	}
 
@@ -551,11 +553,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
 		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText(
-			"A LUNAR DESCENT SIMULATOR",
-			CANVAS_WIDTH / 2,
-			titleY + 20,
-		);
+		ctx.fillText("A LUNAR DESCENT SIMULATOR", CANVAS_WIDTH / 2, titleY + 20);
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,

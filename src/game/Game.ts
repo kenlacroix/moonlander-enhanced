@@ -101,6 +101,12 @@ export class Game {
 	private seed_: number;
 	selectedMission = 0;
 	lastRank: number | null = null;
+	/** Sprint 7.2 — set to true when the most recent crash was specifically a
+	 * spinning-at-touchdown crash (angular rate exceeded MAX_LANDING_ANGULAR_RATE
+	 * but vy and angle were otherwise safe). Lets the renderer show
+	 * "LANDED SPINNING — STRUCTURAL FAILURE" instead of the generic message.
+	 * Reset on each flight start. */
+	lastSpinningCrash = false;
 	gameMode: "freeplay" | "campaign" | "ai-theater" | "historic" = "freeplay";
 	/**
 	 * Mission ruleset, orthogonal to lander.status. "landing" is the
@@ -175,6 +181,29 @@ export class Game {
 	 * AGL. A one-shot dust-plume burst fires on that transition; the
 	 * renderer only draws the gold hidden pad while this is true. */
 	hiddenPadRevealed = false;
+	/** Sprint 7.2 — one-shot "first spin" tutorial. Frames remaining to
+	 * display the "Rotation has momentum — counter-burn to stop" message.
+	 * Triggered on the first rotate input of the session when the player
+	 * has not previously dismissed it (localStorage-gated). */
+	rcsTutorialFramesRemaining = 0;
+	private rcsTutorialSeen = false;
+
+	/** Sprint 7.2 — fire the first-spin tutorial once per player. No-op if
+	 * already seen (localStorage check). Sets a 180-frame countdown (3 s at
+	 * 60Hz) for the HUD to render the message, then persists the flag so
+	 * the message never reappears. Called from StateHandlers when `rcsFiring`
+	 * is true and the game is in "playing" state. */
+	maybeShowRcsTutorial(): void {
+		if (this.rcsTutorialSeen) return;
+		this.rcsTutorialSeen = true;
+		this.rcsTutorialFramesRemaining = 180;
+		try {
+			localStorage.setItem("moonlander-rcs-tutorial-seen", "1");
+		} catch {
+			// localStorage unavailable (private mode). The tutorial will
+			// re-show next session, which is acceptable.
+		}
+	}
 	private embedMode: boolean;
 	private currentInput: InputState = {} as InputState;
 
@@ -228,6 +257,15 @@ export class Game {
 		this.embedMode = embedMode;
 		this.rendererBackend = rendererBackend;
 		this.gameplayRenderer = gameplayRenderer;
+		// Sprint 7.2 — read the first-spin tutorial flag once at startup.
+		// localStorage access is cheap, but it avoids spamming synchronous
+		// reads every frame in the hot path.
+		try {
+			this.rcsTutorialSeen =
+				localStorage.getItem("moonlander-rcs-tutorial-seen") === "1";
+		} catch {
+			this.rcsTutorialSeen = false;
+		}
 		// WebGL mode: gameplayRenderer is WebGLGameplayRenderer on its own
 		// GL canvas; CanvasRenderer is a fresh UI overlay on the 2D canvas,
 		// clearing transparently so the WebGL layer shows through.
@@ -359,6 +397,7 @@ export class Game {
 		const diff = this.activeMission?.difficulty;
 		this.lander = createLander(spawnX, spawnY, getLanderType(diff?.landerType));
 		if (diff?.startingFuel !== undefined) this.lander.fuel = diff.startingFuel;
+		if (diff?.startingRCS !== undefined) this.lander.rcs = diff.startingRCS;
 		this.status = "playing";
 		this.particles_.clear();
 		this.gameLoop.resetAccumulator();
@@ -471,12 +510,14 @@ export class Game {
 		);
 		if (hiddenPad) this.terrain.pads.push(hiddenPad);
 		this.hiddenPadRevealed = false;
+		this.lastSpinningCrash = false;
 		this.lander = createLander(
 			WORLD_WIDTH / 2,
 			diff?.spawnY ?? 80,
 			getLanderType(diff?.landerType),
 		);
 		if (diff?.startingFuel !== undefined) this.lander.fuel = diff.startingFuel;
+		if (diff?.startingRCS !== undefined) this.lander.rcs = diff.startingRCS;
 		this.status = "playing";
 		this.score = 0;
 		this.crashAnalysis = "";
@@ -626,6 +667,10 @@ export class Game {
 			}
 			return;
 		}
+		// Sprint 7.2 — stash the spinning-crash flag so the result overlay
+		// can show "LANDED SPINNING — STRUCTURAL FAILURE" instead of the
+		// generic crash banner. Reset to false on landed results.
+		this.lastSpinningCrash = result.crashed && result.spinningCrash;
 		handleCollisionResult(
 			this,
 			result.landed,

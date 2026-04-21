@@ -7,6 +7,20 @@ export const MAX_LANDING_ANGLE = 10; // degrees from vertical — above = crash
 export const STARTING_FUEL = 1000; // arbitrary fuel units
 export const FUEL_BURN_RATE = 30; // units/second while thrusting
 
+// Sprint 7.2 — rigid-body physics (RCS = Reaction Control System, separate
+// tank from main fuel, used for attitude/rotation only; mirrors Apollo LM).
+export const PHYSICS_V3 = true; // kill switch — flip to false to revert to v2 physics globally
+export const ANGULAR_ACCEL = 180; // degrees/sec² from one RCS burn (roughly matches old ROTATION_SPEED feel)
+export const MAX_ANGULAR_VEL = 360; // degrees/sec ceiling — prevents integrator runaway
+export const MAX_LANDING_ANGULAR_RATE = 8; // degrees/sec — above this at touchdown = crash
+export const STARTING_RCS = 100; // units (vs 1000 main fuel) — ~10% ratio
+export const RCS_BURN_RATE = 15; // units/sec while RCS firing
+
+// RL reward-structure versioning. Bumped whenever calculateReward changes in a
+// way that makes prior weights incompatible. Mismatch on load → force-delete
+// weights and retrain from episode 0 (transparent clean slate, not a broken agent).
+export const REWARD_VERSION = 3; // Sprint 7.2: terminal reward penalizes touchdown rotation
+
 // Display
 export const CANVAS_WIDTH = 1280;
 export const CANVAS_HEIGHT = 720;

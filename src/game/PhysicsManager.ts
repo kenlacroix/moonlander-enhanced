@@ -11,7 +11,7 @@ import {
 import { type AlienState, applyAlienEffect, updateAlien } from "./Alien";
 import type { GravityStormState } from "./GravityStorm";
 import { applyGravityStormEffect, updateGravityStorm } from "./GravityStorm";
-import { type LanderState, updateLander } from "./Lander";
+import { type LanderState, updateLander, updateLanderLegacy } from "./Lander";
 import { checkCollision, normAngle } from "./Physics";
 import type { TerrainData } from "./Terrain";
 import { updateWind, type WindState } from "./Wind";
@@ -28,6 +28,11 @@ export interface PhysicsResult {
 	 * The score here is the unmultiplied base; multiplication happens
 	 * in CollisionHandler where the toast fires. */
 	hiddenPad: boolean;
+	/** Sprint 7.2 — true when the crash was specifically a spinning-at-touchdown
+	 * crash (angular rate exceeded the landing threshold). Lets the renderer
+	 * show "LANDED SPINNING — STRUCTURAL FAILURE" instead of the generic crash
+	 * message. False on non-crash results and on any non-spin-related crash. */
+	spinningCrash: boolean;
 }
 
 export class PhysicsManager {
@@ -64,7 +69,14 @@ export class PhysicsManager {
 		}
 
 		ghostRecordFn(inputState);
-		updateLander(lander, resolvedInput, dt, gameGravity);
+		// Sprint 7.2 — integrator dispatch. v2 ghost replays set
+		// lander.physicsVersion = 2 on spawn (see GhostReplay.ts) so their
+		// replay uses the frozen v2 integrator. New flights default to 3.
+		if (lander.physicsVersion === 2) {
+			updateLanderLegacy(lander, resolvedInput, dt, gameGravity);
+		} else {
+			updateLander(lander, resolvedInput, dt, gameGravity);
+		}
 
 		this.thrustHistory.push(lander.thrusting);
 		if (this.thrustHistory.length > 180) this.thrustHistory.shift();
@@ -110,6 +122,7 @@ export class PhysicsManager {
 				padY: result.onPad.y,
 				padWidth: result.onPad.width,
 				hiddenPad: result.onPad.hidden === true,
+				spinningCrash: false,
 			};
 		}
 
@@ -122,6 +135,7 @@ export class PhysicsManager {
 			padY: 0,
 			padWidth: 0,
 			hiddenPad: false,
+			spinningCrash: result.spinningCrash,
 		};
 	}
 

@@ -1,5 +1,5 @@
-import type { LanderState } from "../game/Lander";
-import { createLander, updateLander } from "../game/Lander";
+import type { LanderState, PhysicsVersion } from "../game/Lander";
+import { createLander, updateLander, updateLanderLegacy } from "../game/Lander";
 import { getLanderType } from "../game/LanderTypes";
 import type { DifficultyConfig } from "../game/Terrain";
 import { FIXED_TIMESTEP, WORLD_WIDTH } from "../utils/constants";
@@ -46,23 +46,25 @@ function unpackInput(frame: InputFrame): InputState {
 export type GhostMode = "vanilla" | "authentic";
 
 /**
- * Sprint 7.1 PR 1.5 — schema version 2. v1 ghosts have no `version` field
- * and no `difficulty` (the whole DifficultyConfig was implicit from the
- * seed + mission lookup). v2 ghosts embed the DifficultyConfig directly
- * so a Random-Mission run — where the archetype + palette come from a
- * share URL, not a stable MISSIONS[] entry — replays correctly.
+ * Schema evolution:
+ *   v1 (pre-Sprint-7.1): no `version` field, no `difficulty`.
+ *   v2 (Sprint 7.1 PR 1.5): embeds `difficulty` so Random Missions replay.
+ *   v3 (Sprint 7.2): adds `physicsVersion: 2 | 3` header — authoritative
+ *                    flag that picks which integrator runs during replay.
+ *                    Pre-7.2 ghosts lack the field and default to
+ *                    physicsVersion 2 so they replay under the rules they
+ *                    were recorded under. No per-frame angularVel field is
+ *                    needed because integration is deterministic from input
+ *                    + fixed timestep once the correct integrator is picked.
  *
- * Version dispatch is intentionally single-field: the loader looks at
- * `version`, and any missing/older value is treated as v1. When a v1
- * ghost loads we set `legacy: true` so the replay UI can show a "legacy
- * ghost" badge — on seeds where terrain generation drifted between
- * versions, the replay may desync and this flag is the only user-visible
- * warning we can give.
+ * When a pre-v3 ghost loads we set `legacy: true` + `physicsVersion: 2` so
+ * the replay UI can show a "legacy ghost" badge and the physics pipeline
+ * knows to route through `updateLanderLegacy`.
  */
-export const GHOST_SCHEMA_VERSION = 2;
+export const GHOST_SCHEMA_VERSION = 3;
 
 export interface GhostRun {
-	/** Schema version. Absent on v1 ghosts; 2 from Sprint 7.1 onward. */
+	/** Schema version. Absent on v1 ghosts; 2 from Sprint 7.1; 3 from Sprint 7.2. */
 	version?: number;
 	seed: number;
 	score: number;
@@ -70,8 +72,11 @@ export interface GhostRun {
 	mode?: GhostMode;
 	/** Embedded terrain/difficulty config so the ghost can be replayed
 	 * outside the MISSIONS[] table (e.g. Random Missions). Optional on
-	 * v1 ghosts, required on v2. */
+	 * v1 ghosts, required on v2+. */
 	difficulty?: DifficultyConfig;
+	/** Sprint 7.2 — which physics integrator replays this ghost. Absent on
+	 * v1/v2 ghosts (default 2 via migration). v3 ghosts always record 3. */
+	physicsVersion?: PhysicsVersion;
 	/** True when this ghost was loaded without a schema version — i.e.
 	 * it predates v2 and its difficulty context is unknown. Consumers
 	 * should flag it in the UI so the player knows the replay may
@@ -119,6 +124,9 @@ export class GhostRecorder {
 			frames: this.frames,
 			mode: this.mode,
 			difficulty: this.difficulty,
+			// Sprint 7.2 — every new recording is under v3 physics. Legacy
+			// loads patch this to 2 via migrateGhost.
+			physicsVersion: 3,
 		};
 
 		try {
@@ -134,7 +142,8 @@ export class GhostRecorder {
 					existing.frames = run.frames;
 					existing.mode = run.mode;
 					existing.difficulty = run.difficulty;
-					// Save path rewrites this slot with a fresh v2 ghost, so
+					existing.physicsVersion = run.physicsVersion;
+					// Save path rewrites this slot with a fresh v3 ghost, so
 					// the legacy flag is no longer accurate.
 					existing.legacy = undefined;
 				}
@@ -158,10 +167,21 @@ export class GhostPlayer {
 	private frames: InputFrame[];
 	private frameIndex = 0;
 	private active = true;
+	private physicsVersion: PhysicsVersion;
 
 	constructor(run: GhostRun) {
 		this.frames = run.frames;
-		this.lander = createLander(WORLD_WIDTH / 2, 80, getLanderType());
+		// Sprint 7.2 — pick integrator based on the ghost's recorded physics
+		// version. v2 ghosts replay under v2 rules entirely (no angularVel
+		// integration, no spinning-crash check). Missing/unknown defaults to
+		// 2 because every pre-7.2 ghost was recorded under v2 physics.
+		this.physicsVersion = run.physicsVersion === 3 ? 3 : 2;
+		this.lander = createLander(
+			WORLD_WIDTH / 2,
+			80,
+			getLanderType(),
+			this.physicsVersion,
+		);
 	}
 
 	/** Advance the ghost by one fixed timestep. Returns false when replay is done. */
@@ -172,7 +192,11 @@ export class GhostPlayer {
 		}
 
 		const input = unpackInput(this.frames[this.frameIndex]);
-		updateLander(this.lander, input, FIXED_TIMESTEP);
+		if (this.physicsVersion === 2) {
+			updateLanderLegacy(this.lander, input, FIXED_TIMESTEP);
+		} else {
+			updateLander(this.lander, input, FIXED_TIMESTEP);
+		}
 		this.frameIndex++;
 		return true;
 	}
@@ -182,12 +206,20 @@ export class GhostPlayer {
 	}
 }
 
-/** Stamp a migration flag on v1 ghosts as they load. Preserves the rest
- * of the stored shape so save() can still write a fresh v2 ghost into
- * the same slot without double-migration. */
+/** Normalize an incoming ghost record to the current schema expectations.
+ *
+ * - v1/v2 ghosts (lacking `physicsVersion`) get marked `physicsVersion: 2`
+ *   so the replay pipeline routes them to `updateLanderLegacy` and skips
+ *   the new spinning-crash landing check. They also get `legacy: true`.
+ * - v3 ghosts pass through unchanged unless they're missing `physicsVersion`
+ *   (schema drift defense — fall back to 2 + legacy if so).
+ */
 function migrateGhost(g: GhostRun): GhostRun {
-	if (g.version === GHOST_SCHEMA_VERSION) return g;
-	return { ...g, legacy: true };
+	const physicsVersion: PhysicsVersion = g.physicsVersion === 3 ? 3 : 2;
+	if (g.version === GHOST_SCHEMA_VERSION && g.physicsVersion === 3) {
+		return g;
+	}
+	return { ...g, legacy: true, physicsVersion };
 }
 
 function loadGhosts(): GhostRun[] {
@@ -195,7 +227,20 @@ function loadGhosts(): GhostRun[] {
 		const data = localStorage.getItem(STORAGE_KEY);
 		if (!data) return [];
 		const raw = JSON.parse(data) as GhostRun[];
-		return raw.map(migrateGhost);
+		// Sprint 7.2 — try/catch the per-ghost migration too. A single
+		// corrupt entry (bad fields, missing frames array) shouldn't kill
+		// the whole replay panel. Skip the bad one, keep the rest.
+		const out: GhostRun[] = [];
+		for (const g of raw) {
+			try {
+				out.push(migrateGhost(g));
+			} catch {
+				// Drop the corrupt entry silently. The UI shows fewer ghosts
+				// than stored; acceptable because the alternative is no
+				// ghost replay UI at all.
+			}
+		}
+		return out;
 	} catch {
 		return [];
 	}
@@ -258,6 +303,7 @@ export function importGhost(json: string): GhostRun | null {
 				existing.frames = run.frames;
 				existing.mode = runMode;
 				existing.difficulty = run.difficulty;
+				existing.physicsVersion = run.physicsVersion;
 				existing.legacy = run.legacy;
 			}
 		} else {

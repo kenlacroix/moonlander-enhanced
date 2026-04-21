@@ -123,9 +123,57 @@ export class Autopilot {
 		}
 
 		// --- Rotation control ---
+		// Sprint 7.2 — under v3 (rigid-body), rotation has inertia. A naive
+		// angle-delta controller over-rotates every time because the old
+		// angularVel keeps the lander spinning past the target. Two-stage PID
+		// instead:
+		//   Outer P: angle error → desired angular velocity (capped)
+		//   Inner bang-bang: angular velocity error → RCS burn direction
+		// Deadband on the inner loop prevents limit-cycle chatter that would
+		// drain RCS propellant. v2 replays and v3 flights share the same
+		// desiredAngle computation above; only the rotation-actuation piece
+		// branches.
 		const angleError = normAngle(desiredAngle - angle);
-		const rotateLeft = angleError < -2;
-		const rotateRight = angleError > 2;
+		let rotateLeft = false;
+		let rotateRight = false;
+
+		if (lander.physicsVersion === 2) {
+			// v2 path: instant angle-set physics, no momentum. Naive deadband
+			// is fine because releasing the input stops rotation immediately.
+			rotateLeft = angleError < -2;
+			rotateRight = angleError > 2;
+		} else {
+			// v3 path: two-stage PID.
+			// Outer loop: proportional angle → target angular velocity. Cap
+			// at 30 °/s so we never demand more than the lander can slow down
+			// before the angle flips past zero. Gain 1.5 tuned to converge
+			// within ~1 s from ±30°.
+			const OUTER_GAIN = 1.5;
+			const TARGET_OMEGA_CAP = 30;
+			const targetOmega = Math.max(
+				-TARGET_OMEGA_CAP,
+				Math.min(TARGET_OMEGA_CAP, angleError * OUTER_GAIN),
+			);
+			const omegaError = targetOmega - lander.angularVel;
+
+			// Inner loop: bang-bang with deadband. Deadband is the smallest ω
+			// change one frame of RCS produces at this lander's rcsMultiplier —
+			// ANGULAR_ACCEL * rcsMult * FIXED_TIMESTEP. Rounding up slightly
+			// so we don't chatter at the edge.
+			const rcsMult = lander.landerType.rcsMultiplier ?? 1;
+			const DEADBAND = 180 * rcsMult * (1 / 60) * 1.2; // ~3.6 °/s for baseline
+
+			// RCS-starvation graceful degrade: when RCS is below 5 units we can
+			// only afford a handful of burns before we're done. Widen the
+			// deadband so we only fire for large errors (accepts "close to
+			// target" as good enough instead of chattering).
+			const effectiveDeadband = lander.rcs < 5 ? DEADBAND * 4 : DEADBAND;
+
+			if (Math.abs(omegaError) > effectiveDeadband) {
+				rotateLeft = omegaError < 0;
+				rotateRight = omegaError > 0;
+			}
+		}
 
 		// --- Thrust control ---
 		// Desired descent rate: slower as we get closer to ground

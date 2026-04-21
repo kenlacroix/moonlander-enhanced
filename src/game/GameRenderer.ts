@@ -82,6 +82,14 @@ export interface GameRenderState {
 	readonly fuelLeakActive: boolean;
 	readonly adaptiveLabel: string | null;
 	readonly hiddenPadRevealed: boolean;
+	/** Sprint 7.2 — frames remaining on the one-shot first-spin tutorial
+	 * banner. 0 = not showing. */
+	readonly rcsTutorialFramesRemaining: number;
+	/** Sprint 7.2 — true when the most recent crash was a spinning-at-
+	 * touchdown structural failure. Lets the result banner show a specific
+	 * message instead of the generic "CRASH" so the player knows why a
+	 * safe-vy/safe-angle touchdown still counted as a crash. */
+	readonly lastSpinningCrash: boolean;
 	readonly score: number;
 	readonly lastRank: number | null;
 	readonly llmText: string;
@@ -387,6 +395,7 @@ export class GameRenderer {
 			state.currentFlight?.authenticState ?? null,
 			state.terrain ?? null,
 			state.status === "playing",
+			state.rcsTutorialFramesRemaining,
 		);
 
 		// Touch controls overlay
@@ -465,7 +474,13 @@ export class GameRenderer {
 				const crashHint = state.input.isTouchDevice
 					? "Tap top to continue"
 					: "R mission select  |  F report";
-				this.renderer.drawMessage("CRASH", crashHint);
+				// Sprint 7.2 — spinning-crash gets its own banner so the
+				// player knows why a touchdown with safe vy + safe angle
+				// still counted as a crash.
+				const title = state.lastSpinningCrash
+					? "LANDED SPINNING — STRUCTURAL FAILURE"
+					: "CRASH";
+				this.renderer.drawMessage(title, crashHint);
 			}
 		}
 

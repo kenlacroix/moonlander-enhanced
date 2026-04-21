@@ -17,6 +17,7 @@ import {
 	serializeEditor,
 } from "../ui/TerrainEditor";
 import { LANDER_HEIGHT, STARTING_FUEL } from "../utils/constants";
+import { buildShareUrl } from "../utils/shareUrl";
 import { startAgentReplay } from "./AgentReplay";
 import {
 	buildAuthenticState,
@@ -39,7 +40,6 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { generateRandomMission } from "./RandomMission";
 import { createRelayState } from "./RelayMode";
-import { buildShareUrl } from "../utils/shareUrl";
 
 const TITLE_OPTION_COUNT = 8;
 
@@ -318,6 +318,27 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 			game.lander.y + Math.sin(rad) * 18,
 			game.lander.angle,
 		);
+	}
+	// Sprint 7.2 — visual RCS thrusters on lander corners while RCS is firing.
+	// `rcsFiring` is set by updateLander only when rotate input + rcs > 0; v2
+	// legacy integrator pins it to false so v2 replays render identically.
+	if (game.lander.rcsFiring && game.status === "playing") {
+		const direction: -1 | 1 = game.lander.angularVel < 0 ? -1 : 1;
+		game.particles.emitRCS(
+			game.lander.x,
+			game.lander.y,
+			game.lander.angle,
+			direction,
+		);
+		// Sprint 7.2 — first-spin tutorial trigger. Fires once per player,
+		// only under v3 physics (no point showing "rotation has momentum" to
+		// a player replaying a v2 ghost). 180 frames = 3 seconds at 60Hz.
+		game.maybeShowRcsTutorial();
+	}
+	// First-spin tutorial countdown (ticks independently of rcsFiring so a
+	// player who triggers it then releases the key still sees the full message).
+	if (game.rcsTutorialFramesRemaining > 0) {
+		game.rcsTutorialFramesRemaining -= 1;
 	}
 	game.camera.follow(game.lander.x, game.lander.y, dt);
 	if (game.achievementToastTimer > 0) {

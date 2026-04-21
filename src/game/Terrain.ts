@@ -44,6 +44,9 @@ export interface DifficultyConfig {
 	padMaxWidth?: number; // maximum pad width in px
 	padCount?: number; // number of landing pads
 	startingFuel?: number; // fuel override
+	/** Sprint 7.2 — RCS propellant override. Undefined falls back to
+	 * STARTING_RCS * landerType.rcsMultiplier in createLander. */
+	startingRCS?: number;
 	spawnY?: number; // starting altitude (lower = harder)
 	windStrength?: number; // wind force (0 = none, 50+ = strong)
 	landerType?: string; // lander variant name
@@ -67,12 +70,7 @@ export interface DifficultyConfig {
 	 * before `specialFeature`, so Apollo 15 (archetype=rolling +
 	 * specialFeature=rille) keeps both behaviors.
 	 */
-	archetype?:
-		| "rolling"
-		| "crater-field"
-		| "spires"
-		| "mesa"
-		| "flats";
+	archetype?: "rolling" | "crater-field" | "spires" | "mesa" | "flats";
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */

@@ -2,6 +2,7 @@ import * as tf from "@tensorflow/tfjs";
 import type { LanderState } from "../game/Lander";
 import type { TerrainData } from "../game/Terrain";
 import type { InputState } from "../systems/Input";
+import { REWARD_VERSION } from "../utils/constants";
 import type { Agent } from "./Agent";
 import {
 	ACTION_COUNT,
@@ -327,6 +328,7 @@ export class RLAgent implements Agent {
 					episodeCount: this.episodeCount,
 					rewardHistory: this.rewardHistory.slice(-200),
 					stateSize: STATE_SIZE, // Sprint 2.7: record state-vector size
+					rewardVersion: REWARD_VERSION, // Sprint 7.2: reward structure version
 				}),
 			);
 			return true;
@@ -352,6 +354,19 @@ export class RLAgent implements Agent {
 					// Legacy pre-Sprint-2.7 weights — assume 8-dim and discard.
 					console.warn(
 						`[RLAgent] Discarding legacy saved weights for "${key}" (no stateSize metadata; likely pre-Sprint-2.7). Retraining from scratch.`,
+					);
+					return false;
+				}
+				// Sprint 7.2 — REWARD_VERSION guard. Reward structure changed
+				// (terminal reward now penalizes touchdown rotation under v3
+				// physics). Legacy policy drives rotate inputs as before,
+				// burning RCS and accumulating spin it never learned to
+				// arrest — lands near 0%, not "suboptimal." Force retrain
+				// on mismatch: transparent clean slate beats broken agent.
+				const savedRewardVersion = parsed.rewardVersion ?? 1;
+				if (savedRewardVersion !== REWARD_VERSION) {
+					console.warn(
+						`[RLAgent] Physics changed — starting fresh from episode 0 (reward version ${savedRewardVersion} → ${REWARD_VERSION} for "${key}").`,
 					);
 					return false;
 				}

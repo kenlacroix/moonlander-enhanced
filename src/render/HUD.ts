@@ -15,6 +15,7 @@ import {
 	MAX_LANDING_ANGLE,
 	MAX_LANDING_SPEED,
 	STARTING_FUEL,
+	STARTING_RCS,
 } from "../utils/constants";
 
 export class HUD {
@@ -33,6 +34,7 @@ export class HUD {
 		authenticState: AuthenticState | null = null,
 		terrain: TerrainData | null = null,
 		isPlaying = true,
+		rcsTutorialFramesRemaining = 0,
 	): void {
 		ctx.save();
 		ctx.font = '14px "Courier New", monospace';
@@ -104,6 +106,26 @@ export class HUD {
 		const fillWidth = (lander.fuel / STARTING_FUEL) * barWidth;
 		ctx.fillStyle = fuelWarn ? COLOR_HUD_WARNING : COLOR_HUD;
 		ctx.fillRect(barX, y, fillWidth, barHeight);
+
+		// Sprint 7.2 — RCS meter below fuel bar. Only rendered under v3
+		// physics (v2 ghost replays don't use RCS, so the meter would be
+		// a misleading empty bar). Low-RCS warning at <10% mirrors the
+		// fuel warning pattern.
+		if (lander.physicsVersion === 3) {
+			y += lineHeight;
+			const rcsMaxFromType =
+				STARTING_RCS * (lander.landerType.rcsMultiplier ?? 1);
+			const rcsPct = ((lander.rcs / rcsMaxFromType) * 100).toFixed(0);
+			const rcsWarn = lander.rcs < rcsMaxFromType * 0.1;
+			this.drawLabel(ctx, x, y, "RCS", `${rcsPct}%`, rcsWarn);
+			y += lineHeight;
+			ctx.strokeStyle = COLOR_HUD;
+			ctx.lineWidth = 1;
+			ctx.strokeRect(barX, y, barWidth, barHeight);
+			const rcsFillWidth = (lander.rcs / rcsMaxFromType) * barWidth;
+			ctx.fillStyle = rcsWarn ? COLOR_HUD_WARNING : COLOR_HUD;
+			ctx.fillRect(barX, y, rcsFillWidth, barHeight);
+		}
 
 		// Wind indicator
 		if (windLabel) {
@@ -181,6 +203,40 @@ export class HUD {
 			ctx.font = '12px "Courier New", monospace';
 			ctx.textAlign = "right";
 			ctx.fillText(`DIFFICULTY: ${adaptiveLabel}`, CANVAS_WIDTH - 20, 44);
+		}
+
+		// Sprint 7.2 — first-spin tutorial banner. Shown once per player the
+		// first time RCS fires under v3 physics (180 frames = 3 seconds).
+		// Fades out over the last 30 frames so it doesn't pop off abruptly.
+		if (rcsTutorialFramesRemaining > 0 && isPlaying) {
+			const fadeFrames = 30;
+			const alpha =
+				rcsTutorialFramesRemaining < fadeFrames
+					? rcsTutorialFramesRemaining / fadeFrames
+					: 1;
+			ctx.save();
+			ctx.globalAlpha = alpha;
+			ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+			ctx.fillRect(CANVAS_WIDTH / 2 - 220, CANVAS_HEIGHT / 2 - 60, 440, 54);
+			ctx.strokeStyle = "#00ff88";
+			ctx.lineWidth = 1;
+			ctx.strokeRect(CANVAS_WIDTH / 2 - 220, CANVAS_HEIGHT / 2 - 60, 440, 54);
+			ctx.fillStyle = "#00ff88";
+			ctx.font = 'bold 14px "Courier New", monospace';
+			ctx.textAlign = "center";
+			ctx.fillText(
+				"ROTATION HAS MOMENTUM",
+				CANVAS_WIDTH / 2,
+				CANVAS_HEIGHT / 2 - 40,
+			);
+			ctx.font = '12px "Courier New", monospace';
+			ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+			ctx.fillText(
+				"Counter-burn (opposite arrow) to stop spinning",
+				CANVAS_WIDTH / 2,
+				CANVAS_HEIGHT / 2 - 20,
+			);
+			ctx.restore();
 		}
 
 		// Controls hint (bottom center)
