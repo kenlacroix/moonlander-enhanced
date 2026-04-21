@@ -2,7 +2,6 @@ import { CanvasRenderer } from "./CanvasRenderer";
 import type { IGameplayRenderer } from "./IGameplayRenderer";
 import { WebGLGameplayRenderer } from "./WebGLGameplayRenderer";
 
-
 /**
  * Result of renderer selection. `backend` is reported so the HUD /
  * settings panel can surface which pipeline is active ("WEBGL" vs

@@ -174,19 +174,18 @@ describe("Sprint 7.1 — regression pin (ALL MISSIONS[] + Apollo seeds stay byte
 		(m) => m.difficulty?.archetype === undefined,
 	).map((m) => m.seed);
 
-	it.each(freeplayArchetypeUndefinedSeeds)(
-		"freeplay seed %i (archetype undefined) stays byte-identical",
-		(seed) => {
-			const noField = generateTerrain(seed);
-			const withRollingExplicit = generateTerrain(seed, {
-				archetype: "rolling",
-			});
-			const withEmptyDiff = generateTerrain(seed, {});
-			expect(noField.points).toEqual(withRollingExplicit.points);
-			expect(noField.points).toEqual(withEmptyDiff.points);
-			expect(noField.pads).toEqual(withRollingExplicit.pads);
-		},
-	);
+	it.each(
+		freeplayArchetypeUndefinedSeeds,
+	)("freeplay seed %i (archetype undefined) stays byte-identical", (seed) => {
+		const noField = generateTerrain(seed);
+		const withRollingExplicit = generateTerrain(seed, {
+			archetype: "rolling",
+		});
+		const withEmptyDiff = generateTerrain(seed, {});
+		expect(noField.points).toEqual(withRollingExplicit.points);
+		expect(noField.points).toEqual(withEmptyDiff.points);
+		expect(noField.pads).toEqual(withRollingExplicit.pads);
+	});
 
 	// Apollo 11/15/17 missions use rolling (either explicitly set to
 	// "rolling" or left undefined — both bypass dispatch). Regression
@@ -198,15 +197,14 @@ describe("Sprint 7.1 — regression pin (ALL MISSIONS[] + Apollo seeds stay byte
 			m.difficulty?.archetype === "rolling",
 	).map((m) => m.seed);
 
-	it.each(historicRollingSeeds)(
-		"historic seed %i (rolling dispatch) stays byte-identical",
-		(seed) => {
-			const a = generateTerrain(seed);
-			const b = generateTerrain(seed, { archetype: "rolling" });
-			expect(a.points).toEqual(b.points);
-			expect(a.pads).toEqual(b.pads);
-		},
-	);
+	it.each(
+		historicRollingSeeds,
+	)("historic seed %i (rolling dispatch) stays byte-identical", (seed) => {
+		const a = generateTerrain(seed);
+		const b = generateTerrain(seed, { archetype: "rolling" });
+		expect(a.points).toEqual(b.points);
+		expect(a.pads).toEqual(b.pads);
+	});
 
 	// Apollo 13 survive mission isn't a landing but still generates
 	// terrain on HeadlessGame init; include it for completeness.

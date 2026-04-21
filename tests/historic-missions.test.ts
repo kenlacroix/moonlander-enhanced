@@ -208,13 +208,9 @@ describe("Sprint 5 Part B — URL-seed routing preserves historic kind", () => {
 		// tests. Picking a seed known NOT to collide with any historic
 		// mission is the whole point of the null branch in the fix.
 		const nonHistoricSeed = 424242;
-		const collides = HISTORIC_MISSIONS.some(
-			(m) => m.seed === nonHistoricSeed,
-		);
+		const collides = HISTORIC_MISSIONS.some((m) => m.seed === nonHistoricSeed);
 		expect(collides).toBe(false);
-		const resolved = HISTORIC_MISSIONS.find(
-			(m) => m.seed === nonHistoricSeed,
-		);
+		const resolved = HISTORIC_MISSIONS.find((m) => m.seed === nonHistoricSeed);
 		expect(resolved).toBeUndefined();
 	});
 });
