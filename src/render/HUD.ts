@@ -13,6 +13,7 @@ import {
 	COLOR_HUD,
 	COLOR_HUD_WARNING,
 	MAX_LANDING_ANGLE,
+	MAX_LANDING_ANGULAR_RATE,
 	MAX_LANDING_SPEED,
 	STARTING_FUEL,
 	STARTING_RCS,
@@ -125,6 +126,32 @@ export class HUD {
 			const rcsFillWidth = (lander.rcs / rcsMaxFromType) * barWidth;
 			ctx.fillStyle = rcsWarn ? COLOR_HUD_WARNING : COLOR_HUD;
 			ctx.fillRect(barX, y, rcsFillWidth, barHeight);
+
+			// Sprint 7.2 Part 2 — live angular-rate-vs-gate readout.
+			// Closes the feedback loop for SPINNING crashes: players can see
+			// when they're approaching the gate before they hit it.
+			// White at <80% of gate, amber 80-99%, red at/over. Only shown
+			// while flying — post-touchdown state reading is noise.
+			if (isPlaying && lander.status === "flying") {
+				y += lineHeight;
+				const rate = Math.abs(lander.angularVel ?? 0);
+				// Defensive fallback for hand-built LanderState fixtures that
+				// don't populate the new field (tests, legacy snapshots).
+				const gate = lander.maxLandingAngularRate ?? MAX_LANDING_ANGULAR_RATE;
+				const ratio = gate > 0 ? rate / gate : 0;
+				const rateColor =
+					ratio >= 1 ? COLOR_HUD_WARNING : ratio >= 0.8 ? "#ffaa00" : COLOR_HUD;
+				ctx.fillStyle = COLOR_HUD;
+				ctx.textAlign = "left";
+				ctx.font = '14px "Courier New", monospace';
+				ctx.fillText("ROT", x, y);
+				ctx.fillStyle = rateColor;
+				ctx.fillText(
+					`${rate.toFixed(1)}°/s / ${gate.toFixed(1)}°/s`,
+					x + 60,
+					y,
+				);
+			}
 		}
 
 		// Wind indicator
