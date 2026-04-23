@@ -106,6 +106,53 @@ export function applyAuthenticFilter(
 }
 
 /**
+ * Sprint 7.2 Part 2 — per-era multiplier on the angular-rate landing gate.
+ * Apollo LM RCS deadband was ~4°/s real-world; multiplying the Vanilla 8°/s
+ * gate by 0.5 hits that exactly. Artemis modern hazard ellipse implies
+ * precision but not Apollo-tight; 0.625 → 5°/s base. Luna 9 is auto-landing
+ * so the gate is irrelevant — multiplier is 1.0 for safety.
+ *
+ * Per-mission tuning may have already lowered the Vanilla base (e.g. Apollo
+ * 11 = 6°/s). Authentic multiplier composes: 6 × 0.5 = 3°/s on Apollo 11
+ * Authentic. Plan acknowledges Apollo 15/17 Authentic at 3.5°/s is below
+ * autopilot per-tick granularity (~4.3°/s) — those missions are pilot-only
+ * in Authentic mode by design.
+ */
+export const AUTHENTIC_ANGULAR_RATE_MULTIPLIER: Record<
+	"1960s-soviet" | "1960s-70s-apollo" | "2020s-artemis",
+	number
+> = {
+	"1960s-soviet": 1.0,
+	"1960s-70s-apollo": 0.5,
+	"2020s-artemis": 0.625,
+};
+
+/**
+ * Sprint 7.2 Part 2 — apply per-era authentic multiplier to a freshly-spawned
+ * lander's landing-rate gate. Called by Game.ts after createLander, only for
+ * historic missions in Authentic mode.
+ *
+ * Takes the era string primitive (not Mission) so callers without a Mission
+ * object (GhostPlayer, future tests) can use it without dragging the mission
+ * registry along. Pass undefined era for non-historic missions to no-op.
+ *
+ * Mutates lander in place. Idempotent only if called once per spawn — calling
+ * twice would compose multipliers (don't).
+ */
+export function applyAuthenticPhysics(
+	lander: LanderState,
+	era: "1960s-soviet" | "1960s-70s-apollo" | "2020s-artemis" | undefined,
+	authenticMode: boolean,
+): void {
+	if (!authenticMode || era === undefined) return;
+	// Fallback to 1.0 (no-op) if a future era is added without a multiplier
+	// entry. Without the `?? 1.0`, `lander.maxLandingAngularRate *= undefined`
+	// would produce NaN and turn every landing into a silent SPINNING crash.
+	const mult = AUTHENTIC_ANGULAR_RATE_MULTIPLIER[era] ?? 1.0;
+	lander.maxLandingAngularRate *= mult;
+}
+
+/**
  * Event fired by updateAuthentic when the state machine transitions. Game
  * uses this to dispatch one-shot audio / HUD effects without polling the
  * state every tick (which would fire the alarm tone 24 times in a row).

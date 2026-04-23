@@ -58,9 +58,15 @@ export function checkCollision(
 				// the rules they were recorded under. See plan §Architecture.
 				// `angularVel ?? 0` keeps us safe for hand-constructed test
 				// fixtures that don't populate the full LanderState shape.
+				// Sprint 7.2 Part 2 — gate value is per-mission via createLander
+				// materialization (lander.maxLandingAngularRate), not the global
+				// constant. Authentic mode tightens it via applyAuthenticPhysics.
+				// `?? MAX_LANDING_ANGULAR_RATE` defends hand-constructed test
+				// fixtures that don't populate the full LanderState shape.
+				const gate = lander.maxLandingAngularRate ?? MAX_LANDING_ANGULAR_RATE;
 				const safeRotation =
 					lander.physicsVersion === 2 ||
-					Math.abs(lander.angularVel ?? 0) <= MAX_LANDING_ANGULAR_RATE;
+					Math.abs(lander.angularVel ?? 0) <= gate;
 				const safeLanding = safeV && safeAngle && safeRotation;
 				const spinningCrash =
 					!safeLanding && safeV && safeAngle && !safeRotation;

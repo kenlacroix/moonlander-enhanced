@@ -47,6 +47,11 @@ export interface DifficultyConfig {
 	/** Sprint 7.2 — RCS propellant override. Undefined falls back to
 	 * STARTING_RCS * landerType.rcsMultiplier in createLander. */
 	startingRCS?: number;
+	/** Sprint 7.2 Part 2 — mission-specific angular-rate landing gate (deg/s).
+	 * Apollo 11 lands tighter than freeplay. Undefined falls back to
+	 * MAX_LANDING_ANGULAR_RATE in createLander. Authentic mode may tighten
+	 * this further via applyAuthenticPhysics in AuthenticMode.ts. */
+	maxLandingAngularRate?: number;
 	spawnY?: number; // starting altitude (lower = harder)
 	windStrength?: number; // wind force (0 = none, 50+ = strong)
 	landerType?: string; // lander variant name
