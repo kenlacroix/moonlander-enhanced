@@ -17,9 +17,7 @@ let reducedMotionQuery: MediaQueryList | null = null;
 export function prefersReducedMotion(): boolean {
 	if (typeof window === "undefined" || !window.matchMedia) return false;
 	if (!reducedMotionQuery) {
-		reducedMotionQuery = window.matchMedia(
-			"(prefers-reduced-motion: reduce)",
-		);
+		reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 	}
 	return reducedMotionQuery.matches;
 }

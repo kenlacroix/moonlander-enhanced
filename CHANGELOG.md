@@ -2,6 +2,37 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.1.0] - 2026-04-21 (Sprint 7.2 PR 1: rigid-body physics + RCS + autopilot rewrite)
+
+Addresses hands-on play-test feedback: "I can spin the lander in a complete circle and only bottom thrust uses fuel." Rotation now has weight, costs propellant, and requires counter-burning to stop. Apollo LM had a separate Reaction Control System tank for attitude — so does MoonLander.
+
+### Added
+- **Rigid-body rotation physics.** Release a rotate key and the lander keeps spinning at its built-up angular velocity (vacuum, no drag). Counter-burn to stop. Before 7.2, rotation was instant angle-set with zero fuel cost.
+- **Separate RCS propellant tank.** 100 units (vs 1000 main fuel), displayed below the fuel bar. Scaled per lander type (`rcsMultiplier`): Sparrow 1.2× (nimble), Apollo LM 0.9× (authentic sluggish), Luna 9 0.7× (1966 Soviet minimal attitude control).
+- **Angular-rate landing check.** Touching down while spinning > 8°/s reads as `LANDED SPINNING — STRUCTURAL FAILURE`. Vertical speed and angle alone no longer suffice.
+- **Visual RCS thrusters.** Tiny white puffs at the lander's upper corners when RCS fires, direction-matched to the applied torque.
+- **First-spin tutorial.** One-shot 3-second banner the first time RCS fires under v3 physics: "Rotation has momentum. Counter-burn to stop spinning." Dismissible, localStorage-gated, never reappears.
+- **Ghost schema v3.** Replays now carry `physicsVersion: 2 | 3`. Pre-7.2 ghosts replay under the legacy v2 integrator (with the v2 landing check), frozen forever, so historical artifacts play back under the rules they were recorded under. Corrupt ghost files fall back to a "ghost unavailable" toast instead of crashing.
+- **Autopilot two-stage PID.** Outer loop maps angle error to a target angular velocity (capped at 30°/s); inner loop fires RCS when angular velocity error exceeds a deadband. Graceful degrade when RCS < 5 units: deadband widens so the autopilot doesn't chatter on an empty tank.
+- **PHYSICS_V3 kill-switch constant.** Flip to `false` to revert the global physics integrator to v2 behavior. Per-lander `physicsVersion` still overrides it for ghost replays.
+- 27 new tests covering integrator, legacy integrator, collision landing-check branches, physics dispatch, autopilot convergence, RCS depletion, MAX_ANGULAR_VEL clamp, RCS particle caps, AgentEnv state vector signal, and leaderboard v2/v3 partition. 381 → 408 tests.
+
+### Changed
+- **RL agent force-retrains on reward-version change.** Pre-7.2 DQN weights no longer load under v3 physics (reward structure penalizes touchdown rotation that legacy policies never learned about). Mismatch on `metadata.rewardVersion` deletes the weights, logs "Physics changed — starting fresh from episode 0," and AI Theater starts at episode 0. Transparent honesty beats a broken agent with a soft warning.
+- **Leaderboard partitioned by physics version.** v3 scores live at `{seed}-{mode}-v3`; legacy v2 scores frozen at the pre-7.2 `{seed}-{mode}` key. Reads prefer v3 and fall back to v2 if the v3 bucket is empty, so existing personal bests stay visible on upgrade.
+- **Autopilot rewrite.** v2 angle-delta deadband replaced by the two-stage PID above for v3 physics. v2 path (ghost replays) keeps the naive 2° deadband since instant angle-set has no inertia to manage.
+
+### Fixed
+- **Landing safety check in `Physics.ts` is defensive.** `angularVel ?? 0` handles hand-constructed test fixtures and any callers that don't populate the full LanderState shape.
+
+### Migration notes
+- **Old DQN weights will be force-deleted** on first load under v0.6.1.0. Training starts fresh.
+- **Old ghost replays still work** and play back under v2 physics. They're flagged `legacy: true` in storage.
+- **Old leaderboard scores stay visible** — readers fall back to the v2 bucket when a seed has no v3 scores yet.
+
+### Not in this PR (PR 2)
+Angular momentum vector overlay (M key), `REWARD_COMPONENT_KEYS` unification across reward-breakdown call sites, reward spin-penalty component, editor `?custom=` URL validation carryover, per-mission RCS tuning from playtest data. See `.plans/sprint-7.2-rigid-body-physics.md` § PR split.
+
 ## [0.6.0.1] - 2026-04-19 (Sprint 7.1 PR 1: palettes + archetypes + mission variety)
 
 Addresses user feedback from hands-on play testing: "all the levels feel about the same." After this PR, historic missions read as distinct places.

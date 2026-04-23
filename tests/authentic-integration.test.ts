@@ -116,7 +116,11 @@ describe("Sprint 5.5 — Leaderboard mode isolation + legacy migration", () => {
 		expect(getBestScore(1969, "authentic")).toBeUndefined();
 	});
 
-	it("first vanilla write after legacy migrates the key", () => {
+	it("first vanilla write after legacy migrates the key to v2 slot (Sprint 7.2)", () => {
+		// Sprint 7.2 — v2 and v3 scores live in separate buckets. The Sprint
+		// 5.5 migration (legacy `${seed}` → `${seed}-vanilla`) still applies
+		// but now targets the v2 bucket specifically, freezing pre-v3 scores
+		// there for archival. New writes go to `${seed}-vanilla-v3`.
 		localStorage.setItem(
 			"moonlander-leaderboard",
 			JSON.stringify({
@@ -124,15 +128,18 @@ describe("Sprint 5.5 — Leaderboard mode isolation + legacy migration", () => {
 			}),
 		);
 		addScore(1969, 800, 22, "vanilla");
+		// getScores prefers v3 bucket; only the new 800 surfaces because v3
+		// has entries now and the fallback chain short-circuits.
 		const entries = getScores(1969, "vanilla");
-		// Both the legacy 777 and the new 800 should be present; legacy
-		// key gone. Sorted desc by score.
-		expect(entries.map((e) => e.score)).toEqual([800, 777]);
+		expect(entries.map((e) => e.score)).toEqual([800]);
 		const raw = JSON.parse(
 			localStorage.getItem("moonlander-leaderboard") ?? "{}",
 		);
+		// Legacy root key migrated away; v2 bucket preserves pre-7.2 score;
+		// v3 bucket holds new score. Clean partition.
 		expect(raw["1969"]).toBeUndefined();
-		expect(raw["1969-vanilla"]).toBeDefined();
+		expect(raw["1969-vanilla"]).toEqual([{ score: 777, date: "2025-01-01" }]);
+		expect(raw["1969-vanilla-v3"]?.[0]?.score).toBe(800);
 	});
 });
 

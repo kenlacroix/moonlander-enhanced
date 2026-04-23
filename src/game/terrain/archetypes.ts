@@ -1,5 +1,5 @@
-import type { Vec2 } from "../../utils/math";
 import { CANVAS_HEIGHT, WORLD_WIDTH } from "../../utils/constants";
+import type { Vec2 } from "../../utils/math";
 import type { LandingPad } from "../Terrain";
 
 /**
@@ -22,9 +22,7 @@ const PAD_AVOID_MARGIN = 4;
 
 export function isOnOrNearPad(x: number, pads: LandingPad[]): boolean {
 	return pads.some(
-		(p) =>
-			x >= p.x - PAD_AVOID_MARGIN &&
-			x <= p.x + p.width + PAD_AVOID_MARGIN,
+		(p) => x >= p.x - PAD_AVOID_MARGIN && x <= p.x + p.width + PAD_AVOID_MARGIN,
 	);
 }
 
@@ -120,7 +118,7 @@ export function applySpires(
 			if (dist > halfWidth) continue;
 			const t = 1 - dist / halfWidth;
 			// y increases downward; subtract to raise terrain
-			p.y -= height * Math.pow(t, 0.6); // sharper-than-linear rise for spire shape
+			p.y -= height * t ** 0.6; // sharper-than-linear rise for spire shape
 		}
 	}
 }
@@ -209,8 +207,7 @@ export function applyFlats(
 		const clusterSpread = 30 + rng() * 30;
 		const boulderCount = 2 + Math.floor(rng() * 3); // 2-4
 		for (let b = 0; b < boulderCount; b++) {
-			const boulderX =
-				clusterCenter + (rng() - 0.5) * clusterSpread * 2;
+			const boulderX = clusterCenter + (rng() - 0.5) * clusterSpread * 2;
 			const boulderRadius = 10 + rng() * 15; // 10-25 px
 			const boulderHeight = 15 + rng() * 15; // 15-30 px
 			for (const p of points) {

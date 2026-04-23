@@ -1,5 +1,7 @@
 import {
 	COLOR_THRUST,
+	LANDER_HEIGHT,
+	LANDER_WIDTH,
 	MAX_DUST_PARTICLES,
 	MAX_EXPLOSION_PARTICLES,
 	MAX_THRUSTER_PARTICLES,
@@ -15,7 +17,7 @@ export interface Particle {
 	maxLife: number;
 	size: number;
 	color: string;
-	type: "exhaust" | "explosion" | "dust";
+	type: "exhaust" | "explosion" | "dust" | "rcs";
 }
 
 export class ParticleSystem {
@@ -67,6 +69,55 @@ export class ParticleSystem {
 				size: 1 + Math.random() * 4,
 				color: colors[Math.floor(Math.random() * colors.length)],
 				type: "explosion",
+			});
+		}
+	}
+
+	/**
+	 * Sprint 7.2 — emit a tiny white puff at one of the lander's upper corners
+	 * while RCS is firing. Which corner depends on the rotation direction:
+	 * `direction === -1` (rotateLeft → counter-clockwise torque) pushes off the
+	 * right-front corner; `direction === +1` pushes off the left-front corner.
+	 * Apollo LM had RCS quads at all four descent-stage corners — this is the
+	 * simplified 2D stand-in that sells "something at the corner is firing."
+	 *
+	 * Cap per frame: 2 particles (much cheaper than thruster exhaust). Rotates
+	 * the corner offset into world space using the lander's current angle so
+	 * the puffs come out the right spot when the lander is tilted.
+	 */
+	emitRCS(x: number, y: number, angleDeg: number, direction: -1 | 1): void {
+		const rcsCount = this.particles.filter((p) => p.type === "rcs").length;
+		if (rcsCount >= 40) return; // hard cap, decoupled from main thruster limit
+
+		// Offset from lander center to the firing corner, in lander-local frame:
+		// direction === -1 → right-front quadrant, direction === +1 → left-front.
+		// LANDER_WIDTH/2 and LANDER_HEIGHT/2 put the emitter at the silhouette
+		// edge so the puff visually separates from the hull.
+		const localCornerX =
+			direction === -1 ? LANDER_WIDTH / 2 : -LANDER_WIDTH / 2;
+		const localCornerY = -LANDER_HEIGHT / 4;
+		const rad = degToRad(angleDeg);
+		const cornerX =
+			x + localCornerX * Math.cos(rad) - localCornerY * Math.sin(rad);
+		const cornerY =
+			y + localCornerX * Math.sin(rad) + localCornerY * Math.cos(rad);
+
+		// Puff sprays outward (away from lander), with a little upward bias so
+		// it reads as "thruster fired" not "damage particle falling."
+		const outwardAngle = rad + (direction === -1 ? 0 : Math.PI);
+		for (let i = 0; i < 2; i++) {
+			const a = outwardAngle + (Math.random() - 0.5) * 0.6;
+			const speed = 1.5 + Math.random() * 1.5;
+			this.particles.push({
+				x: cornerX + (Math.random() - 0.5) * 2,
+				y: cornerY + (Math.random() - 0.5) * 2,
+				vx: Math.cos(a) * speed,
+				vy: Math.sin(a) * speed - 0.3,
+				life: 1,
+				maxLife: 0.15 + Math.random() * 0.15,
+				size: 1.5 + Math.random() * 1.5,
+				color: "#eeeeff",
+				type: "rcs",
 			});
 		}
 	}

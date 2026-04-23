@@ -196,19 +196,24 @@ describe("GhostPlayer", () => {
 });
 
 /**
- * Sprint 7.1 PR 1.5 — ghost schema v2 tests.
+ * Sprint 7.1 → 7.2 — ghost schema v2 and v3 tests.
  *
  * v2 embeds a DifficultyConfig + carries a `version` field so Random
- * Mission ghosts replay deterministically. v1 ghosts (no version field)
- * are migrated on load with `legacy: true` so the UI can warn about
- * possible desync.
+ * Mission ghosts replay deterministically (Sprint 7.1). v3 adds a
+ * `physicsVersion: 2 | 3` header so rigid-body physics replays correctly
+ * and pre-7.2 ghosts route through the legacy integrator (Sprint 7.2).
+ * v1 ghosts (no version field) are migrated on load with `legacy: true`
+ * so the UI can warn about possible desync. Pre-7.2 ghosts (v1 or v2 without
+ * `physicsVersion: 3`) are also marked `legacy: true` because they replay
+ * under v2 physics — the legacy flag is the UI's cue to show a "legacy
+ * ghost" badge.
  */
-describe("Sprint 7.1 — Ghost schema v2", () => {
+describe("Sprint 7.1-7.2 — Ghost schema v2/v3", () => {
 	beforeEach(() => {
 		localStorage.clear();
 	});
 
-	it("v2 save writes version + embedded difficulty", () => {
+	it("fresh save writes current schema version + embedded difficulty", () => {
 		const rec = new GhostRecorder();
 		rec.start(1969, "vanilla", {
 			archetype: "crater-field",
@@ -217,19 +222,22 @@ describe("Sprint 7.1 — Ghost schema v2", () => {
 		rec.record({ thrustUp: true } as InputState);
 		rec.save(100);
 		const loaded = loadGhostForSeed(1969, "vanilla");
-		expect(loaded?.version).toBe(2);
+		// Sprint 7.2 — current schema is v3. Fresh saves are v3 + v3 physics.
+		expect(loaded?.version).toBe(3);
+		expect(loaded?.physicsVersion).toBe(3);
 		expect(loaded?.difficulty?.archetype).toBe("crater-field");
 		expect(loaded?.difficulty?.roughness).toBe(0.5);
 		expect(loaded?.legacy).toBeUndefined();
 	});
 
-	it("v2 save with no difficulty omits the field (freeplay default)", () => {
+	it("fresh save with no difficulty omits the field (freeplay default)", () => {
 		const rec = new GhostRecorder();
 		rec.start(42, "vanilla"); // no difficulty passed
 		rec.record({ thrustUp: true } as InputState);
 		rec.save(100);
 		const loaded = loadGhostForSeed(42, "vanilla");
-		expect(loaded?.version).toBe(2);
+		expect(loaded?.version).toBe(3);
+		expect(loaded?.physicsVersion).toBe(3);
 		expect(loaded?.difficulty).toBeUndefined();
 	});
 
@@ -255,7 +263,7 @@ describe("Sprint 7.1 — Ghost schema v2", () => {
 	});
 
 	it("save clears legacy flag when overwriting a v1 slot with a higher score", () => {
-		// Seed a v1 ghost, then beat it with a fresh v2 save.
+		// Seed a v1 ghost, then beat it with a fresh v3 save.
 		localStorage.setItem(
 			"moonlander-ghosts",
 			JSON.stringify([{ seed: 555, score: 100, frames: [1], mode: "vanilla" }]),
@@ -266,7 +274,8 @@ describe("Sprint 7.1 — Ghost schema v2", () => {
 		rec.save(200);
 		const loaded = loadGhostForSeed(555, "vanilla");
 		expect(loaded?.score).toBe(200);
-		expect(loaded?.version).toBe(2);
+		expect(loaded?.version).toBe(3);
+		expect(loaded?.physicsVersion).toBe(3);
 		expect(loaded?.legacy).toBeUndefined();
 		expect(loaded?.difficulty?.archetype).toBe("mesa");
 	});
@@ -279,7 +288,10 @@ describe("Sprint 7.1 — Ghost schema v2", () => {
 		expect(loaded?.legacy).toBe(true);
 	});
 
-	it("importing a v2 JSON payload preserves version + difficulty", () => {
+	it("importing a v2 JSON payload gets marked legacy under the v3 schema", () => {
+		// Sprint 7.2 — a v2 payload predates rigid-body physics. It must
+		// route to the legacy integrator at replay time, so migrateGhost
+		// stamps legacy=true + physicsVersion=2.
 		const raw = JSON.stringify({
 			version: 2,
 			seed: 456,
@@ -290,6 +302,24 @@ describe("Sprint 7.1 — Ghost schema v2", () => {
 		});
 		const imported = importGhost(raw);
 		expect(imported?.version).toBe(2);
+		expect(imported?.legacy).toBe(true);
+		expect(imported?.physicsVersion).toBe(2);
+		expect(imported?.difficulty?.archetype).toBe("flats");
+	});
+
+	it("importing a v3 JSON payload preserves v3 metadata without legacy", () => {
+		const raw = JSON.stringify({
+			version: 3,
+			seed: 789,
+			score: 888,
+			frames: [1, 1, 0],
+			mode: "vanilla",
+			difficulty: { archetype: "flats" },
+			physicsVersion: 3,
+		});
+		const imported = importGhost(raw);
+		expect(imported?.version).toBe(3);
+		expect(imported?.physicsVersion).toBe(3);
 		expect(imported?.legacy).toBeUndefined();
 		expect(imported?.difficulty?.archetype).toBe("flats");
 	});

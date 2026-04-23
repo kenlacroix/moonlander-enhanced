@@ -2,12 +2,18 @@ const STORAGE_KEY = "moonlander-leaderboard";
 const MAX_ENTRIES_PER_SEED = 5;
 
 /**
- * Sprint 5.5 — records key by `${seed}-${mode}` so Authentic runs and
- * vanilla runs don't overwrite each other's best scores. Pre-5.5 records
- * were keyed by `${seed}` alone; those are migrated lazily on first
- * read to `${seed}-vanilla`.
+ * Sprint 5.5 — records key by `${seed}-${mode}` so Authentic and vanilla
+ * runs don't overwrite each other's best scores.
+ *
+ * Sprint 7.2 — adds a third axis: `${seed}-${mode}-v${physicsVersion}` so
+ * pre-7.2 scores (recorded under v2 physics, free rotation) and post-7.2
+ * scores (recorded under v3 physics, RCS-gated rotation) stay in separate
+ * buckets. Pre-7.2 scores are frozen at the legacy `${seed}-${mode}` key;
+ * all new writes go to the versioned key. Reads prefer the versioned key
+ * and fall back to the legacy key only under physicsVersion 2.
  */
 export type ScoreMode = "vanilla" | "authentic";
+export type PhysicsBucket = 2 | 3;
 
 export interface LeaderboardEntry {
 	score: number;
@@ -17,24 +23,42 @@ export interface LeaderboardEntry {
 
 type LeaderboardData = Record<string, LeaderboardEntry[]>;
 
-function makeKey(seed: number, mode: ScoreMode): string {
-	return `${seed}-${mode}`;
+function makeKey(
+	seed: number,
+	mode: ScoreMode,
+	physicsVersion: PhysicsBucket = 3,
+): string {
+	// v2 reads use the legacy key (no version suffix) so pre-7.2 scores
+	// stay visible. v3 reads/writes use the new versioned key.
+	return physicsVersion === 2
+		? `${seed}-${mode}`
+		: `${seed}-${mode}-v${physicsVersion}`;
 }
 
 /**
- * Read one seed-scoped record slot. Handles the 5.5 migration: if the
- * vanilla key is missing but the legacy `${seed}` key exists, treat the
- * legacy entry as vanilla. Pure read — doesn't write the migration back,
- * so a concurrent reader gets a consistent view. The rewrite happens on
- * the next addScore call for that seed.
+ * Read one seed-scoped record slot. Handles two migrations:
+ *   - Sprint 5.5: legacy `${seed}` → `${seed}-vanilla`
+ *   - Sprint 7.2: `${seed}-${mode}` (v2 scores) → `${seed}-${mode}-v3`
+ *
+ * The 7.2 partition is intentional: v2 scores were earned under free
+ * rotation, v3 scores under RCS-gated rotation. They're not comparable.
+ * To keep the UI from looking broken on upgrade (empty leaderboards on
+ * day 1), reads prefer the v3 key but FALL BACK to the v2 key when v3
+ * has nothing yet. First v3 write for the seed+mode creates the new
+ * bucket; v2 scores remain frozen at their original key for archival.
+ *
+ * Pure read — doesn't write the migration back. Rewrite happens on the
+ * next addScore call for that seed.
  */
 function getEntries(
 	data: LeaderboardData,
 	seed: number,
 	mode: ScoreMode,
 ): LeaderboardEntry[] {
-	const key = makeKey(seed, mode);
-	if (data[key]) return data[key];
+	const v3Key = makeKey(seed, mode, 3);
+	if (data[v3Key]) return data[v3Key];
+	const legacyKey = makeKey(seed, mode, 2);
+	if (data[legacyKey]) return data[legacyKey];
 	if (mode === "vanilla" && data[String(seed)]) return data[String(seed)];
 	return [];
 }
@@ -85,12 +109,15 @@ export function addScore(
 	if (score <= 0) return null;
 
 	const data = load();
-	const key = makeKey(seed, mode);
-	// First-write migration: if we're about to write a vanilla record and
-	// the legacy `${seed}` entry exists, seed the new slot with its entries
-	// then drop the legacy key. Idempotent — subsequent calls no-op.
-	if (mode === "vanilla" && data[String(seed)] && !data[key]) {
-		data[key] = data[String(seed)];
+	// Sprint 7.2 — all new writes are v3 physics scores. v2 scores live at
+	// the pre-7.2 key (no version suffix) and are never written to again.
+	const key = makeKey(seed, mode, 3);
+	const legacyKey = makeKey(seed, mode, 2);
+	// Sprint 5.5 first-write migration (legacy `${seed}` → `${seed}-vanilla`)
+	// still applies — scope it to the v2 legacy key so it doesn't stomp the
+	// v3 bucket. Idempotent — subsequent calls no-op.
+	if (mode === "vanilla" && data[String(seed)] && !data[legacyKey]) {
+		data[legacyKey] = data[String(seed)];
 		delete data[String(seed)];
 	}
 	const entries = data[key] ?? [];

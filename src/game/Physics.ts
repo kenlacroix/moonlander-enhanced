@@ -2,6 +2,7 @@ import {
 	GRAVITY,
 	LANDER_HEIGHT,
 	MAX_LANDING_ANGLE,
+	MAX_LANDING_ANGULAR_RATE,
 	MAX_LANDING_SPEED,
 	THRUST_FORCE,
 } from "../utils/constants";
@@ -13,6 +14,11 @@ export interface CollisionResult {
 	collided: boolean;
 	onPad: LandingPad | null;
 	safeLanding: boolean;
+	/** Sprint 7.2 — true when the collision was a crash specifically because the
+	 * lander was spinning faster than MAX_LANDING_ANGULAR_RATE at touchdown.
+	 * Lets CollisionHandler pick the "LANDED SPINNING — STRUCTURAL FAILURE"
+	 * crash message. Always false under physicsVersion 2. */
+	spinningCrash: boolean;
 }
 
 /** Apply gravity to velocity. gravityOverride replaces the constant when provided. */
@@ -43,11 +49,27 @@ export function checkCollision(
 		if (lander.x >= pad.x && lander.x <= pad.x + pad.width) {
 			if (landerBottom >= pad.y) {
 				const angleDev = Math.abs(normAngle(lander.angle));
-				const safeLanding =
+				const safeV =
 					Math.abs(lander.vy) <= MAX_LANDING_SPEED &&
-					Math.abs(lander.vx) <= MAX_LANDING_SPEED &&
-					angleDev <= MAX_LANDING_ANGLE;
-				return { collided: true, onPad: pad, safeLanding };
+					Math.abs(lander.vx) <= MAX_LANDING_SPEED;
+				const safeAngle = angleDev <= MAX_LANDING_ANGLE;
+				// Sprint 7.2 — v3 adds an angular-rate gate. v2 replays bypass
+				// the gate entirely so historical artifacts keep replaying under
+				// the rules they were recorded under. See plan §Architecture.
+				// `angularVel ?? 0` keeps us safe for hand-constructed test
+				// fixtures that don't populate the full LanderState shape.
+				const safeRotation =
+					lander.physicsVersion === 2 ||
+					Math.abs(lander.angularVel ?? 0) <= MAX_LANDING_ANGULAR_RATE;
+				const safeLanding = safeV && safeAngle && safeRotation;
+				const spinningCrash =
+					!safeLanding && safeV && safeAngle && !safeRotation;
+				return {
+					collided: true,
+					onPad: pad,
+					safeLanding,
+					spinningCrash,
+				};
 			}
 		}
 	}
@@ -55,10 +77,20 @@ export function checkCollision(
 	// Check terrain collision — find the terrain height at lander's x position
 	const terrainY = getTerrainHeightAt(lander.x, terrain.points);
 	if (landerBottom >= terrainY) {
-		return { collided: true, onPad: null, safeLanding: false };
+		return {
+			collided: true,
+			onPad: null,
+			safeLanding: false,
+			spinningCrash: false,
+		};
 	}
 
-	return { collided: false, onPad: null, safeLanding: false };
+	return {
+		collided: false,
+		onPad: null,
+		safeLanding: false,
+		spinningCrash: false,
+	};
 }
 
 /** Get terrain height at a given x by linearly interpolating between terrain points */

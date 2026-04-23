@@ -19,6 +19,52 @@ Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but
 
 ---
 
+## P1/P2/P3 — Sprint 7.2 deferrals (CEO + adversarial review 2026-04-20)
+
+### Sprint 7.2 mobile touch-input retest
+Adversarial review flagged: new physics requires two-axis attitude management on mobile with no tactile feedback. After Sprint 7.2 PR 1 lands, retest via `/browse` on a mobile viewport. If feel regresses, options: "simple mode" toggle (heavier angular damping on touch), relaxed landing tolerance (`MAX_LANDING_ANGULAR_RATE = 16 °/s` on mobile), or the first-spin tutorial card is enough.
+- **Why:** Mobile has 30%+ of sessions and new physics might be unplayable there.
+- **Effort:** S (CC: ~30 min retest + ~30 min fix if needed)
+- **Priority:** P1 after 7.2 ships
+- **Depends on:** Sprint 7.2 PR 1 shipped
+
+### Gravity-storm torque (Sprint 7.2 expansion #4, deferred)
+Apply random angular impulse from gravity anomalies under rigid-body physics — today they only wobble terrain cosmetically. After rigid-body physics ships, this turns gravity storms into genuine attitude hazards. Defer until post-7.2 playtest so magnitude tuning has real feel data.
+- **Why:** Makes an existing hazard threatening in a way that previously wasn't possible (no angular momentum existed).
+- **Effort:** S (CC: ~20 min)
+- **Priority:** P2
+- **Depends on:** Sprint 7.2 rigid-body physics shipped
+
+### Sprint 7.2.1 follow-up: Authentic-mode RCS flavor
+Apollo 11 RCS quad failure events (per historical record — one quad was running lean). Apollo 13 Survive reworked around RCS-primary scoring (the mission was about attitude control!). Deferred from 7.2 base to keep the integrator-rewrite PR focused.
+- **Why:** Authentic Mode gets richer, Apollo 13 Survive becomes genuinely about its historical problem.
+- **Effort:** M (CC: ~30 min both missions)
+- **Priority:** P2
+- **Depends on:** Sprint 7.2 shipped
+
+### "Dead Reckoning" achievement (Sprint 7.2 expansion #5, deferred)
+Neil Armstrong landed Apollo 11 with legendary RCS efficiency. A badge rewarding the same. Land 3 consecutive missions without pressing rotate-left or rotate-right (or with 0 RCS consumed). Defer until post-7.2 so the threshold can be data-driven.
+- **Why:** Gives players a reason to master the new physics beyond just surviving it.
+- **Effort:** S (CC: ~15 min)
+- **Priority:** P3
+- **Depends on:** Sprint 7.2 shipped + enough playtest data to calibrate threshold
+
+### Sprint 7.3 — Engine gimbal + center-of-mass shift (platonic physics)
+Approach D from 7.2 CEO review. Real LM had gimbaled DPS engine; CoM shifts as fuel burns. Should happen only after 7.2 battle-tests the momentum foundation.
+- **Why:** Platonic physics sim, Education Mode flagship demo.
+- **Effort:** XL (CC: ~6-8 hr, two PRs)
+- **Priority:** P3
+- **Depends on:** Sprint 7.2 shipped + 1-2 weeks of playtest
+
+### Sunset v2 ghost replay in Sprint 7.3+
+Ghost v2 replay path (`updateLanderLegacy` + legacy landing check branch in CollisionHandler) is a permanent physics fork per Sprint 7.2. If no physics-affecting code touches it for 2 sprints, consider sunsetting: keep v2 leaderboard scores, drop replay capability (replaced by "legacy flight — score only").
+- **Why:** Every future physics change has to be dual-implemented or explicitly broken. Tax compounds.
+- **Effort:** S (CC: ~20 min)
+- **Priority:** P3
+- **Depends on:** Sprint 7.3 landing, 2+ sprints without touching the legacy path
+
+---
+
 ## P2 — CEO Review Findings (2026-04-14)
 
 ### AI Theater Mobile Responsive Fallback

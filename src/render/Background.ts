@@ -106,7 +106,7 @@ export class Background {
 					for (let e = 0; e < extras; e++) {
 						const extraX = sx + ((star.y * 37 * (e + 1)) % 40) - 20;
 						const extraY =
-							(star.y + (star.x * 13 * (e + 1)) % 30 - 15 + CANVAS_HEIGHT) %
+							(star.y + ((star.x * 13 * (e + 1)) % 30) - 15 + CANVAS_HEIGHT) %
 							CANVAS_HEIGHT;
 						ctx.beginPath();
 						ctx.arc(extraX, extraY, star.size / 2.5, 0, Math.PI * 2);
