@@ -5,10 +5,13 @@ import type { AutoLandingMission } from "../game/HistoricMission";
  * of any nation to achieve a soft landing on another celestial body and
  * the first to transmit photographs from the lunar surface.
  *
- * These are `kind: "auto-landing"` — the player spectates while the
- * built-in autopilot flies the descent. The "1960s-soviet" era slot is
- * defined here for the first time; later Luna/Soviet missions (Luna 13,
- * Luna 16, etc.) would extend this list.
+ * These are `kind: "auto-landing"` — originally designed for autopilot-
+ * flown spectator mode. Shipped with autopilot force-enabled in v0.5.9.1;
+ * reverted in v0.6.2.2 because the PID overshoots on Luna 9's craft
+ * profile (see TODOS.md). Player now flies by default; `[P]` opts into
+ * the autopilot demo if they want to watch it try. The "1960s-soviet"
+ * era slot is defined here for the first time; later Luna/Soviet
+ * missions (Luna 13, Luna 16, etc.) would extend this list.
  */
 export const LUNA_MISSIONS: AutoLandingMission[] = [
 	{
@@ -16,7 +19,7 @@ export const LUNA_MISSIONS: AutoLandingMission[] = [
 		name: "LUNA 9 — OCEAN OF STORMS",
 		seed: 9_1966,
 		description:
-			"First-ever soft landing on another celestial body. Watch the autopilot fly.",
+			"First-ever soft landing on another celestial body. Fly the 1966 Soviet probe — or press [P] to let the autopilot try.",
 		kind: "auto-landing",
 		era: "1960s-soviet",
 		sunAngle: -25,

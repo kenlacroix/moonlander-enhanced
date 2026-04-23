@@ -260,14 +260,15 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.status = "menu";
 		return;
 	}
-	// Auto-landing missions (Luna 9) force autopilot on for the full
-	// flight; the player is a spectator. Gate the toggle off so P-key
-	// can't disengage the pilot mid-descent.
-	if (
-		input.toggleAutopilot &&
-		game.status === "playing" &&
-		game.missionMode !== "auto-landing"
-	)
+	// Auto-landing missions (Luna 9) default the autopilot ON for
+	// spectator-mode descent. But the PID doesn't always converge on
+	// Luna 9's craft profile (low thrust 0.85x + low mass 0.7x) and
+	// overshoots laterally on seed 91966 specifically. Pre-Part-2 this
+	// was force-locked ON — player watched it crash every time. Allow
+	// [P] to toggle so the player can take over and finish the descent
+	// manually. Mission still auto-starts in autopilot mode; the change
+	// is just "you can now rescue it."
+	if (input.toggleAutopilot && game.status === "playing")
 		game.autopilot.toggle();
 	if (input.toggleAnnotations && game.status === "playing")
 		game.autopilot.toggleAnnotations();
@@ -387,13 +388,18 @@ export function selectMission(game: Game, mission: Mission): void {
 		game.currentFlight = null;
 	}
 	game.reset();
-	// Sprint 5 Part B — auto-landing missions force the autopilot on; the
-	// player spectates. Must run AFTER reset() because reset() sets
-	// autopilot.enabled=false. handlePostFlightInput also gates the toggle
-	// off in auto-landing mode so the player can't disengage mid-flight.
-	if (isHistoricMission(mission) && mission.kind === "auto-landing") {
-		game.autopilot.enabled = true;
-	}
+	// Sprint 5 Part B shipped auto-landing missions (Luna 9) with autopilot
+	// force-enabled — player watched it fly. Shipped broken in v0.5.9.1:
+	// autopilot PID overshoots on luna-9's craft profile and crashes every
+	// time. v0.6.2.1 unlocked [P] so players could rescue, but by the time
+	// overshoot is visible the lander is 18 px above terrain at vx=120 —
+	// too late for a human save.
+	//
+	// v0.6.2.2: flip the default. Autopilot starts OFF on auto-landing
+	// missions. Player flies Luna 9 themselves. [P] still engages the
+	// autopilot mid-flight if they want to try the spectator experience.
+	// Preserves the "auto-landing" kind for discriminated-union typing
+	// (moments-free, no MAX_FLIGHT_DURATION) without forcing the crash.
 	game.llm.fetchBriefing(
 		game,
 		mission,
