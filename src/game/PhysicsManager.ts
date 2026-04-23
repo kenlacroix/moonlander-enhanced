@@ -11,7 +11,11 @@ import {
 } from "../utils/constants";
 import { type AlienState, applyAlienEffect, updateAlien } from "./Alien";
 import type { GravityStormState } from "./GravityStorm";
-import { applyGravityStormEffect, updateGravityStorm } from "./GravityStorm";
+import {
+	applyGravityStormEffect,
+	consumeAngularImpulse,
+	updateGravityStorm,
+} from "./GravityStorm";
 import { type LanderState, updateLander, updateLanderLegacy } from "./Lander";
 import { checkCollision, normAngle } from "./Physics";
 import type { TerrainData } from "./Terrain";
@@ -113,6 +117,15 @@ export class PhysicsManager {
 				lander.landerType.massMultiplier,
 				gameGravity,
 			);
+			// v0.6.2.4 — apply angular jolt from storm phase transitions to
+			// v3 landers only. v2 landers don't integrate angularVel so the
+			// impulse would do nothing (and could risk desync if a v2 ghost
+			// replay ever saw a non-zero read). Always consume to clear the
+			// pending value even on v2 — belt-and-suspenders against drift.
+			const angularImpulse = consumeAngularImpulse(gravityStorm);
+			if (lander.physicsVersion === 3) {
+				lander.angularVel += angularImpulse;
+			}
 		}
 
 		if (!this.fuelLeakTriggered && this.flightElapsed > 5) {
