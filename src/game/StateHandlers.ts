@@ -260,14 +260,15 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.status = "menu";
 		return;
 	}
-	// Auto-landing missions (Luna 9) force autopilot on for the full
-	// flight; the player is a spectator. Gate the toggle off so P-key
-	// can't disengage the pilot mid-descent.
-	if (
-		input.toggleAutopilot &&
-		game.status === "playing" &&
-		game.missionMode !== "auto-landing"
-	)
+	// Auto-landing missions (Luna 9) default the autopilot ON for
+	// spectator-mode descent. But the PID doesn't always converge on
+	// Luna 9's craft profile (low thrust 0.85x + low mass 0.7x) and
+	// overshoots laterally on seed 91966 specifically. Pre-Part-2 this
+	// was force-locked ON — player watched it crash every time. Allow
+	// [P] to toggle so the player can take over and finish the descent
+	// manually. Mission still auto-starts in autopilot mode; the change
+	// is just "you can now rescue it."
+	if (input.toggleAutopilot && game.status === "playing")
 		game.autopilot.toggle();
 	if (input.toggleAnnotations && game.status === "playing")
 		game.autopilot.toggleAnnotations();
