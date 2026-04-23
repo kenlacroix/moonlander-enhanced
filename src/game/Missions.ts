@@ -98,7 +98,19 @@ export const MISSIONS: Mission[] = [
 	},
 ];
 
-/** Campaign missions — 5 missions with escalating difficulty */
+/** Campaign missions — 5 missions with escalating difficulty.
+ *
+ * v0.6.3.0 — physics ramp. Missions 1-2 use classic v2 physics
+ * (rotate-instant, no RCS tank, no angular-rate landing gate) so new
+ * players can learn pad-targeting and fuel management without also
+ * fighting rigid-body rotation. Mission 3 introduces v3 physics
+ * (rotation has momentum, separate RCS tank, angular-rate gate); the
+ * "RCS" and "ROT" HUD readouts appear at this point. Missions 3-5 are
+ * all v3 so the rest of the campaign teaches mastery of the new
+ * mechanics. The transition is currently silent (no in-game callout);
+ * when the Tier 3 narrative sprint ships, this is where the flight
+ * instructor character would explain what just changed.
+ */
 export const CAMPAIGN: Mission[] = [
 	{
 		id: 1,
@@ -112,6 +124,7 @@ export const CAMPAIGN: Mission[] = [
 			padCount: 3,
 			startingFuel: 1200,
 			windStrength: 0,
+			physicsVersion: 2,
 		},
 	},
 	{
@@ -126,13 +139,15 @@ export const CAMPAIGN: Mission[] = [
 			padCount: 2,
 			startingFuel: 1000,
 			windStrength: 15,
+			physicsVersion: 2,
 		},
 	},
 	{
 		id: 3,
 		name: "FUEL CRISIS",
 		seed: 3003,
-		description: "Standard terrain but limited fuel. Every drop counts.",
+		description:
+			"Standard terrain but limited fuel. Every drop counts. Rotation now has momentum — counter-burn to stop spinning.",
 		difficulty: {
 			roughness: 0.5,
 			padMinWidth: 60,
@@ -140,6 +155,7 @@ export const CAMPAIGN: Mission[] = [
 			padCount: 2,
 			startingFuel: 700,
 			gravityStormsEnabled: true,
+			physicsVersion: 3,
 		},
 	},
 	{
@@ -157,6 +173,7 @@ export const CAMPAIGN: Mission[] = [
 			aliensEnabled: true,
 			gravityStormsEnabled: true,
 			crevices: 2,
+			physicsVersion: 3,
 		},
 	},
 	{
@@ -175,6 +192,7 @@ export const CAMPAIGN: Mission[] = [
 			aliensEnabled: true,
 			gravityStormsEnabled: true,
 			crevices: 3,
+			physicsVersion: 3,
 		},
 	},
 ];
