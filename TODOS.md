@@ -21,13 +21,14 @@ Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but
 
 ## P1/P2/P3 — Sprint 7.2 deferrals (CEO + adversarial review 2026-04-20)
 
-### Luna 9 autopilot doesn't actually land (pre-existing bug found during Sprint 7.2 Part 2 playtest 2026-04-23)
-Luna 9 is a `kind: "auto-landing"` mission shipped in v0.5.9.1 (PR #34). The autopilot is force-engaged and the player can't disengage (`StateHandlers.ts:269` gates `[P]` toggle, `:394` force-enables on mission start). But for the luna-9 lander type (thrust 0.85×, fuel 0.5×) on seed 91966's crater-field terrain, the autopilot's PID doesn't converge — lander overshoots laterally, can't arrest vertical descent, and crashes at x=2177 with vx=116 px/s, vy=25 px/s, angularVel=-16.8°/s at frame 262. Byte-identical on both Part 1 main and Part 2 branch — **not** a Part 2 regression. Reproduce: `npx tsx` a HeadlessGame run with Luna 9's difficulty.
-- **Why:** Mission ships with "watch the autopilot fly Luna 9" framing, but it always crashes. Either the autopilot needs tuning for low-thrust craft on crater-field terrain, or Luna 9's difficulty (spawnY/fuel/seed) needs re-tuning, or the mission should stop force-locking the autopilot so the player can take over. Worth fixing — this is a shipped bug on main.
-- **Effort:** M (CC: ~30-60 min iterative tuning, or ~5 min quick fix to allow [P] toggle)
-- **Priority:** P1 — affects a shipped feature that's visibly broken to any player who clicks "Watch it fly"
-- **Depends on:** Nothing. Standalone bug fix.
-- **Options to try:** (1) bump Luna 9 `spawnY` higher for more time to converge; (2) widen autopilot deadband for low `thrustMultiplier` craft; (3) allow player to disengage autopilot on auto-landing missions (but then the mission is no longer "auto-landing"); (4) tune Luna 9 to a different seed where autopilot converges; (5) relax Luna 9 landing tolerance (separate safety exception for auto-landing missions).
+### Luna 9 autopilot PID doesn't converge on this seed (PARTIALLY MITIGATED 2026-04-23)
+Luna 9 is a `kind: "auto-landing"` mission shipped in v0.5.9.1 (PR #34). Autopilot defaults ON for spectator-mode descent. But for the luna-9 lander type (thrust 0.85×, mass 0.7×) on seed 91966's flat maria terrain, the autopilot overshoots laterally — crashes at x=2177 with vx=116 px/s, vy=25 px/s, angularVel=-16.8°/s at frame 262. Tried: bumping spawnY (40-100), more fuel (500-800), more RCS (80-120). Same crash every time. Trajectory is autopilot-PID-fundamental, not input starvation.
+- **Mitigated in v0.6.2.1:** Removed the `auto-landing` lock on `[P]` toggle. Player can now take over when the autopilot starts overshooting. Mission still spectator-mode by default, but no longer a forced crash.
+- **Real fix still needed:** Autopilot PID needs tuning for low-`thrustMultiplier` craft, OR Luna 9 should switch to a seed where autopilot converges, OR the autopilot's horizontal-velocity damping needs to be more aggressive when craft has low thrust authority.
+- **Why fix it for real:** The pure spectator experience is what makes Luna 9 evocative ("watch the 1966 Soviet probe land itself"). Player-takeover is a fallback, not the design intent.
+- **Effort:** M (CC: ~30-60 min for autopilot retune + Luna 9 seed sweep)
+- **Priority:** P2 (downgraded from P1 since players can now rescue it)
+- **Depends on:** Nothing. Standalone investigation.
 
 ### Sprint 7.2 mobile touch-input retest
 Adversarial review flagged: new physics requires two-axis attitude management on mobile with no tactile feedback. After Sprint 7.2 PR 1 lands, retest via `/browse` on a mobile viewport. If feel regresses, options: "simple mode" toggle (heavier angular damping on touch), relaxed landing tolerance (`MAX_LANDING_ANGULAR_RATE = 16 °/s` on mobile), or the first-spin tutorial card is enough.

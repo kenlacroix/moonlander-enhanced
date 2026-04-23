@@ -2,6 +2,15 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.2.1] - 2026-04-23 (Luna 9 autopilot partial mitigation)
+
+Luna 9 ships with `kind: "auto-landing"` — the player watches the autopilot fly the 1966 Soviet probe as a spectator experience. But the autopilot's PID doesn't converge on Luna 9's craft profile (low thrust 0.85×, low mass 0.7×) on the seed 91966 flat-maria terrain. Lander overshoots laterally and crashes at vx~120 px/s every single time. Pre-existing bug shipped in v0.5.9.1.
+
+This release doesn't fix the autopilot — that's a real tuning job tracked in TODOS.md. Instead, it removes the toggle lock so the player can take over when the autopilot starts overshooting.
+
+### Changed
+- **Auto-landing missions no longer force-lock the `[P]` toggle.** Previously the autopilot was engaged at mission start and the player couldn't disengage. Now `[P]` toggles autopilot on any mission, including Luna 9. Autopilot still defaults ON for auto-landing missions — the change is just "you can now rescue it" when the PID overshoots.
+
 ## [0.6.2.0] - 2026-04-23 (Sprint 7.2 Part 2: per-mission RCS + landing-rate tuning)
 
 Part 1 of Sprint 7.2 introduced rigid-body rotation and a single global 8°/s angular-rate landing gate. Part 2 moves that gate into per-mission data so Apollo 11 lands tighter than freeplay, Authentic mode tightens further to real Apollo LM RCS deadband values, and the HUD now shows a live readout of your rotation vs the gate so SPINNING crashes stop being surprises.
