@@ -37,12 +37,8 @@ Adversarial review flagged: new physics requires two-axis attitude management on
 - **Priority:** P1 after 7.2 ships
 - **Depends on:** Sprint 7.2 PR 1 shipped
 
-### Gravity-storm torque (Sprint 7.2 expansion #4, deferred)
-Apply random angular impulse from gravity anomalies under rigid-body physics — today they only wobble terrain cosmetically. After rigid-body physics ships, this turns gravity storms into genuine attitude hazards. Defer until post-7.2 playtest so magnitude tuning has real feel data.
-- **Why:** Makes an existing hazard threatening in a way that previously wasn't possible (no angular momentum existed).
-- **Effort:** S (CC: ~20 min)
-- **Priority:** P2
-- **Depends on:** Sprint 7.2 rigid-body physics shipped
+### ~~Gravity-storm torque~~ — SHIPPED v0.6.2.4 (2026-04-23)
+Shipped with two seeded ±5°/s jolts per storm cycle (normal→high, high→low). v3 landers only; v2 ghost replays discard the impulse to pin determinism. 7 new tests at `tests/gravity-storm.test.ts`. Magnitude tuning from armchair reasoning, not playtest yet — if post-ship feedback says it's too punishing (or too mild), constant lives at `GravityStorm.ts:MAX_STORM_TORQUE`.
 
 ### Sprint 7.2.1 follow-up: Authentic-mode RCS flavor
 Apollo 11 RCS quad failure events (per historical record — one quad was running lean). Apollo 13 Survive reworked around RCS-primary scoring (the mission was about attitude control!). Deferred from 7.2 base to keep the integrator-rewrite PR focused.
