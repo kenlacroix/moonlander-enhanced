@@ -2,6 +2,35 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.3.0] - 2026-04-23 (Free Play Sandbox — physics + hazard toggles)
+
+Sprint 7.2 made rotation a real attitude problem. Playtest of v0.6.2.4 said it was *too* real for casual Free Play — flying and landing both got noticeably harder, even with marginal ROT and angle readouts. This release puts the steering wheel in the player's hands: Free Play is now a sandbox you opt into, not a difficulty wall you bounce off.
+
+### Added
+- **Free Play Difficulty in Settings.** Radio for physics engine: `Classic (v2)` (default — instant rotation, no RCS tank, no angular-rate landing gate) vs `Rigid-body (v3)` (Sprint 7.2's full model). Three checkboxes: Aliens, Gravity storms, Fuel leaks — each defaults OFF. Apply only to Free Play; Campaign/Historic/AI Theater ignore them.
+- **`DifficultyConfig.physicsVersion?: 2 \| 3`.** Optional per-mission override. Used by the Campaign ramp; available for any future per-mission override.
+- **Pure `resolveFlightPolicy(gameMode, mission, prefs)` helper** in `src/systems/GamePreferences.ts`. Single source of truth for per-flight physics + hazard policy. Called once from `Game.reset()`. No stateful intermediate fields.
+- **18 new tests** for the GamePreferences module + resolveFlightPolicy + integration through PhysicsManager. 431 → 449 tests.
+
+### Changed
+- **Campaign physics ramp.** Mission 1 (FIRST CONTACT) and Mission 2 (ROUGH APPROACH) now use Classic (v2) physics so new players learn pad-targeting and fuel management without also fighting rigid-body rotation. Mission 3 (FUEL CRISIS) introduces v3 — RCS tank and ROT readout appear, mission description warns "Rotation now has momentum — counter-burn to stop spinning." Missions 4-5 stay v3.
+- **Free Play first-time experience.** With no preferences set, Free Play defaults to v2 physics + zero hazards. Previous behavior (v3 physics + ~30% alien spawn + ~20% storm spawn + 10% fuel-leak spawn) is now opt-in via Settings.
+- **`PhysicsManager.setHazardPolicy(policy)`** new method. Caches the per-flight hazard policy so the fuel-leak random trigger respects user preference. Default behavior (no policy set) is legacy: `seed % 10 === 7` still fires, so pre-v0.6.3.0 ghost replays stay byte-identical.
+- **`createLander` 5th arg `physicsVersion`** flows from the resolved policy. Existing call sites updated; signature default stays `3` for back-compat.
+
+### Removed
+- **`PHYSICS_V3` compile-time constant.** It was a hotfix kill switch from Sprint 7.2 with one consumer (`PhysicsManager` dispatch). The new user-facing toggle is a better safety net — players can opt out of v3 themselves if it ever breaks. Per-lander `lander.physicsVersion` is now the single source of truth for integrator dispatch.
+
+### Not changed
+- Ghost replay determinism: v2 ghosts still replay under the v2 integrator (GhostPlayer sets `physicsVersion=2` on legacy ghosts). v3 ghosts still replay under v3.
+- Historic missions: still forced v3 (Apollo / Artemis / Luna 9). Authentic-mode tightening unchanged.
+- AI Theater: still forced v3 (DQN/PG training was calibrated against v3 reward shape).
+- Landing tolerance constants: unchanged. The v2 toggle is the relief lever; tolerances stay where Sprint 7.2 set them.
+- `REWARD_VERSION` stays at 3.
+
+### Known
+- Tier 3 (campaign narrative + flight instructor character) is sketched in the plan at `~/.claude/plans/i-wasnt-able-to-valiant-hellman.md` and deferred to a future `/office-hours`-scoped sprint. The campaign physics ramp is currently silent — Mission 3's transition to v3 is signaled only by the description text. When narrative ships, that transition becomes a story beat.
+
 ## [0.6.2.3] - 2026-04-23 (Going public — canyou.land + mobile portrait overlay)
 
 The game is now live at [canyou.land](https://canyou.land/) (Cloudflare Pages, auto-deployed from main). Ahead of a public URL hitting phones, this release adds a mobile portrait-orientation guard.
