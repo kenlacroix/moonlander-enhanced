@@ -2,7 +2,9 @@
 
 A browser-based, AI-enhanced reimagining of the 1979 Atari Moon Lander. Runs entirely in the browser. No install, no backend.
 
-Current version: **v0.6.2.2** (see [`CHANGELOG.md`](./CHANGELOG.md)).
+**Play at [canyou.land](https://canyou.land/)** — or clone and `npm run dev` locally.
+
+Current version: **v0.6.2.3** (see [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ![Title screen](./docs/screenshots/title.png)
 
