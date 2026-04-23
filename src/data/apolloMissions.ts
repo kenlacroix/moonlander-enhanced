@@ -31,6 +31,16 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 800,
+			// Sprint 7.2 Part 2 — Apollo 11 RCS budget. Apollo LM rcsMultiplier
+			// is 0.9 → natural default would be 90. 120 gives the LM a margin
+			// for the boulder-field manual descent it's known for. Authentic
+			// mode runs the same tank but with the 1202-alarm thrust lockout
+			// stealing seconds.
+			startingRCS: 120,
+			// Sprint 7.2 Part 2 — Vanilla 6°/s is tighter than freeplay 8°/s
+			// (Tranquility was a stable site). Authentic via era multiplier
+			// (×0.5) → 3°/s, near-historical Apollo LM RCS deadband.
+			maxLandingAngularRate: 6,
 			spawnY: 90,
 			padMinWidth: 80,
 			padMaxWidth: 110,
@@ -96,6 +106,11 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,
+			// Sprint 7.2 Part 2 — extended-J-mission tank. 110 vs 90 default.
+			startingRCS: 110,
+			// Sprint 7.2 Part 2 — 7°/s Vanilla. Authentic ×0.5 → 3.5°/s
+			// (below autopilot per-tick granularity; manual-only by design).
+			maxLandingAngularRate: 7,
 			spawnY: 100,
 			padMinWidth: 70,
 			padMaxWidth: 100,
@@ -147,6 +162,11 @@ export const APOLLO_MISSIONS: LandingMission[] = [
 		difficulty: {
 			landerType: "apollo-lm",
 			startingFuel: 1100,
+			// Sprint 7.2 Part 2 — extended-J-mission tank. 110 vs 90 default.
+			startingRCS: 110,
+			// Sprint 7.2 Part 2 — 7°/s Vanilla matches Apollo 15 (similar
+			// J-mission complexity). Authentic ×0.5 → 3.5°/s, manual-only.
+			maxLandingAngularRate: 7,
 			spawnY: 95,
 			padMinWidth: 70,
 			padMaxWidth: 100,
