@@ -52,6 +52,13 @@ export interface DifficultyConfig {
 	 * MAX_LANDING_ANGULAR_RATE in createLander. Authentic mode may tighten
 	 * this further via applyAuthenticPhysics in AuthenticMode.ts. */
 	maxLandingAngularRate?: number;
+	/** v0.6.3.0 — per-mission physics version override. Campaign uses this
+	 * to ramp from v2 (classic rotate-instant) on Missions 1-2 to v3
+	 * (rigid-body) on Missions 3-5 so new players aren't thrown into the
+	 * deep end. Historic and AI Theater ignore this (always v3). Free Play
+	 * also ignores this (user preference decides). Undefined falls back to
+	 * v3 for campaign, matching pre-v0.6.3.0 behavior. */
+	physicsVersion?: 2 | 3;
 	spawnY?: number; // starting altitude (lower = harder)
 	windStrength?: number; // wind force (0 = none, 50+ = strong)
 	landerType?: string; // lander variant name
