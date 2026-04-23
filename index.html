@@ -45,12 +45,69 @@
                       position: relative;
                       z-index: 1;
                     }
+                    /* v0.6.2.3 — portrait-phone nag overlay.
+                       The game is 1280x720 fixed-aspect; rendered into
+                       a phone's portrait viewport (e.g. 375x812) it
+                       letterboxes to ~375x211 with 70% of the screen
+                       black. This overlay covers that dead space and
+                       tells the player to rotate.
+                       Gated on `(pointer: coarse)` so desktop users
+                       with tall windows don't get nagged, and on
+                       portrait orientation so the overlay disappears
+                       as soon as they rotate. */
+                    #rotate-nag {
+                      display: none;
+                      position: fixed;
+                      inset: 0;
+                      z-index: 10;
+                      background: #000;
+                      color: #00ff88;
+                      font-family: "Courier New", monospace;
+                      align-items: center;
+                      justify-content: center;
+                      flex-direction: column;
+                      padding: 2em;
+                      text-align: center;
+                      gap: 1em;
+                    }
+                    #rotate-nag .icon {
+                      font-size: 4em;
+                      animation: rotate-hint 2s ease-in-out infinite;
+                    }
+                    #rotate-nag h1 {
+                      font-size: 1.5em;
+                      letter-spacing: 0.1em;
+                      margin: 0;
+                    }
+                    #rotate-nag p {
+                      font-size: 1em;
+                      opacity: 0.7;
+                      max-width: 16em;
+                    }
+                    @keyframes rotate-hint {
+                      0%, 100% { transform: rotate(0deg); }
+                      50% { transform: rotate(90deg); }
+                    }
+                    @media (orientation: portrait) and (pointer: coarse) {
+                      #rotate-nag { display: flex; }
+                    }
+                    /* Respect prefers-reduced-motion for accessibility —
+                       users who've asked for less animation still get
+                       the overlay, just without the rotating icon. */
+                    @media (prefers-reduced-motion: reduce) {
+                      #rotate-nag .icon { animation: none; }
+                    }
   </style>
 </head>
 <body>
   <div id="game-stage">
     <canvas id="game-canvas-gl"></canvas>
     <canvas id="game-canvas"></canvas>
+  </div>
+  <div id="rotate-nag" role="alert" aria-live="polite">
+    <div class="icon" aria-hidden="true">↻</div>
+    <h1>ROTATE YOUR PHONE</h1>
+    <p>MoonLander uses a landscape cockpit view. Turn your phone sideways to fly.</p>
   </div>
   <script type="module" src="/src/main.ts"></script>
   <script>

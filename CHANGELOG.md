@@ -2,6 +2,17 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.2.3] - 2026-04-23 (Going public — canyou.land + mobile portrait overlay)
+
+The game is now live at [canyou.land](https://canyou.land/) (Cloudflare Pages, auto-deployed from main). Ahead of a public URL hitting phones, this release adds a mobile portrait-orientation guard.
+
+### Added
+- **"ROTATE YOUR PHONE" overlay** on portrait-orientation touch devices. The game's fixed 1280×720 aspect ratio letterboxes hard in portrait (70% of a 375×812 screen was dead black). A CSS-only full-screen overlay now covers that gap and tells the player to rotate, with a rotating-arrow icon hint. Gated on `@media (orientation: portrait) and (pointer: coarse)` so desktop users with tall windows don't get nagged. Respects `prefers-reduced-motion` (stops the icon animation for users who've asked for less motion).
+- **Live site link in README** — "Play at canyou.land — or clone and `npm run dev` locally" under the title, above the hero screenshot.
+
+### Changed
+- No gameplay changes. 431 tests still pass. This is a shipping-infrastructure release.
+
 ## [0.6.2.2] - 2026-04-23 (Luna 9 autopilot default-off)
 
 Playtest of v0.6.2.1 revealed the `[P]` unlock wasn't enough: by the time the autopilot's overshoot is visible, the lander is ~18 px above terrain at vx=120 px/s — too late for a human save even with full fuel remaining. The toggle was technically working; the UX window was just impossible.
