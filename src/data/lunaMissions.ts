@@ -32,6 +32,14 @@ export const LUNA_MISSIONS: AutoLandingMission[] = [
 		difficulty: {
 			landerType: "luna-9",
 			startingFuel: 500,
+			// Sprint 7.2 Part 2 — luna-9 rcsMultiplier is 0.7 → natural default 70.
+			// 80 is a small deliberate buffer for auto-landing. Luna 9 has a
+			// fixed single seed (9_1966) so the claim is deterministic — if
+			// the autopilot ever runs dry at 70 on this one seed it's a real
+			// regression, not a random-seed edge case. Landing gate
+			// (maxLandingAngularRate) intentionally NOT overridden — Luna 9
+			// is auto-landed; the angular-rate gate is irrelevant either way.
+			startingRCS: 80,
 			spawnY: 100,
 			padMinWidth: 90,
 			padMaxWidth: 130,

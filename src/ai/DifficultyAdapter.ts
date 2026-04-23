@@ -86,6 +86,13 @@ export function applyAdaptiveModifiers(
 		),
 		padCount: base?.padCount,
 		startingFuel: (base?.startingFuel ?? 1000) + modifiers.fuelBonus,
+		// Sprint 7.2 Part 2 — preserve per-mission overrides through the
+		// adapter. Today this function only runs when base === undefined
+		// (freeplay without mission, see Game.ts:515), but leaving these
+		// out would silently strip the fields if a future freeplay mission
+		// ever opted in.
+		startingRCS: base?.startingRCS,
+		maxLandingAngularRate: base?.maxLandingAngularRate,
 		spawnY: base?.spawnY,
 		windStrength: Math.max(
 			0,

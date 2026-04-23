@@ -3,6 +3,7 @@ import {
 	ANGULAR_ACCEL,
 	FUEL_BURN_RATE,
 	MAX_ANGULAR_VEL,
+	MAX_LANDING_ANGULAR_RATE,
 	RCS_BURN_RATE,
 	ROTATION_SPEED,
 	STARTING_FUEL,
@@ -11,6 +12,7 @@ import {
 import { clamp } from "../utils/math";
 import type { LanderType } from "./LanderTypes";
 import { applyGravity, thrustVector } from "./Physics";
+import type { DifficultyConfig } from "./Terrain";
 
 export type LanderStatus = "idle" | "flying" | "landed" | "crashed";
 
@@ -49,12 +51,27 @@ export interface LanderState {
 	status: LanderStatus;
 	landerType: LanderType;
 	physicsVersion: PhysicsVersion;
+	/** Sprint 7.2 Part 2 — materialized landing-rate gate. Per-mission override
+	 * via DifficultyConfig.maxLandingAngularRate; defaults to the global constant.
+	 * Read by Physics.checkCollision (and HUD) instead of the constant directly,
+	 * so per-mission tuning flows through one entry point. Authentic mode may
+	 * tighten this further via applyAuthenticPhysics(). */
+	maxLandingAngularRate: number;
 }
 
+/**
+ * Sprint 7.2 Part 2 — single entry point for lander initialization.
+ *
+ * `difficulty` consolidates per-mission overrides (startingFuel, startingRCS,
+ * maxLandingAngularRate) that previously lived as scattered post-mutations in
+ * Game.ts. Pass undefined for non-mission spawns (custom terrain, ghost replay,
+ * agent training).
+ */
 export function createLander(
 	x: number,
 	y: number,
 	landerType: LanderType,
+	difficulty?: DifficultyConfig,
 	physicsVersion: PhysicsVersion = 3,
 ): LanderState {
 	return {
@@ -64,16 +81,21 @@ export function createLander(
 		vy: 0,
 		angle: 0,
 		angularVel: 0,
-		fuel: STARTING_FUEL * landerType.fuelMultiplier,
+		fuel: difficulty?.startingFuel ?? STARTING_FUEL * landerType.fuelMultiplier,
 		// Scale RCS by lander type — Apollo LM sluggish (0.9), Sparrow nimble (1.2),
 		// Luna 9 minimal (0.7). Defaults to 1.0 if a lander type didn't opt in.
-		rcs: STARTING_RCS * (landerType.rcsMultiplier ?? 1),
+		// Per-mission startingRCS (e.g. Apollo 11 = 120) replaces the lander-type
+		// product entirely, by design.
+		rcs:
+			difficulty?.startingRCS ?? STARTING_RCS * (landerType.rcsMultiplier ?? 1),
 		thrusting: false,
 		rcsFiring: false,
 		rcsFiringDirection: 0,
 		status: "flying",
 		landerType,
 		physicsVersion,
+		maxLandingAngularRate:
+			difficulty?.maxLandingAngularRate ?? MAX_LANDING_ANGULAR_RATE,
 	};
 }
 

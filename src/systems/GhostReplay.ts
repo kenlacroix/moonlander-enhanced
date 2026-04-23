@@ -176,10 +176,15 @@ export class GhostPlayer {
 		// integration, no spinning-crash check). Missing/unknown defaults to
 		// 2 because every pre-7.2 ghost was recorded under v2 physics.
 		this.physicsVersion = run.physicsVersion === 3 ? 3 : 2;
+		// Sprint 7.2 Part 2 — GhostPlayer is a visual overlay (synthetic Eagle
+		// at default position). It doesn't reconstruct mission terrain/physics;
+		// per-mission overrides intentionally not threaded here. The lander's
+		// materialized maxLandingAngularRate falls back to the global default.
 		this.lander = createLander(
 			WORLD_WIDTH / 2,
 			80,
 			getLanderType(),
+			undefined,
 			this.physicsVersion,
 		);
 	}

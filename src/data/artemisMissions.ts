@@ -29,6 +29,12 @@ export const ARTEMIS_MISSIONS: LandingMission[] = [
 		difficulty: {
 			landerType: "artemis-lm",
 			startingFuel: 1300,
+			// Sprint 7.2 Part 2 — Artemis HLS larger than Apollo. Bigger tank.
+			// artemis-lm rcsMultiplier is 1.1 → natural default 110; 140 gives
+			// modern margin for hazard-aware landing maneuvers.
+			startingRCS: 140,
+			// Sprint 7.2 Part 2 — 6°/s Vanilla. Authentic ×0.625 → 3.75°/s.
+			maxLandingAngularRate: 6,
 			spawnY: 110,
 			padMinWidth: 65,
 			padMaxWidth: 95,

@@ -2,6 +2,33 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.2.0] - 2026-04-23 (Sprint 7.2 Part 2: per-mission RCS + landing-rate tuning)
+
+Part 1 of Sprint 7.2 introduced rigid-body rotation and a single global 8°/s angular-rate landing gate. Part 2 moves that gate into per-mission data so Apollo 11 lands tighter than freeplay, Authentic mode tightens further to real Apollo LM RCS deadband values, and the HUD now shows a live readout of your rotation vs the gate so SPINNING crashes stop being surprises.
+
+### Added
+- **`DifficultyConfig.maxLandingAngularRate`.** Optional per-mission override of the 8°/s landing-rate gate. Flows through `createLander` into `LanderState` and is read by `Physics.checkCollision`. Missions without the field fall back to the global default, preserving freeplay / campaign / Random Missions exactly.
+- **Apollo/Artemis Vanilla gates tightened by mission.** Apollo 11 Tranquility = 6°/s; Apollo 15 Hadley + Apollo 17 Taurus-Littrow = 7°/s (rille/valley precision); Artemis III Shackleton = 6°/s (hazard ellipse precision). Luna 9 keeps the global default — auto-landing mission, gate is irrelevant.
+- **Per-mission RCS budgets populated.** Apollo 11 = 120 units (manual-descent margin vs Apollo LM natural 90), Apollo 15/17 = 110 (extended J-missions), Artemis III = 140 (larger craft, hazard maneuvers), Luna 9 = 80 (deliberate buffer over 70 natural for autopilot-driven descent).
+- **Authentic-mode `applyAuthenticPhysics(lander, era, authenticMode)` helper** in `AuthenticMode.ts`. Composes an era-scoped multiplier on top of the Vanilla per-mission gate: Apollo era 0.5× (→ 3°/s Apollo 11, 3.5°/s Apollo 15/17; matches real Apollo LM ~4°/s RCS deadband at the Vanilla base), Artemis 0.625× (→ 3.75°/s Artemis III), Luna 1.0× (auto-landing). Apollo 15/17 Authentic is below autopilot per-tick granularity — those are manual-only by design.
+- **HUD live angular-rate readout.** "ROT: 5.2°/s / 6.0°/s" line below the RCS meter during flight. White under 80% of the gate, amber 80-99%, red at/over. Closes the feedback loop on SPINNING crashes.
+- **`HeadlessGame` accepts `DifficultyConfig`.** Used by the Part 2 regression tests to spawn Apollo / Artemis missions in headless sims and verify autopilot convergence against the tightened gate.
+- **18 new tests** covering createLander materialization, consolidated startingFuel/startingRCS overrides, `Physics.checkCollision` reading the per-lander gate, `applyAuthenticPhysics` era multipliers (composition, no-op cases, Luna untouched), autopilot regression (Artemis III still lands within 6°/s), and v3-ghost forward-compat (pre-Part-2 embedded DifficultyConfig materializes default gate). 413 → 431 tests.
+
+### Changed
+- **`createLander` signature consolidates overrides.** New `difficulty?: DifficultyConfig` parameter between `landerType` and `physicsVersion`. When passed, pulls `startingFuel` / `startingRCS` / `maxLandingAngularRate` from the mission config at spawn time. Replaces 4 post-mutation lines previously scattered across `Game.ts:399-400, 519-520`. All 7 call sites audited and updated (Game:398+514 threading difficulty + authentic; Game:488 custom-terrain no-op; HeadlessGame:32+74 optional; AgentReplay:27 no-op; GhostReplay:179 visual-overlay no-op).
+- **`Physics.checkCollision` reads `lander.maxLandingAngularRate`** instead of the global `MAX_LANDING_ANGULAR_RATE` constant. Hand-constructed test fixtures without the field fall back to the constant defensively.
+- **`spawnRelayLander` and main `reset` call `applyAuthenticPhysics`** after `createLander` so relay-mode landers #2 and #3 carry the same tightening as the initial spawn. Custom terrain, AgentReplay, HeadlessGame, GhostReplay stay on Vanilla physics.
+
+### Not changed
+- Global `MAX_LANDING_ANGULAR_RATE`, `STARTING_RCS`, `ANGULAR_ACCEL`, `MAX_ANGULAR_VEL`, `RCS_BURN_RATE` constants — all stay at their Part 1 values. Freeplay / campaign / Random Missions play identically to v0.6.1.0.
+- `REWARD_VERSION` stays at 3 — AI Theater does not train on historic missions, so tightened gates don't drift the RL agent's Q-values.
+- Ghost schema stays at v3 — embedded `DifficultyConfig` already carried the mission context; pre-Part-2 ghosts replay under the default gate because their embedded difficulty lacks the new field.
+- Leaderboard partition stays physics-version-only (seed × mode × v3). Per-mission tolerances ride inside the seed's mission config.
+
+### Known
+- **Part 1 historic-mission scores carry over at the old gate.** Apollo 11/15/17 and Artemis III Vanilla scores recorded under v0.6.1.0's global 8°/s gate remain on the leaderboard. Since Part 2 tightens these to 6-7°/s, a Part 1 run that landed at 7.5°/s shows on the board but is no longer reproducible under current rules. Clean sweep if desired: clear `moonlander-leaderboard` entry for `${seed}-vanilla-v3` on affected missions (Apollo 11: seed 111969, Apollo 15: 151971, Apollo 17: 171972, Artemis III: 32028).
+
 ## [0.6.1.0] - 2026-04-21 (Sprint 7.2 PR 1: rigid-body physics + RCS + autopilot rewrite)
 
 Addresses hands-on play-test feedback: "I can spin the lander in a complete circle and only bottom thrust uses fuel." Rotation now has weight, costs propellant, and requires counter-burning to stop. Apollo LM had a separate Reaction Control System tank for attitude — so does MoonLander.
