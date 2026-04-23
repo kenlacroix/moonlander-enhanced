@@ -36,6 +36,7 @@ import type { Artifact } from "./Artifacts";
 import { placeArtifacts } from "./Artifacts";
 import {
 	applyAuthenticFilter,
+	applyAuthenticPhysics,
 	buildAuthenticState,
 	type FlightConfig,
 	updateAuthentic,
@@ -395,9 +396,23 @@ export class Game {
 
 	spawnRelayLander(spawnX: number, spawnY: number): void {
 		const diff = this.activeMission?.difficulty;
-		this.lander = createLander(spawnX, spawnY, getLanderType(diff?.landerType));
-		if (diff?.startingFuel !== undefined) this.lander.fuel = diff.startingFuel;
-		if (diff?.startingRCS !== undefined) this.lander.rcs = diff.startingRCS;
+		this.lander = createLander(
+			spawnX,
+			spawnY,
+			getLanderType(diff?.landerType),
+			diff,
+		);
+		// Sprint 7.2 Part 2 — relay lander #2/#3 must reapply authentic-mode
+		// tightening since createLander can't reach into AuthenticMode without
+		// a circular dependency. era is undefined for non-historic missions
+		// (helper no-ops). Skipped when authenticMode is false (also no-op).
+		applyAuthenticPhysics(
+			this.lander,
+			this.activeMission && isHistoricMission(this.activeMission)
+				? this.activeMission.era
+				: undefined,
+			this.currentFlight?.authenticMode ?? false,
+		);
 		this.status = "playing";
 		this.particles_.clear();
 		this.gameLoop.resetAccumulator();
@@ -515,9 +530,18 @@ export class Game {
 			WORLD_WIDTH / 2,
 			diff?.spawnY ?? 80,
 			getLanderType(diff?.landerType),
+			diff,
 		);
-		if (diff?.startingFuel !== undefined) this.lander.fuel = diff.startingFuel;
-		if (diff?.startingRCS !== undefined) this.lander.rcs = diff.startingRCS;
+		// Sprint 7.2 Part 2 — see spawnRelayLander for the same pattern. Authentic
+		// tightening must apply here too; createLander materialized the per-mission
+		// base, helper composes the era multiplier on top.
+		applyAuthenticPhysics(
+			this.lander,
+			this.activeMission && isHistoricMission(this.activeMission)
+				? this.activeMission.era
+				: undefined,
+			this.currentFlight?.authenticMode ?? false,
+		);
 		this.status = "playing";
 		this.score = 0;
 		this.crashAnalysis = "";
