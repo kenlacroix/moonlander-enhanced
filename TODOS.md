@@ -21,13 +21,13 @@ Currently the browser console logs a 404 for `/favicon.ico`. Purely cosmetic but
 
 ## P1/P2/P3 — Sprint 7.2 deferrals (CEO + adversarial review 2026-04-20)
 
-### Luna 9 autopilot PID doesn't converge on this seed (PARTIALLY MITIGATED 2026-04-23)
-Luna 9 is a `kind: "auto-landing"` mission shipped in v0.5.9.1 (PR #34). Autopilot defaults ON for spectator-mode descent. But for the luna-9 lander type (thrust 0.85×, mass 0.7×) on seed 91966's flat maria terrain, the autopilot overshoots laterally — crashes at x=2177 with vx=116 px/s, vy=25 px/s, angularVel=-16.8°/s at frame 262. Tried: bumping spawnY (40-100), more fuel (500-800), more RCS (80-120). Same crash every time. Trajectory is autopilot-PID-fundamental, not input starvation.
-- **Mitigated in v0.6.2.1:** Removed the `auto-landing` lock on `[P]` toggle. Player can now take over when the autopilot starts overshooting. Mission still spectator-mode by default, but no longer a forced crash.
-- **Real fix still needed:** Autopilot PID needs tuning for low-`thrustMultiplier` craft, OR Luna 9 should switch to a seed where autopilot converges, OR the autopilot's horizontal-velocity damping needs to be more aggressive when craft has low thrust authority.
-- **Why fix it for real:** The pure spectator experience is what makes Luna 9 evocative ("watch the 1966 Soviet probe land itself"). Player-takeover is a fallback, not the design intent.
-- **Effort:** M (CC: ~30-60 min for autopilot retune + Luna 9 seed sweep)
-- **Priority:** P2 (downgraded from P1 since players can now rescue it)
+### Luna 9 autopilot PID doesn't converge on this seed (MITIGATED 2026-04-23)
+Luna 9 was `kind: "auto-landing"` with autopilot force-enabled from v0.5.9.1 through v0.6.2.1. Autopilot overshoots on luna-9's craft profile (thrust 0.85×, mass 0.7×) on seed 91966 — crashes at x=2177, vx=116 px/s at frame 262. Byte-identical crash across spawnY (40-100), fuel (500-800), RCS (80-120). Pure PID trajectory problem, not input starvation.
+- **v0.6.2.1:** Unlocked `[P]` toggle so player could rescue. Insufficient — by the time overshoot is visible the lander is 18 px above terrain with vx=120, unrescuable.
+- **v0.6.2.2:** Flipped the default. Autopilot starts OFF on Luna 9; player flies. `[P]` still engages the spectator demo mid-flight. Mission is now landable.
+- **Real fix if desired:** Restoring the original spectator-mode intent requires either (a) autopilot PID retune for low-thrustMultiplier craft, (b) switch Luna 9 to a seed where autopilot converges (breaks share-URL determinism on seed 9_1966), or (c) autopilot's horizontal-velocity damping more aggressive when craft has low thrust authority.
+- **Effort:** M (CC: ~30-60 min for autopilot retune + seed sweep)
+- **Priority:** P3 (downgraded from P2 — functional now, just not the original vision)
 - **Depends on:** Nothing. Standalone investigation.
 
 ### Sprint 7.2 mobile touch-input retest
