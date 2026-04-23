@@ -15,6 +15,10 @@ import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import { type Achievement, loadAchievements } from "../systems/Achievements";
 import { Audio } from "../systems/Audio";
 import {
+	loadGamePreferences,
+	resolveFlightPolicy,
+} from "../systems/GamePreferences";
+import {
 	GhostPlayer,
 	GhostRecorder,
 	loadGhostForSeed,
@@ -396,11 +400,18 @@ export class Game {
 
 	spawnRelayLander(spawnX: number, spawnY: number): void {
 		const diff = this.activeMission?.difficulty;
+		// v0.6.3.0 — relay spawns share the initial flight's physics policy.
+		// Re-resolving here would re-read user prefs which could drift mid-
+		// flight if the user opened Settings between relay #1 and #2.
+		// Simplest consistent behavior: use the existing lander's
+		// physicsVersion (which was set at the initial reset() call).
+		const physicsVersion = this.lander.physicsVersion;
 		this.lander = createLander(
 			spawnX,
 			spawnY,
 			getLanderType(diff?.landerType),
 			diff,
+			physicsVersion,
 		);
 		// Sprint 7.2 Part 2 — relay lander #2/#3 must reapply authentic-mode
 		// tightening since createLander can't reach into AuthenticMode without
@@ -517,6 +528,16 @@ export class Game {
 		} else {
 			this.adaptiveLabel = null;
 		}
+		// v0.6.3.0 — resolve the per-flight policy once, use it everywhere.
+		// Free Play reads user prefs (default v2, no hazards); Campaign uses
+		// the per-mission DifficultyConfig.physicsVersion ramp; Historic and
+		// AI Theater stay forced v3 + all hazards passed through to
+		// per-mission gating. Pure function, no cached state on Game.
+		const flightPolicy = resolveFlightPolicy(
+			this.gameMode,
+			this.activeMission,
+			loadGamePreferences(),
+		);
 		this.terrain = generateTerrain(this.seed_, diff);
 		const hiddenPad = maybeGenerateHiddenPad(
 			this.activeMission,
@@ -531,6 +552,7 @@ export class Game {
 			diff?.spawnY ?? 80,
 			getLanderType(diff?.landerType),
 			diff,
+			flightPolicy.physicsVersion,
 		);
 		// Sprint 7.2 Part 2 — see spawnRelayLander for the same pattern. Authentic
 		// tightening must apply here too; createLander materialized the per-mission
@@ -556,14 +578,17 @@ export class Game {
 		this.telemetry.reset();
 		this.autopilot.enabled = false;
 		this.physics.reset();
+		this.physics.setHazardPolicy(flightPolicy);
 		const windStrength = diff?.windStrength ?? 0;
 		this.wind = windStrength > 0 ? createWind(this.seed_, windStrength) : null;
-		this.alien = shouldSpawnAlien(this.seed_, diff)
-			? createAlien(this.seed_)
-			: null;
-		this.gravityStorm = shouldSpawnGravityStorm(this.seed_, diff)
-			? createGravityStorm(this.seed_)
-			: null;
+		this.alien =
+			flightPolicy.aliens && shouldSpawnAlien(this.seed_, diff)
+				? createAlien(this.seed_)
+				: null;
+		this.gravityStorm =
+			flightPolicy.storms && shouldSpawnGravityStorm(this.seed_, diff)
+				? createGravityStorm(this.seed_)
+				: null;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		// Sprint 7.1 PR 1.5 — hand the archetype to the soundtrack before
 		// start(), so the next flight's drone / shimmer / tension profile
