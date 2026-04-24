@@ -9,7 +9,11 @@ export const FUEL_BURN_RATE = 30; // units/second while thrusting
 
 // Sprint 7.2 — rigid-body physics (RCS = Reaction Control System, separate
 // tank from main fuel, used for attitude/rotation only; mirrors Apollo LM).
-export const PHYSICS_V3 = true; // kill switch — flip to false to revert to v2 physics globally
+// v0.6.3.0 dropped the PHYSICS_V3 compile-time kill switch. Version selection
+// is now per-flight via `lander.physicsVersion` and resolved from either the
+// user preference (Free Play), per-mission DifficultyConfig.physicsVersion
+// (campaign ramp), or forced to 3 (historic / AI Theater). See
+// `src/systems/GamePreferences.ts`.
 export const ANGULAR_ACCEL = 180; // degrees/sec² from one RCS burn (roughly matches old ROTATION_SPEED feel)
 export const MAX_ANGULAR_VEL = 360; // degrees/sec ceiling — prevents integrator runaway
 export const MAX_LANDING_ANGULAR_RATE = 8; // degrees/sec — above this at touchdown = crash

@@ -27,20 +27,19 @@ import { checkCollision } from "../src/game/Physics";
 import { PhysicsManager } from "../src/game/PhysicsManager";
 import type { TerrainData } from "../src/game/Terrain";
 import {
+	GhostRecorder,
+	type GhostRun,
+	loadGhostForSeed,
+} from "../src/systems/GhostReplay";
+import {
 	_resetLeaderboardCacheForTests,
 	addScore,
 	getScores,
 } from "../src/systems/Leaderboard";
 import {
-	type GhostRun,
-	GhostRecorder,
-	loadGhostForSeed,
-} from "../src/systems/GhostReplay";
-import {
 	FIXED_TIMESTEP,
 	MAX_ANGULAR_VEL,
 	MAX_LANDING_ANGULAR_RATE,
-	PHYSICS_V3,
 	STARTING_RCS,
 } from "../src/utils/constants";
 import { installLocalStoragePolyfill } from "./helpers/localStorage";
@@ -490,15 +489,12 @@ describe("Sprint 7.2 — post-review gap tests", () => {
 		expect(loaded?.physicsVersion).toBe(3);
 	});
 
-	it("PHYSICS_V3 kill switch is wired into PhysicsManager dispatch", () => {
-		// Regression guard: the constant must exist and be true for v3
-		// behavior. Test the default path (PHYSICS_V3 === true). Can't
-		// easily flip the compile-time const at runtime, but proving the
-		// constant is imported + consulted by PhysicsManager is worth a
-		// smoke assertion — a regression that drops the dispatch branch
-		// would leave the constant dead again (as the review found).
-		expect(PHYSICS_V3).toBe(true);
-		// Sanity: a v3 lander under PHYSICS_V3=true integrates angularVel.
+	it("v3 lander dispatches to the v3 integrator (regression guard)", () => {
+		// Regression guard for the dispatch branch in PhysicsManager.step.
+		// v0.6.3.0 dropped the PHYSICS_V3 compile-time kill switch — version
+		// selection is now per-lander only via lander.physicsVersion. This
+		// test ensures a v3 lander still routes to updateLander (not the
+		// frozen legacy path) and that angularVel actually integrates.
 		const pm = new PhysicsManager();
 		const l = makeLander({ physicsVersion: 3 });
 		const terrain = makePad();
@@ -514,8 +510,7 @@ describe("Sprint 7.2 — post-review gap tests", () => {
 			1,
 			() => {},
 		);
-		// If PHYSICS_V3 were false OR the dispatch lost the kill-switch
-		// branch and routed v3 landers through legacy, angularVel would
+		// If dispatch routed v3 landers through legacy, angularVel would
 		// still be 0. It's not — the v3 integrator ran.
 		expect(l.angularVel).toBeLessThan(0);
 		// Using GhostRecorder just to keep the import live (linters

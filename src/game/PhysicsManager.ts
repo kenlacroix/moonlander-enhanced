@@ -1,10 +1,10 @@
+import type { FlightPolicy } from "../systems/GamePreferences";
 import type { InputState } from "../systems/Input";
 import {
 	FUEL_BURN_RATE,
 	LANDER_HEIGHT,
 	MAX_LANDING_ANGLE,
 	MAX_LANDING_SPEED,
-	PHYSICS_V3,
 	SCORE_ANGLE_BONUS,
 	SCORE_FUEL_MULTIPLIER,
 	SCORE_SPEED_BONUS,
@@ -41,12 +41,26 @@ export class PhysicsManager {
 	fuelLeakActive = false;
 	private fuelLeakTriggered = false;
 	thrustHistory: boolean[] = [];
+	/** v0.6.3.0 — hazard policy for this flight. Gates random fuel-leak
+	 * spawn. Set once by Game.reset() after `resolveFlightPolicy`; cleared
+	 * by reset(). When undefined, legacy behavior applies (fuel leak gated
+	 * only by seed % 10 === 7) so ghost replays and any caller that forgets
+	 * to set the policy stay byte-identical to pre-v0.6.3.0. */
+	private hazardPolicy: FlightPolicy | null = null;
 
 	reset(): void {
 		this.flightElapsed = 0;
 		this.fuelLeakActive = false;
 		this.fuelLeakTriggered = false;
 		this.thrustHistory = [];
+		this.hazardPolicy = null;
+	}
+
+	/** v0.6.3.0 — set the per-flight hazard policy. Must be called AFTER
+	 * reset() (which clears it to null) and BEFORE step() starts firing
+	 * the fuel-leak trigger at t=5s. Game.reset() handles the ordering. */
+	setHazardPolicy(policy: FlightPolicy): void {
+		this.hazardPolicy = policy;
 	}
 
 	step(
@@ -70,13 +84,13 @@ export class PhysicsManager {
 		}
 
 		ghostRecordFn(inputState);
-		// Sprint 7.2 — integrator dispatch. v2 ghost replays set
-		// lander.physicsVersion = 2 on spawn (see GhostReplay.ts) so their
-		// replay uses the frozen v2 integrator. New flights default to 3.
-		// PHYSICS_V3 is a global kill switch — flip to false in
-		// constants.ts to revert every flight (not just v2 replays) to v2
-		// physics, e.g. if a post-ship regression needs a hotfix revert.
-		if (lander.physicsVersion === 2 || !PHYSICS_V3) {
+		// Integrator dispatch by per-lander physicsVersion. v2 ghost replays
+		// set physicsVersion=2 on spawn (see GhostReplay.ts). Free Play reads
+		// from GamePreferences (default v2); Campaign uses per-mission ramp
+		// via DifficultyConfig.physicsVersion; Historic and AI Theater always
+		// v3. The compile-time PHYSICS_V3 kill switch was removed in v0.6.3.0
+		// when the user-facing toggle became the primary safety net.
+		if (lander.physicsVersion === 2) {
 			updateLanderLegacy(lander, resolvedInput, dt, gameGravity);
 		} else {
 			updateLander(lander, resolvedInput, dt, gameGravity);
@@ -103,7 +117,13 @@ export class PhysicsManager {
 
 		if (!this.fuelLeakTriggered && this.flightElapsed > 5) {
 			this.fuelLeakTriggered = true;
-			this.fuelLeakActive = seed % 10 === 7;
+			// v0.6.3.0 — gate random fuel leak on the flight policy. If no
+			// policy set (ghost replay, hand-constructed test fixtures,
+			// callers that forgot to call setHazardPolicy) the policy-less
+			// default is legacy behavior: seed % 10 === 7 still triggers, so
+			// pre-v0.6.3.0 ghosts replay byte-identical.
+			const fuelLeakAllowed = this.hazardPolicy?.fuelLeaks ?? true;
+			this.fuelLeakActive = fuelLeakAllowed && seed % 10 === 7;
 		}
 		if (this.fuelLeakActive && lander.fuel > 0) {
 			lander.fuel = Math.max(0, lander.fuel - FUEL_BURN_RATE * 0.3 * dt);
