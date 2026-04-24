@@ -2,6 +2,19 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.3.1] - 2026-04-24 (Gravity storms now torque the lander)
+
+Gravity storms have been in the game since Sprint 2 but only did two things: change gravity multiplier for ~8 seconds and wobble the terrain cosmetically. Under v3 rigid-body physics, they finally do what the design always implied — knock your attitude around. With v0.6.3.0 making Free Play hazards opt-in, this lands as a quality lift for the players who opted in, plus Campaign Mission 3+ where storms are already part of the design.
+
+### Changed
+- **Gravity storms apply an angular impulse on each phase transition.** Two seeded random jolts per storm cycle (normal→high and high→low), each in range ±5°/s. A single jolt from a stable attitude stays below every mission's landing-rate gate (global 8°/s, Apollo 11's 6°/s, etc.) — survivable if you counter-burn between transitions. Ignoring two jolts and letting them compound, or catching a jolt while already rotating, will blow past the gate and turn into a SPINNING crash. The terrain wobble stays cosmetic.
+- v3 landers only. v2 ghost replays still don't integrate angular velocity, so the impulse is consumed-but-discarded on v2 (pins ghost-replay determinism).
+- Sequence is deterministic via the existing storm RNG — same seed produces the same jolt timing and magnitudes, so ghost replays on stormed missions stay byte-identical.
+
+### Added
+- `MAX_STORM_TORQUE` constant (5°/s) and `consumeAngularImpulse()` helper in `GravityStorm.ts`.
+- 7 new tests: initial state, jolt on normal→high, jolt on high→low, consume clears state, determinism across seeds, no-op during cooldown, no-op on low→normal.
+
 ## [0.6.3.0] - 2026-04-23 (Free Play Sandbox — physics + hazard toggles)
 
 Sprint 7.2 made rotation a real attitude problem. Playtest of v0.6.2.4 said it was *too* real for casual Free Play — flying and landing both got noticeably harder, even with marginal ROT and angle readouts. This release puts the steering wheel in the player's hands: Free Play is now a sandbox you opt into, not a difficulty wall you bounce off.
