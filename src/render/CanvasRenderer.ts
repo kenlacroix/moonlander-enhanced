@@ -618,6 +618,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		campaignProgress?: Set<number>,
 		authenticInfo?: { missionId: number; on: boolean } | null,
 		authenticBestScores?: Map<number, number>,
+		cleanClears?: Set<number>,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -668,6 +669,17 @@ export class CanvasRenderer implements IGameplayRenderer {
 				if (isCompleted) {
 					ctx.fillStyle = "#00ff88";
 					ctx.fillText("[DONE]", CANVAS_WIDTH / 2 - 300, y + 6);
+					// Sprint 7.4 — clean-clear star. Renders next to [DONE] when
+					// the mission was completed with a `clean` FlightOutcome
+					// (not bounced). Bright gold to distinguish from the
+					// completion green; absence of star on a [DONE] mission is
+					// the visible "you bounced this — try again for the star"
+					// signal that drives Tier 3 replay value.
+					if (cleanClears?.has(m.id)) {
+						ctx.fillStyle = "#ffd84a";
+						ctx.font = 'bold 16px "Courier New", monospace';
+						ctx.fillText("\u2605", CANVAS_WIDTH / 2 - 240, y + 6);
+					}
 				} else if (isLocked) {
 					ctx.fillStyle = "#444444";
 					ctx.fillText("[LOCKED]", CANVAS_WIDTH / 2 - 300, y + 6);

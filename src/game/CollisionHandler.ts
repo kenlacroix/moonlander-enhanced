@@ -4,10 +4,15 @@ import {
 } from "../systems/Achievements";
 import { addScore } from "../systems/Leaderboard";
 import { SCORE_FUEL_MULTIPLIER, STARTING_FUEL } from "../utils/constants";
+import {
+	classifyLanding,
+	type FlightOutcome,
+	nearestPad,
+} from "./FlightOutcome";
 import type { Game } from "./Game";
 import { HIDDEN_PAD_SCORE_MULTIPLIER } from "./HiddenPad";
 import { isHistoricMission } from "./HistoricMission";
-import { CAMPAIGN, saveCampaignProgress } from "./Missions";
+import { CAMPAIGN, saveCampaignProgress, saveCleanClears } from "./Missions";
 import { normAngle } from "./Physics";
 import { isRandomMission } from "./RandomMission";
 import {
@@ -58,6 +63,11 @@ export function handleCollisionResult(
 			game.campaignCompleted.add(game.activeMission.id);
 			saveCampaignProgress(game.campaignCompleted);
 		}
+		// Sprint 7.4 — emit FlightOutcome for Campaign narrative dialogue.
+		// Bounced never demotes a landing (campaignCompleted update above
+		// runs unconditionally for any landed result). Clean clears get
+		// the star on the mission menu via the parallel cleanClears Set.
+		emitCampaignOutcome(game, true);
 		checkAchievements(game);
 		if (hiddenPad) {
 			// Transient toast (not a persistent Achievement unlock) — fires
@@ -92,6 +102,10 @@ export function handleCollisionResult(
 			STARTING_FUEL,
 		);
 		game.missionChatter.onCrashed();
+		// Sprint 7.4 — Campaign narrative crash outcome. The non-landing
+		// branch handles all crash variants (vy/angle/rate/timeout); the
+		// CampaignChatter dialogue table picks the most-specific variant.
+		emitCampaignOutcome(game, false);
 	}
 	handleRelayAfterCollision(game);
 	if (game.aiTheater.isActive) {
@@ -189,6 +203,76 @@ export function handleSurviveTimeout(game: Game): void {
 	game.audio.setThruster(false);
 	game.audio.playCrash();
 	game.audio.soundtrack.onCrashed();
+}
+
+/**
+ * Sprint 7.4 — emit a `FlightOutcome` to CampaignChatter on flight-end.
+ * Classifies clean vs bounced (landed branch) using the FlightOutcome
+ * helper; routes the outcome through CampaignChatter.complete() which
+ * picks the most-specific Hoshi post-landing variant.
+ *
+ * No-ops when:
+ *   - gameMode is not "campaign" (Free Play, Historic, AI Theater)
+ *   - mission has no narrative.enabled flag
+ *   - relay run is mid-cycle (don't fire post-landing chatter between
+ *     relay landers — only on the final touchdown)
+ */
+function emitCampaignOutcome(game: Game, landed: boolean): void {
+	if (game.gameMode !== "campaign") return;
+	if (!game.activeMission?.narrative?.enabled) return;
+	if (game.relay && !isRelayComplete(game.relay)) return;
+
+	const startingFuel =
+		game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL;
+	const fuelPct = Math.max(0, game.lander.fuel / startingFuel);
+	const peakRate = game.flightPeakAngularRate;
+	const bestAngularRate =
+		game.lander.physicsVersion === 3 ? peakRate : undefined;
+	const hazardsFired = { ...game.flightHazardsFired };
+
+	let outcome: FlightOutcome;
+	if (landed) {
+		const pad = nearestPad(game.lander.x, game.terrain.pads);
+		if (!pad) {
+			// Defensive: should never happen on a successful landing path,
+			// but the type system says nearestPad can return null on a
+			// padless terrain. Treat as bounced to avoid awarding a star
+			// on undefined data.
+			outcome = {
+				result: "bounced",
+				fuelRemainingPct: fuelPct,
+				hazardsFired,
+				bestAngularRate,
+			};
+		} else {
+			const cls = classifyLanding(
+				game.lander,
+				pad,
+				bestAngularRate,
+				game.lander.maxLandingAngularRate,
+			);
+			outcome = {
+				result: cls.result,
+				fuelRemainingPct: fuelPct,
+				hazardsFired,
+				bestAngularRate,
+				landingMarginPx: cls.landingMarginPx,
+			};
+			if (cls.result === "clean" && game.activeMission) {
+				game.cleanClears.add(game.activeMission.id);
+				saveCleanClears(game.cleanClears);
+			}
+		}
+	} else {
+		outcome = {
+			result: "crashed",
+			fuelRemainingPct: fuelPct,
+			hazardsFired,
+			bestAngularRate,
+		};
+	}
+
+	game.campaignChatter.complete(outcome);
 }
 
 function handleRelayAfterCollision(game: Game): void {

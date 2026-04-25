@@ -586,7 +586,7 @@ These move to a future "Sprint 6.5 — renderer primitive rework" if the visual 
 
 ---
 
-### Sprint 7.4 — Campaign Narrative (Tier 3) 🚧 IN PROGRESS (started 2026-04-24)
+### Sprint 7.4 — Campaign Narrative (Tier 3) ✅ COMPLETE (v0.6.4.0)
 
 *Design doc at `~/.gstack/projects/kenlacroix-moonlander-enhanced/root-main-design-20260424-150313.md`. Status: APPROVED + eng-reviewed. Bundles Campaign archetype-wiring (the gap noted in Sprint 7.1).*
 

@@ -94,6 +94,15 @@ export interface GameRenderState {
 	readonly lastRank: number | null;
 	readonly llmText: string;
 	readonly missionChatterText: string;
+	/** Sprint 7.4 — campaign chatter line with speaker tag for prefix
+	 * rendering. Null when no campaign chatter is active. */
+	readonly campaignChatterLine: {
+		speaker: "hoshi" | "chen";
+		text: string;
+	} | null;
+	/** Sprint 7.4 — true when a multi-line post-landing sequence has
+	 * more lines queued. Renderer shows the [SPACE] SKIP hint. */
+	readonly campaignHasQueuedLines: boolean;
 	readonly artifactText: string;
 	readonly crashAnalysis: string;
 	readonly flightElapsed: number;
@@ -101,6 +110,10 @@ export interface GameRenderState {
 	readonly selectedMission: number;
 	readonly gameMode: "freeplay" | "campaign" | "ai-theater" | "historic";
 	readonly campaignCompleted: Set<number>;
+	/** Sprint 7.4 — clean-clears save state. Mission menu renders a
+	 * star on missions in this Set (in addition to the [DONE] checkmark
+	 * for missions in campaignCompleted). */
+	readonly cleanClears: Set<number>;
 	readonly input: Input;
 	readonly latestTrainingStats: TrainingStats | null;
 	readonly trainingLoop: TrainingLoop | null;
@@ -280,6 +293,61 @@ export class GameRenderer {
 		ctx.restore();
 	}
 
+	/**
+	 * Sprint 7.4 — Campaign chatter caption with speaker prefix. Hoshi
+	 * lines render in a different tint than Chen lines so the player
+	 * reads "who's talking" at a glance. Position offset 28 px below
+	 * MissionChatter's slot so a Historic mission and Campaign mission
+	 * never overlap (they can't run simultaneously per gameMode but
+	 * defensive layout still helps).
+	 *
+	 * Color scheme:
+	 *   FLIGHT: (Hoshi) — pale green-cyan, normal weight, standard font
+	 *   CAPCOM: (Chen) — desaturated amber, monospace (already monospace,
+	 *           so the speaker tag is the visual distinction)
+	 *
+	 * `showSkipHint` is true when a multi-line queue is active. Renders
+	 * a small "[SPACE] SKIP" hint so the player learns the binding.
+	 */
+	private drawCampaignChatter(
+		line: { speaker: "hoshi" | "chen"; text: string },
+		showSkipHint: boolean,
+	): void {
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		ctx.font = "13px 'Courier New', monospace";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "top";
+		const prefix = line.speaker === "hoshi" ? "FLIGHT: " : "CAPCOM: ";
+		const fullText = prefix + line.text;
+		const padX = 14;
+		const padY = 6;
+		const metrics = ctx.measureText(fullText);
+		const w = metrics.width + padX * 2;
+		const h = 22;
+		const x = 1280 / 2 - w / 2;
+		const y = 110;
+		// Box outlined per speaker. Hoshi gets a green-cyan tone (engineer
+		// at his console); Chen gets warm amber (radio-fixed-width feel).
+		const borderColor = line.speaker === "hoshi" ? "#7fc8b8" : "#d8a868";
+		const textColor = line.speaker === "hoshi" ? "#c8f0e8" : "#f0d8a8";
+		ctx.fillStyle = "rgba(0,0,0,0.7)";
+		ctx.strokeStyle = borderColor;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.fill();
+		ctx.stroke();
+		ctx.fillStyle = textColor;
+		ctx.fillText(fullText, 1280 / 2, y + padY - 1);
+		if (showSkipHint) {
+			ctx.font = "10px 'Courier New', monospace";
+			ctx.fillStyle = "rgba(255,255,255,0.4)";
+			ctx.fillText("[SPACE] SKIP", 1280 / 2, y + h + 4);
+		}
+		ctx.restore();
+	}
+
 	private drawForkCaption(
 		fork: NonNullable<GameRenderState["forkReplay"]>,
 	): void {
@@ -409,6 +477,16 @@ export class GameRenderer {
 
 		if (state.missionChatterText) {
 			this.drawChatterCaption(state.missionChatterText);
+		}
+		// Sprint 7.4 — Campaign chatter renders below MissionChatter's slot
+		// with speaker-prefix styling. Both can be present on a flight
+		// mode-mismatch case (gameMode is exclusive in practice, so this
+		// is defensive). Skip hint shows when a multi-line queue is mid-display.
+		if (state.campaignChatterLine) {
+			this.drawCampaignChatter(
+				state.campaignChatterLine,
+				state.campaignHasQueuedLines,
+			);
 		}
 
 		// Post-flight telemetry chart
@@ -600,6 +678,9 @@ export class GameRenderer {
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
 			authenticInfo,
 			authenticBestScores,
+			// Sprint 7.4 — pass cleanClears only for campaign mode so the
+			// star renders alongside [DONE] for missions cleared cleanly.
+			state.gameMode === "campaign" ? state.cleanClears : undefined,
 		);
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {

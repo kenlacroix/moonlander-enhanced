@@ -275,6 +275,13 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 	if (input.toggleRetroSkin) {
 		game.toggleRetroSkin();
 	}
+	// Sprint 7.4 — Space (or click via menuSelect) skips to the next
+	// queued campaign chatter line. Only meaningful when a multi-line
+	// briefing or post-landing sequence is mid-display. Replaying
+	// players don't want to re-read the same Hoshi analysis.
+	if (input.menuSelect && game.campaignHasQueuedLines) {
+		game.campaignChatter.skip();
+	}
 }
 
 export function updateFlightVisuals(game: Game, dt: number): void {
@@ -301,8 +308,22 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 					game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL,
 			});
 		}
+		// Sprint 7.4 — Campaign chatter update fires the same altitude/fuel/
+		// drift triggers MissionChatter does, but for Campaign missions only.
+		if (
+			game.gameMode === "campaign" &&
+			game.activeMission?.narrative?.enabled
+		) {
+			game.campaignChatter.update({
+				lander: game.lander,
+				altitude,
+				startingFuel:
+					game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL,
+			});
+		}
 	}
 	game.missionChatter.tick(dt);
+	game.campaignChatter.tick(dt);
 	game.particles.update(dt);
 	game.audio.setThruster(game.lander.thrusting && game.status === "playing");
 	if (
@@ -408,6 +429,16 @@ export function selectMission(game: Game, mission: Mission): void {
 	updateURL(mission.seed);
 	if (isHistoricMission(mission) && mission.kind === "landing") {
 		game.missionChatter.start(mission.facts, game.getLLMConfig());
+	}
+	// Sprint 7.4 — Campaign narrative dialogue. Activates only when the
+	// player launched in Campaign mode AND the mission opted into the
+	// narrative field. Free Play, Historic, and AI Theater never reach
+	// this branch (gameMode is exclusive). The two chatter systems
+	// (MissionChatter for Historic, CampaignChatter for Campaign) never
+	// fire simultaneously — gameMode === "historic" vs "campaign" is
+	// the discriminator.
+	if (game.gameMode === "campaign" && mission.narrative?.enabled) {
+		game.campaignChatter.start(mission.id, game.getLLMConfig());
 	}
 	if (game.gameMode === "ai-theater") {
 		game.aiTheater.start(

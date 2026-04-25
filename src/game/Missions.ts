@@ -29,6 +29,16 @@ export interface Mission {
 	 * so freeplay terrain keeps its pre-Sprint-7.1 appearance.
 	 */
 	palette?: TerrainPalette;
+	/**
+	 * Sprint 7.4 — opt-in flag for Campaign narrative dialogue. When
+	 * `enabled: true` AND `gameMode === "campaign"`, the Game wires up
+	 * `CampaignChatter` instead of `MissionChatter`. Missing/false on
+	 * Free Play, Historic, and AI Theater paths; CampaignChatter never
+	 * activates for them. The instructor character (Dr. Hoshi) is
+	 * hardcoded for now — extensibility deferred until a second voice
+	 * is actually wanted (see Tier 4 follow-up in TODOS.md).
+	 */
+	narrative?: { enabled: boolean };
 }
 
 /** Free-play missions — all use default difficulty */
@@ -117,6 +127,15 @@ export const CAMPAIGN: Mission[] = [
 		name: "FIRST CONTACT",
 		seed: 1001,
 		description: "Easy terrain, generous pads and fuel. Prove you can land.",
+		// Sprint 7.4 — neutral palette + rolling archetype matches Hoshi's
+		// "polite first lesson" briefing tone. No visual shock on the
+		// onboarding mission.
+		palette: {
+			terrain: "#9a9a9a",
+			terrainEdge: "#bbbbbb",
+			sky: "#000000",
+		},
+		narrative: { enabled: true },
 		difficulty: {
 			roughness: 0.3,
 			padMinWidth: 100,
@@ -125,6 +144,7 @@ export const CAMPAIGN: Mission[] = [
 			startingFuel: 1200,
 			windStrength: 0,
 			physicsVersion: 2,
+			archetype: "rolling",
 		},
 	},
 	{
@@ -132,6 +152,14 @@ export const CAMPAIGN: Mission[] = [
 		name: "ROUGH APPROACH",
 		seed: 2002,
 		description: "Bumpier surface. Pads are narrower. Stay steady.",
+		// Sprint 7.4 — dusty tan palette + crater-field archetype makes
+		// the mission name literal: terrain is genuinely rougher.
+		palette: {
+			terrain: "#a89070",
+			terrainEdge: "#c8a890",
+			sky: "#0a0805",
+		},
+		narrative: { enabled: true },
 		difficulty: {
 			roughness: 0.5,
 			padMinWidth: 70,
@@ -140,6 +168,7 @@ export const CAMPAIGN: Mission[] = [
 			startingFuel: 1000,
 			windStrength: 15,
 			physicsVersion: 2,
+			archetype: "crater-field",
 		},
 	},
 	{
@@ -148,6 +177,15 @@ export const CAMPAIGN: Mission[] = [
 		seed: 3003,
 		description:
 			"Standard terrain but limited fuel. Every drop counts. Rotation now has momentum — counter-burn to stop spinning.",
+		// Sprint 7.4 — rust-red spires (Hadley Rille adjacent) match
+		// Hoshi's mom-name-drop briefing. Dramatic visual shift pairs
+		// with v3 physics introduction.
+		palette: {
+			terrain: "#9a4838",
+			terrainEdge: "#c46850",
+			sky: "#180806",
+		},
+		narrative: { enabled: true },
 		difficulty: {
 			roughness: 0.5,
 			padMinWidth: 60,
@@ -156,6 +194,7 @@ export const CAMPAIGN: Mission[] = [
 			startingFuel: 700,
 			gravityStormsEnabled: true,
 			physicsVersion: 3,
+			archetype: "spires",
 		},
 	},
 	{
@@ -163,6 +202,14 @@ export const CAMPAIGN: Mission[] = [
 		name: "NEEDLE THREADING",
 		seed: 4004,
 		description: "Jagged terrain with crevices, tiny pads. Precision landing.",
+		// Sprint 7.4 — cool blue-grey mesa palette: precision-landing
+		// visual language. Pads on plateaus.
+		palette: {
+			terrain: "#788098",
+			terrainEdge: "#9098b8",
+			sky: "#050810",
+		},
+		narrative: { enabled: true },
 		difficulty: {
 			roughness: 0.8,
 			padMinWidth: 40,
@@ -174,6 +221,7 @@ export const CAMPAIGN: Mission[] = [
 			gravityStormsEnabled: true,
 			crevices: 2,
 			physicsVersion: 3,
+			archetype: "mesa",
 		},
 	},
 	{
@@ -182,6 +230,13 @@ export const CAMPAIGN: Mission[] = [
 		seed: 5005,
 		description:
 			"Extreme terrain with deep crevices, one small pad. Good luck.",
+		// Sprint 7.4 — dark crimson spires read ominous. Final challenge.
+		palette: {
+			terrain: "#5a1818",
+			terrainEdge: "#883030",
+			sky: "#0a0202",
+		},
+		narrative: { enabled: true },
 		difficulty: {
 			roughness: 0.9,
 			padMinWidth: 35,
@@ -193,6 +248,7 @@ export const CAMPAIGN: Mission[] = [
 			gravityStormsEnabled: true,
 			crevices: 3,
 			physicsVersion: 3,
+			archetype: "spires",
 		},
 	},
 ];
@@ -214,6 +270,38 @@ export function loadCampaignProgress(): Set<number> {
 export function saveCampaignProgress(completed: Set<number>): void {
 	try {
 		localStorage.setItem(CAMPAIGN_STORAGE_KEY, JSON.stringify([...completed]));
+	} catch {
+		// localStorage unavailable
+	}
+}
+
+/**
+ * Sprint 7.4 — clean clears (mission completed with `result === "clean"`,
+ * NOT just `result === "bounced"`). Stored in a parallel Set so the
+ * existing campaignCompleted save schema stays untouched. Mission menu
+ * shows checkmark for completion + star for clean clear.
+ *
+ * Old saves without the clean-clears key just see an empty Set on first
+ * read — equivalent to "no clean clears yet," no migration needed.
+ */
+const CAMPAIGN_CLEAN_CLEARS_KEY = "moonlander-campaign-clean-clears";
+
+export function loadCleanClears(): Set<number> {
+	try {
+		const data = localStorage.getItem(CAMPAIGN_CLEAN_CLEARS_KEY);
+		if (data) return new Set(JSON.parse(data) as number[]);
+	} catch {
+		// localStorage unavailable or malformed JSON — fall through to empty.
+	}
+	return new Set();
+}
+
+export function saveCleanClears(cleanClears: Set<number>): void {
+	try {
+		localStorage.setItem(
+			CAMPAIGN_CLEAN_CLEARS_KEY,
+			JSON.stringify([...cleanClears]),
+		);
 	} catch {
 		// localStorage unavailable
 	}
