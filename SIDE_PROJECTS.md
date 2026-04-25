@@ -199,6 +199,69 @@ That's the honest answer to "what would AI-enhanced DIY look like for THIS proje
 
 ---
 
+## Android app — sideloaded sensor-enabled MoonLander
+
+**Status:** Idea captured 2026-04-25.
+
+A native Android app (likely Capacitor wrapper) that does what the mobile web cannot: phone sensors as gameplay, paired with the DIY physical controller from the other side project.
+
+### Why this is different from "just put the web app in the App Store"
+
+The mobile web version of MoonLander already works. PWA install gives 80% of native feel. Going to the App Store solely for app-store presence is premature optimization with real ongoing cost (review process, two store listings, slower iteration).
+
+The reason TO build a native Android app is that **phone sensors unlock gameplay the web can't deliver**. Specifically:
+
+- **Tilt-to-fly** — phone gyroscope/accelerometer drives lander rotation. Hold the phone like a flight stick. Same physical-virtual coupling proposition as the micro:bit DIY controller, but using hardware everyone already owns.
+- **Haptics on impact, fuel low, alien attack, gravity storm** — Android's vibration API has way more nuance than the browser's. Different patterns per event become legible.
+- **Proximity / ambient light sensors as gameplay** — speculative but interesting. Cover the phone = darken the cockpit and shift to instrument-only flight. Approach a wall = trigger something. Probably overkill but worth flagging.
+- **Native gamepad support** — Android's gamepad API integrates better than the web Gamepad API for some controllers.
+- **Better integration with the DIY controller** — if the user is also wearing/holding a micro:bit physical controller, the Android app can pair with it via Bluetooth without needing WebUSB/WebHID quirks.
+
+### Why sideloaded specifically
+
+Going through Google Play means review, store listings, screenshots, marketing copy — overhead that's wrong for a side project's audience. Sideloading via APK distribution (download + enable Unknown Sources) is fine for:
+- Personal use
+- Sharing with friends as a "try this"
+- Hobbyist demo at a meetup or conference
+- Pairing with the DIY-controller tutorial as the "here's the companion app"
+
+If it later finds an audience that warrants Play Store presence, that's a separate decision.
+
+### Capacitor wrapper as the build path
+
+Capacitor wraps the existing TypeScript/Vite codebase in a native Android shell. Game still runs in a webview but with full-screen native chrome and access to native APIs via plugins. The mobile-web fixes already shipped (Sprint 7.5 viewport, joystick, touch sizing) all carry over directly — no rewrite.
+
+Setup: ~1-2 days. After that, every web release rebuilds the APK with one command. Native APIs (sensors, haptics) are added via Capacitor plugins as needed.
+
+### Concrete first build scope
+
+1. Capacitor Android shell wrapping the web build
+2. Tilt-to-rotate via `@capacitor/motion` plugin (accelerometer drives rotation, replaces or augments touch joystick)
+3. Native haptics via `@capacitor/haptics` on landing, crash, fuel-warn
+4. Sideloadable APK distributable via direct download from `canyou.land/android` or similar
+
+**Effort:** ~8-12 hours for a working sideload-ready APK with tilt + haptics. App Store path adds days for review.
+
+### Risks
+
+- **Tilt-as-only-control might frustrate.** Holding a phone tilted for a 2-3 minute landing is awkward. Default behavior should probably be: touch joystick OR tilt, player picks at session start.
+- **Haptics drain battery.** Tune intensity and duration carefully.
+- **Webview performance on older Android.** PixiJS / WebGL works on most modern Android, but a cheap 2019 phone may stutter. Accept and target mid-tier+.
+- **Distribution friction.** Sideloading requires the user to enable Unknown Sources, which is a security warning that scares non-technical users. Tutorial / FAQ on the download page reduces the friction.
+
+### What I'd do first
+
+A bench test: install the existing PWA on Android via "Add to Home Screen," then build a minimal Capacitor wrapper alongside it and compare side-by-side. If the Capacitor version doesn't feel meaningfully better than the PWA, the marginal value is small and the sensor-gameplay angle has to do all the work. If it does feel better, go.
+
+The PWA-first comparison costs a few hours and tells you whether the wrapper is even worth pursuing.
+
+### Pairs naturally with
+
+- **DIY MoonLander Controller** (same SIDE_PROJECTS.md doc above) — Android app talks to the physical controller via Bluetooth. Together, you can play canyou.land on a phone with a homemade physical control surface. Strong "everything's connected" demo.
+- **AI-enhanced controller** features (Tier 1 features A/B/C in the DIY section above) carry over identically — the RL clone trained on your touch + tilt patterns lives on the phone.
+
+---
+
 ## Related ideas (lighter sketches)
 
 These are smaller side-project notes adjacent to MoonLander Enhanced. Add detail if and when they get serious.

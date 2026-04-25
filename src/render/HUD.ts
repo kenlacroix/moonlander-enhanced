@@ -36,14 +36,24 @@ export class HUD {
 		terrain: TerrainData | null = null,
 		isPlaying = true,
 		rcsTutorialFramesRemaining = 0,
+		isTouch = false,
 	): void {
 		ctx.save();
-		ctx.font = '14px "Courier New", monospace';
+		// Sprint 7.5 — touch devices get 1.6x larger HUD readouts.
+		// The canvas is letterboxed to fit phone landscape, so the
+		// rendered canvas height is ~390 CSS pixels (down from 720
+		// internal). At legacy 14-px font, readouts become ~7.5 CSS
+		// pixels tall — unreadable. 1.6x scaling brings primary
+		// readouts to ~12 CSS pixels, comfortably legible on phone.
+		const fontMul = isTouch ? 1.6 : 1;
+		const f = (px: number, bold = false): string =>
+			`${bold ? "bold " : ""}${Math.round(px * fontMul)}px "Courier New", monospace`;
+		ctx.font = f(14);
 		ctx.textBaseline = "top";
 
 		const x = 20;
 		let y = 20;
-		const lineHeight = 22;
+		const lineHeight = Math.round(22 * fontMul);
 
 		// Altitude (distance from bottom of screen — approximate).
 		// Authentic (Apollo era only): readout blanks to "---" when lander is
@@ -143,7 +153,7 @@ export class HUD {
 					ratio >= 1 ? COLOR_HUD_WARNING : ratio >= 0.8 ? "#ffaa00" : COLOR_HUD;
 				ctx.fillStyle = COLOR_HUD;
 				ctx.textAlign = "left";
-				ctx.font = '14px "Courier New", monospace';
+				ctx.font = f(14);
 				ctx.fillText("ROT", x, y);
 				ctx.fillStyle = rateColor;
 				ctx.fillText(
@@ -190,7 +200,7 @@ export class HUD {
 		// Score (top right)
 		if (score > 0) {
 			ctx.fillStyle = COLOR_HUD;
-			ctx.font = '20px "Courier New", monospace';
+			ctx.font = f(20);
 			ctx.textAlign = "right";
 			ctx.fillText(`SCORE: ${score}`, CANVAS_WIDTH - 20, 20);
 		}
@@ -199,9 +209,9 @@ export class HUD {
 		if (elapsedTime !== null) {
 			const beatingBest = bestTime !== null && elapsedTime < bestTime;
 			ctx.fillStyle = beatingBest ? "#00ff88" : "rgba(255, 255, 255, 0.7)";
-			ctx.font = '14px "Courier New", monospace';
+			ctx.font = f(14);
 			ctx.textAlign = "right";
-			const timerY = score > 0 ? 46 : 20;
+			const timerY = score > 0 ? Math.round(46 * fontMul) : 20;
 			ctx.fillText(
 				`TIME  ${formatTime(elapsedTime)}`,
 				CANVAS_WIDTH - 20,
@@ -209,11 +219,11 @@ export class HUD {
 			);
 			if (bestTime !== null) {
 				ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-				ctx.font = '11px "Courier New", monospace';
+				ctx.font = f(11);
 				ctx.fillText(
 					`BEST  ${formatTime(bestTime)}`,
 					CANVAS_WIDTH - 20,
-					timerY + 16,
+					timerY + Math.round(16 * fontMul),
 				);
 			}
 		}
@@ -227,9 +237,13 @@ export class HUD {
 						? "#ffaa00"
 						: "#ff4444";
 			ctx.fillStyle = labelColor;
-			ctx.font = '12px "Courier New", monospace';
+			ctx.font = f(12);
 			ctx.textAlign = "right";
-			ctx.fillText(`DIFFICULTY: ${adaptiveLabel}`, CANVAS_WIDTH - 20, 44);
+			ctx.fillText(
+				`DIFFICULTY: ${adaptiveLabel}`,
+				CANVAS_WIDTH - 20,
+				Math.round(44 * fontMul),
+			);
 		}
 
 		// Sprint 7.2 — first-spin tutorial banner. Shown once per player the

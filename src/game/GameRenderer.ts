@@ -464,6 +464,9 @@ export class GameRenderer {
 			state.terrain ?? null,
 			state.status === "playing",
 			state.rcsTutorialFramesRemaining,
+			// Sprint 7.5 Tier 3 — bigger HUD readouts on touch devices
+			// so altitude/speed/fuel are legible at phone-landscape scale.
+			state.input.isTouchDevice,
 		);
 
 		// Sprint 7.5 Tier 2 — visible virtual joystick + thrust button.

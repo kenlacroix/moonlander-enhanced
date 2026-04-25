@@ -475,6 +475,16 @@ export class Game {
 				: undefined,
 			this.currentFlight?.authenticMode ?? false,
 		);
+		// Sprint 7.5 Tier 3 — same touch accessibility relaxation as
+		// Game.reset(). Relay lander #2/#3 inherits the eased gate.
+		if (
+			this.input.isTouchDevice &&
+			this.lander.physicsVersion === 3 &&
+			!diff?.maxLandingAngularRate &&
+			!(this.activeMission && isHistoricMission(this.activeMission))
+		) {
+			this.lander.maxLandingAngularRate = 16;
+		}
 		this.status = "playing";
 		this.particles_.clear();
 		this.gameLoop.resetAccumulator();
@@ -615,6 +625,22 @@ export class Game {
 				: undefined,
 			this.currentFlight?.authenticMode ?? false,
 		);
+		// Sprint 7.5 Tier 3 — touch accessibility: relax the angular-rate
+		// landing gate on touch devices when the mission didn't already
+		// override it. Touch is binary (no analog rotation), so a 1-frame
+		// thumb release can leave the lander rotating well past the 8°/s
+		// default gate. Doubling to 16°/s makes touch landings achievable
+		// without dumbing down the physics for keyboard players or
+		// disrespecting per-mission tightened gates (Apollo 11 = 6°/s
+		// stays tight, because that's a different value than the default).
+		if (
+			this.input.isTouchDevice &&
+			this.lander.physicsVersion === 3 &&
+			!diff?.maxLandingAngularRate &&
+			!(this.activeMission && isHistoricMission(this.activeMission))
+		) {
+			this.lander.maxLandingAngularRate = 16;
+		}
 		this.status = "playing";
 		this.score = 0;
 		this.crashAnalysis = "";

@@ -496,6 +496,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		terrain: TerrainData | null = null,
 		isPlaying = true,
 		rcsTutorialFramesRemaining = 0,
+		isTouch = false,
 	): void {
 		this.hud.draw(
 			this.ctx,
@@ -513,6 +514,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 			terrain,
 			isPlaying,
 			rcsTutorialFramesRemaining,
+			isTouch,
 		);
 	}
 
