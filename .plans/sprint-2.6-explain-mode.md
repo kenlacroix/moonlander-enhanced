@@ -1,10 +1,10 @@
 # Sprint 2.6 — AI Theater Explain Mode (plan)
 
-**Status (2026-04-16):** Parts A + B shipped.
+**Status: ✅ COMPLETE — all parts shipped.**
 - Part A — AI VISION strip + AGENT_META registry → v0.5.8.1 (PR #27, merged `d9d743e`).
 - Part B — Reward breakdown overlay + EXPLAIN toggle → v0.5.8.2 (PR #29, merged `4dc80af`).
-- Part C — first-run tutorial + `?` compact toggle + E1/E2/E3 polish → remaining.
-- Deferred findings from A+B (transfer DQN on non-Moon worlds, REWARD_COMPONENT_KEYS drift, Codex re-run) tracked in `TODOS.md` as the natural home for Part C to pick up.
+- Part C — first-run tutorial + `?` compact toggle + E1/E2/E3 polish → v0.5.8.3 (PR #31).
+- Deferred findings (transfer DQN on non-Moon worlds, REWARD_COMPONENT_KEYS drift, Codex re-run) tracked in `TODOS.md`.
 
 ## Goal
 Turn AI Theater from "look, RL is happening" into "now I understand what RL is." Right now a viewer sees colored curves climbing and a percentage counting down, but can't tell you what the AI sees, what it's optimizing, or why one algorithm beats another. This sprint makes those three things concrete and visible.

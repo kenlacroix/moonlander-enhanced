@@ -1,5 +1,7 @@
 # Sprint 2.7 — Smarter DQN (plan)
 
+**Status: ✅ COMPLETE — shipped v0.5.8.0.** Parts A (reward shaping + state expansion 8→11) and B (Prioritized Experience Replay via SumTree) shipped. Part C shipped hyperparameter polish + wider 128-unit network; **true Dueling DQN deferred** to backlog (would require switching from Sequential to functional API).
+
 ## Goal
 Make the DQN agent visibly smarter, faster. Right now it crashes ~50 times before stumbling into its first landing, and even after 100+ episodes the behavior looks random for too long. A viewer watching AI Theater should see the agent "get it" within 15-20 episodes and then refine its approach — not flail for 50 episodes then suddenly land once by accident.
 

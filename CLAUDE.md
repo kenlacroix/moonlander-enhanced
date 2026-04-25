@@ -518,7 +518,134 @@ These move to a future "Sprint 6.5 — renderer primitive rework" if the visual 
 
 ---
 
-### Sprint 7 — Peer-to-Peer Multiplayer — M (~2hr CC)
+### Sprint 7.1 — Level Variety ✅ COMPLETE (v0.6.0.1 + v0.6.1.0 PR 1.5)
+
+*CEO-reviewed 2026-04-19 in SCOPE EXPANSION mode. Plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-19-level-variety.md`. All 7 proposals accepted + shipped across 2 PRs.*
+
+**Part A — Palettes + archetypes ✅ COMPLETE (v0.6.0.1)**
+- [x] Per-mission `TerrainPalette` (sky, star tint, density, terrain color) — curated for Apollo 11/15/17/Artemis/Luna 9
+- [x] 5 terrain archetypes: `rolling` (default), `crater-field`, `spires`, `mesa`, `flats` — run after pad placement, pad-safe, deterministic per seed
+- [x] Archetype glyphs on mission-select (○●▲■≈)
+- [x] Per-archetype palette bias (crater→orange-red, spires→blue-grey, mesa→tan, flats→neutral)
+- [x] Both Canvas and WebGL backends pipe palette through `drawBackground`/`drawTerrain`
+
+**Part B — Random Mission + hidden pads + audio motifs ✅ COMPLETE (v0.6.1.0 PR 1.5 / commit 0866c46)**
+- [x] Random Mission title-screen option with LLM-driven `DifficultyConfig` synthesis + offline seeded fallback
+- [x] Dust plume hidden-pad reveal at low AGL with triple-score reward
+- [x] Per-archetype audio motif layered into adaptive soundtrack
+- [x] Archetype + palette encoded in seed-share URL (base64 alongside seed)
+- [x] Ghost schema v2 (forward-compat for archetype-aware replay)
+
+**Known gap — Campaign missions don't currently use archetypes.** Playtest 2026-04-24 surfaced that Campaign terrain reads bland because all 5 Campaign missions default to `rolling` — the infrastructure shipped but wasn't wired to Campaign. **Bundled into Sprint 7.4 below.**
+
+**Exit question:** Do players hit Random Mission more than once? ✅ Yes (confirmed in solo playtest).
+
+---
+
+### Sprint 7.2 — Rigid-Body Physics ✅ COMPLETE (v0.6.1.0 + v0.6.2.x)
+
+*CEO-reviewed + codex-challenged 2026-04-20. Plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-20-sprint-7.2-rigid-body-physics.md`. Shipped in two parts.*
+
+**Part 1 — Rigid-body rotation + RCS tank + angular-rate landing gate ✅ COMPLETE (v0.6.1.0)**
+- [x] Rotation has momentum; counter-burn required to stop spinning (~180°/sec² angular acceleration)
+- [x] Separate RCS propellant tank (STARTING_RCS, independent of main fuel)
+- [x] MAX_LANDING_ANGULAR_RATE = 8°/sec (a new landing gate — above this at touchdown = SPINNING crash)
+- [x] RCS meter + ROT readout in HUD under physicsVersion 3; hidden under v2
+- [x] `lander.physicsVersion: 2 | 3` per-flight state; v2 integrator frozen for ghost replay determinism
+- [x] Autopilot rewritten with PID guidance across altitude zones
+
+**Part 2 — Per-mission landing tolerances ✅ COMPLETE (v0.6.2.x)**
+- [x] `DifficultyConfig.maxLandingAngularRate` optional per-mission override (Apollo 11 = 6°/sec, Apollo 11 Authentic = 3°/sec)
+- [x] `DifficultyConfig.startingRCS` optional per-mission override (Luna 9 capped low; Artemis larger budget)
+- [x] `applyAuthenticPhysics(lander, era, authenticMode)` helper for authentic-era tightening
+- [x] Luna 9 autopilot-default-OFF mitigation (v0.6.2.2 — autopilot overshoots on seed 9_1966; player flies by default)
+
+**Exit question:** Does physics feel "rigid body real" without feeling punitive? ✅ Yes on v3, ✅ Yes on v2 (opt-out shipped in Sprint 7.3).
+
+---
+
+### Sprint 7.3 — Free Play Sandbox + Gravity-Storm Torque ✅ COMPLETE (v0.6.3.0 + v0.6.3.1)
+
+*Plan at `~/.claude/plans/i-wasnt-able-to-valiant-hellman.md`. Playtest 2026-04-24 confirmed the v2-default fixes Free Play fun without breaking Campaign progression.*
+
+**Part A — Free Play Sandbox ✅ COMPLETE (v0.6.3.0, PR #48)**
+- [x] Free Play defaults to v2 physics + zero hazards; Rigid-body (v3) and each hazard opt-in via Settings > Free Play Difficulty
+- [x] Campaign physics ramp: Missions 1-2 use v2, Missions 3-5 use v3 (with description hint)
+- [x] Pure `resolveFlightPolicy(gameMode, mission, prefs)` helper in `src/systems/GamePreferences.ts`
+- [x] `DifficultyConfig.physicsVersion?: 2 | 3` optional override
+- [x] Removed compile-time `PHYSICS_V3` kill switch in favor of per-lander/per-mission version
+- [x] 18 new tests for the preferences module (449 total)
+
+**Part B — Gravity-Storm Torque ✅ COMPLETE (v0.6.3.1, PR #47)**
+- [x] Gravity storms apply ±5°/s angular impulse on each phase transition (normal→high, high→low) — v3 only
+- [x] Seeded per-storm RNG (ghost replays on stormed missions stay byte-identical)
+- [x] `MAX_STORM_TORQUE` constant + `consumeAngularImpulse()` helper
+- [x] 7 new tests (456 total)
+
+**Exit question:** Does Free Play feel fun again? ✅ Yes (playtest 2026-04-24).
+
+---
+
+### Sprint 7.4 — Campaign Narrative (Tier 3) 🚧 IN PROGRESS (started 2026-04-24)
+
+*Design doc at `~/.gstack/projects/kenlacroix-moonlander-enhanced/root-main-design-20260424-150313.md`. Status: APPROVED + eng-reviewed. Bundles Campaign archetype-wiring (the gap noted in Sprint 7.1).*
+
+**Scope:**
+- [ ] Named flight instructor character (Dr. Liam Hoshi, NASA Descent Systems engineer) + CapCom Maya Chen for in-flight radio
+- [ ] ~35 unique dialogue lines across 5 Campaign missions (briefing + in-flight + 4-variant post-landing)
+- [ ] Branching post-landing dialogue on `FlightOutcome` (clean / bounced / crashed / timeout, × hazard-fired flag)
+- [ ] New `CampaignChatter` class (composes MissionChatter pattern, doesn't inherit); two new triggers `alien-spawn` + `storm-start`
+- [ ] `cleanClears: Set<number>` save state alongside `completedMissions` — mission menu shows checkmark (completion) + star (clean completion)
+- [ ] **Bundled: Campaign archetype + palette wiring.** Each of 5 Campaign missions gets an archetype + palette that pairs with the Hoshi briefing narrative (M1 rolling / M2 crater-field / M3 spires rust-red / M4 mesa blue-grey / M5 spires dark-crimson)
+- [ ] LLM persona prompt for Hoshi (offline-first; LLM enhancement is polish)
+- [ ] Skippable chatter (Space / click to advance multi-line post-landing analysis)
+- [ ] Regression test: every existing clean landing still unlocks progression; bounced never demotes a landing
+
+**Budget:** ~9-11 hr CC. Scope-escape lever built in (cut LLM persona + multi-line UI if budget crosses 11).
+
+**Exit question:** Does the 5-mission campaign feel like a story arc instead of five difficulty steps?
+
+---
+
+### Sprint 7.5 — Mobile Quality 🔜 PLANNED — L (~3-4hr CC)
+
+*Captured 2026-04-24 from user observation: "we need to thoroughly test and adjust for mobile use." Browser-only for now; Android-app wrap is a future thing. Folds in pre-existing P1 mobile retest TODO (Sprint 7.2 mobile touch-input retest under v3 physics) and the AI Theater split-screen mobile fallback TODO.*
+
+**Scope:**
+- [ ] **Audit pass on real mobile devices** — `/browse` mobile viewport (iPhone 14, Pixel 7 widths) for: title screen layout, mission select, in-flight HUD, Free Play settings overlay, AI Theater, terrain editor, share-card export, post-landing dialog
+- [ ] **Touch input retest under v3 physics** — Sprint 7.2 introduced rigid-body rotation + RCS; on mobile with no tactile feedback, two-axis attitude management may regress feel. Options if it does: heavier angular damping on touch, relaxed `MAX_LANDING_ANGULAR_RATE` on mobile, or first-spin tutorial card alone.
+- [ ] **Portrait overlay polish** — `going public` v0.6.2.3 added a portrait-orientation overlay; verify it covers all entry points (embed, shared seed URL, daily challenge, LLM-driven Random Mission)
+- [ ] **AI Theater mobile fallback** — split-screen doesn't fit; switch to sequential mode (player runs, then AI training takes over) on narrow viewports. Detection via `matchMedia("(max-width: 768px)")` or width threshold.
+- [ ] **HUD readability at 360px wide** — current HUD shrinks but may overflow with v3's added ROT readout + RCS meter
+- [ ] **Touch hit areas ≥44px** for all on-screen control buttons (iOS HIG / Material guideline)
+- [ ] **Performance check** — sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer; measure bundle size impact and load-to-interactive
+- [ ] **Audio autoplay gate** — Web Audio first-touch unlock works on mobile Safari + Chrome; verify across pause/resume cycles
+
+**Exit question:** Could a stranger pick up the game on their phone and complete Mission 1 without frustration?
+
+---
+
+### Sprint 7.6 — Animated Character Portraits 🔜 PLANNED — M (~2-3hr CC + art)
+
+*Captured 2026-04-24 from user observation. Tier 3 (Sprint 7.4) ships voice-only; portraits explicitly deferred to this sprint. Blocked on Sprint 7.4 ship + art assets sourced.*
+
+**Scope:**
+- [ ] Single SVG-or-pixel-art bust per character (Hoshi, Chen, future instructors)
+- [ ] 2-3 frame mouth animation driven by chatter event timing
+- [ ] Renders alongside dialogue line during briefing, in-flight chatter, post-landing analysis
+- [ ] Color-blind safe + speaker-prefix kept (additive, not replacement)
+- [ ] Mobile: portraits scale or hide on narrow viewports
+
+**Blocker:** art sourcing (commissioned, AI-generated, or pixel art pass)
+
+**Exit question:** Does seeing Hoshi's face for the first time on Mission 5 land harder than text alone?
+
+---
+
+### Sprint 11 — Peer-to-Peer Multiplayer (pushed back) — M (~2hr CC)
+
+*Originally numbered Sprint 7. Renumbered 11 because Sprints 7.1-7.6 inserted ahead — the ad-hoc sub-numbering happened because playtest feedback surfaced variety/physics/sandbox/narrative/mobile/portrait priorities faster than multiplayer.*
+
 - [ ] Audit physics code for determinism (no Math.random outside seeded PRNG)
 - [ ] WebRTC DataChannel, zero server (copy-paste offer/answer or PeerJS relay)
 - [ ] Same seed = same terrain, sync input frames only (~20 bytes/sec)
@@ -557,7 +684,7 @@ These move to a future "Sprint 6.5 — renderer primitive rework" if the visual 
 
 ---
 
-**Total estimated CC time:** ~28-32 hours across all sprints
+**Total estimated CC time:** ~28-32 hours originally estimated. Actuals: Sprints 7.1 + 7.2 + 7.3 shipped in roughly that budget. Remaining: Sprint 7.4 (~9-11 hr), Sprint 7.5 mobile (~3-4 hr), Sprint 7.6 portraits (~2-3 hr + art), Sprints 8-11 (~15 hr combined) = ~30 hr of post-7.4 roadmap work.
 
 ---
 

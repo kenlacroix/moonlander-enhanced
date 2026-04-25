@@ -1,6 +1,9 @@
 # Sprint 7.1 — Level Variety (plan)
 
-Status: **CEO-reviewed 2026-04-19 in SCOPE EXPANSION mode.** 5/5 expansion opportunities accepted. Cross-model adversarial review caught 5 gaps, all resolved below. Ready for /plan-eng-review, then implement.
+**Status: ✅ COMPLETE — Parts A + B both shipped.**
+- Part A palettes + archetypes → v0.6.0.1 (PR #40, commit `a70a5ae`).
+- Part B Random Mission + hidden pads + audio motifs + share URL + ghost schema v2 → PR #41, commit `0866c46`.
+- **Known gap:** Campaign missions still default to `rolling` archetype — bundled into Sprint 7.4 (Campaign Narrative).
 
 ## Context
 
