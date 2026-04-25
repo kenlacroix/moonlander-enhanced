@@ -4,24 +4,31 @@ Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current sc
 
 ---
 
-## P1 — Mobile Quality (Sprint 7.5)
+## P1 — Mobile Quality (Sprint 7.5) — ACTIVE
 
 Captured 2026-04-24 from user observation: "we need to thoroughly test and adjust for mobile use." Browser-only for now; Android-app wrap is a future thing.
 
-Folds in pre-existing P1 mobile retest TODO (Sprint 7.2 mobile touch-input retest under v3 physics) — see "Sprint 7.2 mobile touch-input retest" further down in this file. Folds in P2 AI Theater Mobile Responsive Fallback (also further down).
+Live mobile testing on canyou.land branch preview 2026-04-24 surfaced two foundational blockers (canvas viewport not scaling to phone, menu unnavigable via touch). Until these land, the rest of the audit is blocked because there's nothing to navigate to.
 
-- **Audit pass on real mobile devices:** `/browse` mobile viewport (iPhone 14, Pixel 7 widths) for title screen, mission select, in-flight HUD, Free Play settings overlay, AI Theater, terrain editor, share-card export, post-landing dialog
-- **Touch input retest under v3 physics:** Sprint 7.2 introduced rigid-body rotation + RCS — two-axis attitude management with no tactile feedback may regress feel. Options: heavier angular damping on touch, relaxed `MAX_LANDING_ANGULAR_RATE` on mobile, or first-spin tutorial card
-- **Portrait overlay polish:** v0.6.2.3 added portrait-orientation overlay; verify all entry points (embed, shared seed URL, daily challenge, Random Mission) show it correctly
-- **AI Theater mobile fallback:** split-screen doesn't fit; sequential mode below ~768px viewport
-- **HUD readability at 360px wide:** v3's added ROT readout + RCS meter may overflow
-- **Touch hit areas ≥44px** for all on-screen control buttons
-- **Performance check:** sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer
-- **Audio autoplay gate:** Web Audio first-touch unlock works on mobile Safari + Chrome across pause/resume cycles
+### Tier 1 — Foundational blockers (fix first)
 
-**Effort:** L (CC: ~3-4 hr — split into audit pass first, then targeted fixes)
-**Priority:** P1 — mobile is 30%+ of sessions and v3 physics is fresh
-**Depends on:** Sprint 7.4 ships (so the mobile audit covers narrative + portrait orientation overlay together)
+- [ ] **Canvas viewport stretch on mobile.** Game canvas renders at fixed 1280×720 internal resolution but no CSS scaling — overflows phone landscape viewport. Add `aspect-ratio: 16/9; max-width: 100vw; max-height: 100vh; width: auto; height: auto` to canvas elements so it scales to fit landscape phone screens.
+- [ ] **Mobile menu navigable.** Current behavior: tap middle = menuDown, tap upper 30% = menuSelect + restart (undiscoverable). Fix: tap-on-mission-row directly highlights AND launches that mission. Hit-test against rendered row positions in canvas coordinates. Mirrors mobile-list UX everywhere else.
+
+### Tier 2 — Once Tier 1 unblocks navigation
+
+- [ ] **Touch input retest under v3 physics.** Sprint 7.2 introduced rigid-body rotation + RCS — two-axis attitude management with no tactile feedback may regress feel. User-validated suggestion: dial/joystick-style on-screen control instead of left/right zones. Options: heavier angular damping on touch, relaxed `MAX_LANDING_ANGULAR_RATE` on mobile, virtual stick widget, or first-spin tutorial card.
+- [ ] **Sprint 7.4 chatter overlay validation at 360-414px.** Speaker prefix box may overflow narrow widths. Already structured in code but needs visual verification.
+- [ ] **Portrait overlay polish:** v0.6.2.3 added portrait-orientation overlay; verify all entry points (embed, shared seed URL, daily challenge, Random Mission).
+- [ ] **AI Theater mobile fallback:** split-screen doesn't fit; sequential mode below ~768px viewport.
+- [ ] **HUD readability at 360px wide:** v3's added ROT readout + RCS meter may overflow.
+- [ ] **Touch hit areas ≥44px** for all on-screen control buttons.
+- [ ] **Performance check:** sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer.
+- [ ] **Audio autoplay gate:** Web Audio first-touch unlock works on mobile Safari + Chrome across pause/resume cycles.
+
+**Effort:** Tier 1 ~1 hr CC, Tier 2 ~3-4 hr CC depending on dial-control complexity.
+**Priority:** P1 — mobile is 30%+ of sessions; canyou.land is public; v0.6.4.0 deployed to branch preview.
+**Depends on:** Tier 1 lands first or Tier 2 work blocks on inability to navigate to test screens.
 
 ---
 

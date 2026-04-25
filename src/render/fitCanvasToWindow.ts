@@ -16,11 +16,22 @@ import { CANVAS_HEIGHT, CANVAS_WIDTH } from "../utils/constants";
 export function fitCanvasToWindow(canvas: HTMLCanvasElement): void {
 	const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
 	const windowAspect = window.innerWidth / window.innerHeight;
+	// Sprint 7.5 Tier 1 — mobile viewport bug fix. The previous
+	// implementation set ONE axis to "100vh"/"100vw" (CSS unit) while
+	// computing the OTHER from `window.innerHeight`/`window.innerWidth`.
+	// On iOS Safari those don't agree: `100vh` is the full viewport
+	// including the URL bar's max-extent, while `window.innerHeight`
+	// is the currently-visible viewport (URL bar may be showing or
+	// collapsed). The mismatch produced wrong aspect ratio and
+	// bottom-cutoff. Use direct pixel values from window.inner* on
+	// both axes so both dimensions are computed from the same source.
 	if (windowAspect > aspect) {
-		canvas.style.height = "100vh";
+		// Phone landscape (wider than 16:9): fit to height, compute width
+		canvas.style.height = `${window.innerHeight}px`;
 		canvas.style.width = `${window.innerHeight * aspect}px`;
 	} else {
-		canvas.style.width = "100vw";
+		// Tall window (narrower than 16:9): fit to width, compute height
+		canvas.style.width = `${window.innerWidth}px`;
 		canvas.style.height = `${window.innerWidth / aspect}px`;
 	}
 }

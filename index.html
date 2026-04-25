@@ -15,7 +15,12 @@
                       display: flex;
                       justify-content: center;
                       align-items: center;
-                      height: 100vh;
+                      /* Sprint 7.5 — 100dvh is the dynamic viewport
+                         height that accounts for iOS Safari's URL-bar
+                         collapse. Old `100vh` would over-extend behind
+                         the URL bar, causing visible cutoff at the
+                         bottom of the canvas on phones. */
+                      height: 100dvh;
                       overflow: hidden;
                     }
                     /* Sprint 6 dual-canvas stack: WebGL gameplay on the

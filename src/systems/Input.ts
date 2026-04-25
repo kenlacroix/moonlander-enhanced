@@ -16,6 +16,14 @@ export interface InputState {
 	toggleRelay: boolean;
 	toggleAnnotations: boolean;
 	forkTakeover: boolean;
+	/** Sprint 7.5 Tier 1 — last touchend position translated to
+	 * canvas-internal coordinates (1280x720 space). Optional: only the
+	 * Input class populates it; synthetic InputState consumers (Autopilot,
+	 * AgentEnv, GhostReplay) leave it absent. Menu handlers hit-test
+	 * mission rows against this; flight handlers ignore it (they use
+	 * touchActive zones for left/right/thrust). One-shot: cleared after
+	 * getState() reads it. */
+	tapCanvas?: { x: number; y: number } | null;
 }
 
 /** Touch zone identifiers */
@@ -42,7 +50,18 @@ export class Input {
 	private touchActive = new Map<number, TouchZone>();
 	private _touchRestart = false;
 	private _touchMenuSelect = false;
+	/** Sprint 7.5 Tier 1 — last touchend canvas-coordinate position. */
+	private _tapCanvas: { x: number; y: number } | null = null;
+	private canvas: HTMLCanvasElement | null = null;
 	readonly isTouchDevice: boolean;
+
+	/** Sprint 7.5 Tier 1 — register the canvas element so touchend can
+	 * translate viewport CSS-pixel coordinates into canvas-internal
+	 * 1280x720 coordinates for hit-testing. Called from Game ctor.
+	 * Optional: keyboard-only consumers don't need it. */
+	setCanvas(canvas: HTMLCanvasElement): void {
+		this.canvas = canvas;
+	}
 
 	constructor() {
 		this.isTouchDevice =
@@ -142,14 +161,31 @@ export class Input {
 					const zone = this.touchActive.get(t.identifier);
 					this.touchActive.delete(t.identifier);
 
-					const relY = t.clientY / window.innerHeight;
-					if (relY < 0.3) {
-						// Tap upper area = restart / launch mission
+					// Sprint 7.5 Tier 1 — translate touchend to canvas
+					// coordinates so menu handlers can hit-test against
+					// rendered mission rows. Replaces the undiscoverable
+					// "tap upper third = select, middle third = scroll"
+					// Y-zone gesture. The new model: tap any visible
+					// mission row to highlight + launch it directly.
+					if (this.canvas) {
+						const rect = this.canvas.getBoundingClientRect();
+						const relX = (t.clientX - rect.left) / rect.width;
+						const relY = (t.clientY - rect.top) / rect.height;
+						if (relX >= 0 && relX <= 1 && relY >= 0 && relY <= 1) {
+							this._tapCanvas = {
+								x: relX * 1280,
+								y: relY * 720,
+							};
+						}
+					}
+
+					// Preserve tap-upper = restart for post-flight screen
+					// (where there's no list to hit-test against). Only
+					// fires _touchRestart, NOT _touchMenuSelect — menu
+					// state now uses tapCanvas hit-testing in handlers.
+					const relYWindow = t.clientY / window.innerHeight;
+					if (relYWindow < 0.3) {
 						this._touchRestart = true;
-						this._touchMenuSelect = true;
-					} else if (relY >= 0.3 && relY < 0.7) {
-						// Tap middle area in menu = scroll down through missions
-						this._menuDownPressed = true;
 					}
 				}
 			},
@@ -205,6 +241,7 @@ export class Input {
 			toggleRelay: this._relayToggled,
 			toggleAnnotations: this._annotationsToggled,
 			forkTakeover: this._forkPressed,
+			tapCanvas: this._tapCanvas,
 		};
 		this._restartPressed = false;
 		this._menuUpPressed = false;
@@ -222,6 +259,7 @@ export class Input {
 		this._forkPressed = false;
 		this._touchRestart = false;
 		this._touchMenuSelect = false;
+		this._tapCanvas = null;
 		return state;
 	}
 }

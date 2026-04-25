@@ -337,6 +337,10 @@ export class Game {
 		this.llm = new LLMIntegration(() => this.llmConfig);
 		this.audio = new Audio();
 		this.input = new Input();
+		// Sprint 7.5 Tier 1 — give Input the UI canvas so touchend can
+		// translate viewport CSS-pixel coords into canvas-internal
+		// coordinates for menu hit-testing.
+		this.input.setCanvas(this.canvasRenderer.canvas);
 		this.camera_ = new Camera();
 		this.particles_ = new ParticleSystem();
 		// Sprint 7.1 PR 1.5 — a `?cfg=` payload carries its own seed;
