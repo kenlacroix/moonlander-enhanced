@@ -15,24 +15,30 @@
                       display: flex;
                       justify-content: center;
                       align-items: center;
-                      /* Sprint 7.5 — 100dvh is the dynamic viewport
-                         height that accounts for iOS Safari's URL-bar
-                         collapse. Old `100vh` would over-extend behind
-                         the URL bar, causing visible cutoff at the
-                         bottom of the canvas on phones. */
+                      /* 100dvh = dynamic viewport, collapses with iOS URL bar */
+                      width: 100vw;
                       height: 100dvh;
                       overflow: hidden;
                     }
-                    /* Sprint 6 dual-canvas stack: WebGL gameplay on the
-                       bottom, Canvas 2D UI on top. Same size, same
-                       position. The UI canvas clears transparently when
-                       WebGL is active so the gameplay layer shows
-                       through. When the Canvas 2D fallback is active,
-                       the WebGL canvas is hidden and the UI canvas does
-                       both layers (opaque clear). */
+                    /* Sprint 7.5 — pure-CSS aspect-ratio sizing.
+                       The previous JS-driven fitCanvasToWindow had
+                       iOS timing problems (window.innerHeight wrong
+                       during URL-bar collapse). CSS aspect-ratio +
+                       max-width/height lets the browser handle it
+                       correctly across all viewport changes.
+
+                       Sprint 6 dual-canvas: GL on bottom, UI on top.
+                       Both must size identically. Setting the same
+                       max constraints + aspect-ratio on both produces
+                       lockstep sizing without JS coordination. */
                     #game-stage {
                       position: relative;
                       line-height: 0;
+                      aspect-ratio: 16 / 9;
+                      max-width: 100vw;
+                      max-height: 100dvh;
+                      width: auto;
+                      height: auto;
                     }
                     #game-canvas-gl,
                     #game-canvas {
@@ -40,6 +46,8 @@
                       image-rendering: pixelated;
                       touch-action: none;
                       user-select: none;
+                      width: 100%;
+                      height: 100%;
                     }
                     #game-canvas-gl {
                       position: absolute;

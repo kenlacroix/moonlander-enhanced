@@ -40,6 +40,7 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { generateRandomMission } from "./RandomMission";
 import { createRelayState } from "./RelayMode";
+import { getMissionListGeometry, getTitleGeometry } from "../utils/menuLayout";
 
 const TITLE_OPTION_COUNT = 8;
 
@@ -62,24 +63,19 @@ export function updateTitle(game: Game, input: InputState): void {
 			(game.titleSelection - 1 + TITLE_OPTION_COUNT) % TITLE_OPTION_COUNT;
 	if (input.menuDown)
 		game.titleSelection = (game.titleSelection + 1) % TITLE_OPTION_COUNT;
-	// Sprint 7.5 Tier 1 — tap-on-title-row direct select. Mirrors the
-	// mission-select handler. Geometry matches CanvasRenderer.drawTitle:
-	// rowSpacing=50, firstRowY = CANVAS_HEIGHT/2 - 20 - (extraRows*50)/2
-	// where extraRows = options.length - 5 = 3. Rows are 46 px tall
-	// (y - 14 to y + 32), centered horizontally with x ∈ [440, 840].
+	// Sprint 7.5 Tier 1 — tap-on-title-row direct select. Geometry from
+	// shared getTitleGeometry helper, in lockstep with CanvasRenderer.
 	if (input.tapCanvas) {
 		const tapX = input.tapCanvas.x;
 		const tapY = input.tapCanvas.y;
-		const rowSpacing = 50;
 		const optionCount = TITLE_OPTION_COUNT;
-		const firstRowY = 720 / 2 - 20 - ((optionCount - 5) * rowSpacing) / 2;
-		const xMin = 1280 / 2 - 200;
-		const xMax = 1280 / 2 + 200;
-		if (tapX >= xMin && tapX <= xMax) {
+		const geo = getTitleGeometry(game.input.isTouchDevice);
+		const firstRowY = geo.firstRowY(720, optionCount);
+		if (tapX >= geo.xMin && tapX <= geo.xMax) {
 			for (let i = 0; i < optionCount; i++) {
-				const y = firstRowY + i * rowSpacing;
+				const y = firstRowY + i * geo.rowSpacing;
 				const rowTop = y - 14;
-				const rowBot = y + 32;
+				const rowBot = y + (geo.rowHeight - 14);
 				if (tapY >= rowTop && tapY <= rowBot) {
 					game.titleSelection = i;
 					(input as { menuSelect: boolean }).menuSelect = true;
@@ -187,26 +183,22 @@ export function updateMenu(game: Game, input: InputState): void {
 	if (input.menuDown)
 		game.selectedMission = (game.selectedMission + 1) % missions.length;
 	// Sprint 7.5 Tier 1 — tap-on-mission-row direct select. Replaces the
-	// undiscoverable Y-zone gesture (tap upper third = select, middle =
-	// scroll). Hit-test against the rendered mission-list geometry from
-	// CanvasRenderer.drawMissionSelect: rows start at y=130, 48 px tall,
-	// up to 10 visible rows. Tapping a row sets selectedMission AND
-	// promotes the tap to a menuSelect so the rest of the menu handler
+	// undiscoverable Y-zone gesture. Hit-test against the rendered
+	// geometry from CanvasRenderer.drawMissionSelect via shared
+	// getMissionListGeometry helper. Tapping a row sets selectedMission
+	// AND promotes the tap to a menuSelect so the rest of the handler
 	// launches that mission this frame.
 	if (input.tapCanvas) {
 		const tapY = input.tapCanvas.y;
-		const startY = 130;
-		const lineHeight = 48;
-		const visibleCount = Math.min(missions.length, 10);
-		// Selection box for row i spans y - 16 to y + 32 (48 px tall),
-		// centered on y + 6 where the text renders. Match that geometry.
+		const { startY, lineHeight, visibleCount: max } = getMissionListGeometry(
+			game.input.isTouchDevice,
+		);
+		const visibleCount = Math.min(missions.length, max);
 		for (let i = 0; i < visibleCount; i++) {
 			const rowTop = startY + i * lineHeight - 16;
 			const rowBot = rowTop + lineHeight;
 			if (tapY >= rowTop && tapY <= rowBot) {
 				game.selectedMission = i;
-				// Synthesize menuSelect — the rest of this handler reads
-				// `input.menuSelect` to decide whether to launch.
 				(input as { menuSelect: boolean }).menuSelect = true;
 				break;
 			}

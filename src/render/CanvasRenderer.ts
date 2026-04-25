@@ -7,6 +7,7 @@ import type { Mission } from "../game/Missions";
 import type { Particle } from "../game/Particles";
 import type { LandingPad, TerrainData } from "../game/Terrain";
 import type { RetroVectorSkin } from "../graphics/skins/RetroVector";
+import { getMissionListGeometry, getTitleGeometry } from "../utils/menuLayout";
 import type { TelemetryFrame } from "../systems/Telemetry";
 import {
 	CANVAS_HEIGHT,
@@ -521,6 +522,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		totalCampaign: number,
 		dailyDateLabel: string,
 		dailyBestScore: number | undefined,
+		isTouch = false,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -572,19 +574,34 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// exactly on the baseline. New box is 46 tall (ends at y+32), clear of
 		// descenders with 3px of margin. rowSpacing bumped to 50 so adjacent
 		// boxes have a 4px gap and don't visually fuse into one strip.
-		const rowSpacing = 50;
-		const firstRowY =
-			CANVAS_HEIGHT / 2 - 20 - ((options.length - 5) * rowSpacing) / 2;
+		// Sprint 7.5 — touch devices get larger, more spaced rows for
+		// thumb-friendly hit targets. Geometry shared with updateTitle's
+		// hit-test via getTitleGeometry helper.
+		const titleGeo = getTitleGeometry(isTouch);
+		const rowSpacing = titleGeo.rowSpacing;
+		const rowHeight = titleGeo.rowHeight;
+		const boxHalfW = (titleGeo.xMax - titleGeo.xMin) / 2;
+		const firstRowY = titleGeo.firstRowY(CANVAS_HEIGHT, options.length);
 		for (let i = 0; i < options.length; i++) {
 			const y = firstRowY + i * rowSpacing;
 			const isSelected = i === selection;
 
 			if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
+				ctx.fillRect(
+					CANVAS_WIDTH / 2 - boxHalfW,
+					y - 14,
+					boxHalfW * 2,
+					rowHeight,
+				);
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 200, y - 14, 400, 46);
+				ctx.strokeRect(
+					CANVAS_WIDTH / 2 - boxHalfW,
+					y - 14,
+					boxHalfW * 2,
+					rowHeight,
+				);
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
@@ -619,6 +636,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 		authenticInfo?: { missionId: number; on: boolean } | null,
 		authenticBestScores?: Map<number, number>,
 		cleanClears?: Set<number>,
+		isTouch = false,
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
@@ -633,10 +651,10 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.font = '14px "Courier New", monospace';
 		ctx.fillText("SELECT MISSION", CANVAS_WIDTH / 2, 90);
 
-		// Mission list
-		const startY = 130;
-		const lineHeight = 48;
-		const visibleCount = Math.min(missions.length, 10);
+		// Sprint 7.5 — use shared geometry so the rendered row
+		// positions match what StateHandlers.updateMenu hit-tests.
+		const { startY, lineHeight, visibleCount: max } = getMissionListGeometry(isTouch);
+		const visibleCount = Math.min(missions.length, max);
 
 		for (let i = 0; i < visibleCount; i++) {
 			const m = missions[i];
@@ -1509,42 +1527,115 @@ export class CanvasRenderer implements IGameplayRenderer {
 	}
 
 	/** Draw semi-transparent touch control zones for mobile */
-	drawTouchControls(): void {
+	/**
+	 * Sprint 7.5 Tier 2 — visible virtual joystick (left) + thrust button
+	 * (right). Replaces the old huge faint rectangles that were
+	 * functionally invisible on phones.
+	 *
+	 * Geometry mirrors `STICK_CENTER`/`THRUST_CENTER` in Input.ts so the
+	 * visible affordance matches the actual hit zone. Stick knob position
+	 * is read from the live input state — when the player drags, the knob
+	 * follows the finger inside the radius.
+	 *
+	 * @param stickKnob — knob offset from stick center; (0,0) when no
+	 *   touch is on the stick. Renderer adds this to STICK_CENTER.
+	 * @param thrustHeld — true when the thrust button is currently held;
+	 *   renderer brightens the button fill so the player gets visual
+	 *   feedback that thrust is firing.
+	 */
+	drawTouchControls(
+		stickKnob: { dx: number; dy: number } = { dx: 0, dy: 0 },
+		thrustHeld = false,
+	): void {
 		const ctx = this.ctx;
 		ctx.save();
-		ctx.globalAlpha = 0.15;
 
-		const zoneH = CANVAS_HEIGHT * 0.35;
-		const zoneY = CANVAS_HEIGHT - zoneH;
-		const sideW = CANVAS_WIDTH * 0.3;
-		const centerX = sideW;
-		const centerW = CANVAS_WIDTH - sideW * 2;
+		// --- Virtual joystick (left) ---
+		const stickX = 220;
+		const stickY = 540;
+		const stickRadius = 100;
 
-		// Left rotate zone
-		ctx.fillStyle = "#4488ff";
-		ctx.fillRect(0, zoneY, sideW, zoneH);
+		// Outer ring (boundary of the stick's hit zone)
+		ctx.globalAlpha = 0.35;
+		ctx.fillStyle = "#003a5a";
+		ctx.beginPath();
+		ctx.arc(stickX, stickY, stickRadius, 0, Math.PI * 2);
+		ctx.fill();
 
-		// Right rotate zone
-		ctx.fillRect(CANVAS_WIDTH - sideW, zoneY, sideW, zoneH);
+		ctx.globalAlpha = 0.7;
+		ctx.strokeStyle = "#4488ff";
+		ctx.lineWidth = 3;
+		ctx.beginPath();
+		ctx.arc(stickX, stickY, stickRadius, 0, Math.PI * 2);
+		ctx.stroke();
 
-		// Thrust zone (center)
-		ctx.fillStyle = "#ff6600";
-		ctx.fillRect(centerX, zoneY, centerW, zoneH);
+		// Center cross (visual reference for the deadzone)
+		ctx.globalAlpha = 0.25;
+		ctx.strokeStyle = "#88aaff";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(stickX - 18, stickY);
+		ctx.lineTo(stickX + 18, stickY);
+		ctx.moveTo(stickX, stickY - 18);
+		ctx.lineTo(stickX, stickY + 18);
+		ctx.stroke();
 
-		// Labels
-		ctx.globalAlpha = 0.4;
+		// Knob (follows finger; defaults to center when released)
+		const knobX = stickX + stickKnob.dx;
+		const knobY = stickY + stickKnob.dy;
+		ctx.globalAlpha = 0.85;
+		ctx.fillStyle = "#88aaff";
+		ctx.beginPath();
+		ctx.arc(knobX, knobY, 38, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.strokeStyle = "#ffffff";
+		ctx.lineWidth = 2;
+		ctx.stroke();
+
+		// Label
+		ctx.globalAlpha = 0.55;
 		ctx.fillStyle = "#ffffff";
-		ctx.font = 'bold 18px "Courier New", monospace';
+		ctx.font = 'bold 13px "Courier New", monospace';
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText("< ROTATE", sideW / 2, zoneY + zoneH / 2);
-		ctx.fillText("ROTATE >", CANVAS_WIDTH - sideW / 2, zoneY + zoneH / 2);
-		ctx.fillText("THRUST", CANVAS_WIDTH / 2, zoneY + zoneH / 2);
+		ctx.fillText("ROTATE", stickX, stickY + stickRadius + 18);
 
-		// Tap hint at top
-		ctx.globalAlpha = 0.3;
-		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("TAP HERE TO RESTART", CANVAS_WIDTH / 2, 20);
+		// --- Thrust button (right) ---
+		const thrustX = 1060;
+		const thrustY = 540;
+		const thrustRadius = 100;
+
+		ctx.globalAlpha = thrustHeld ? 0.85 : 0.45;
+		ctx.fillStyle = thrustHeld ? "#ff8833" : "#5a2810";
+		ctx.beginPath();
+		ctx.arc(thrustX, thrustY, thrustRadius, 0, Math.PI * 2);
+		ctx.fill();
+
+		ctx.globalAlpha = thrustHeld ? 1.0 : 0.7;
+		ctx.strokeStyle = "#ff6600";
+		ctx.lineWidth = 3;
+		ctx.beginPath();
+		ctx.arc(thrustX, thrustY, thrustRadius, 0, Math.PI * 2);
+		ctx.stroke();
+
+		// Inner glow when active
+		if (thrustHeld) {
+			ctx.globalAlpha = 0.6;
+			ctx.fillStyle = "#ffcc66";
+			ctx.beginPath();
+			ctx.arc(thrustX, thrustY, 40, 0, Math.PI * 2);
+			ctx.fill();
+		}
+
+		// Label
+		ctx.globalAlpha = thrustHeld ? 1.0 : 0.7;
+		ctx.fillStyle = "#ffffff";
+		ctx.font = 'bold 16px "Courier New", monospace';
+		ctx.fillText("THRUST", thrustX, thrustY);
+
+		ctx.globalAlpha = 0.55;
+		ctx.font = 'bold 13px "Courier New", monospace';
+		ctx.fillText("HOLD", thrustX, thrustY + thrustRadius + 18);
 
 		ctx.restore();
 	}

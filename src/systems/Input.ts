@@ -27,7 +27,20 @@ export interface InputState {
 }
 
 /** Touch zone identifiers */
-type TouchZone = "left" | "right" | "thrust" | "none";
+type TouchZone = "left" | "right" | "thrust" | "stick" | "thrustBtn" | "none";
+
+/**
+ * Sprint 7.5 Tier 2 — virtual joystick + thrust button geometry in
+ * canvas-internal coordinates (1280x720 space). Both controls are
+ * thumb-friendly: 100-px stick radius (200-px diameter target) and
+ * 100-px thrust button radius. Far above the iOS 44-px hit target
+ * minimum even at 30%-scale on a small phone.
+ */
+export const STICK_CENTER = { x: 220, y: 540 };
+export const STICK_RADIUS = 100;
+export const STICK_DEADZONE = 25;
+export const THRUST_CENTER = { x: 1060, y: 540 };
+export const THRUST_RADIUS = 100;
 
 export class Input {
 	private keys = new Set<string>();
@@ -52,8 +65,22 @@ export class Input {
 	private _touchMenuSelect = false;
 	/** Sprint 7.5 Tier 1 — last touchend canvas-coordinate position. */
 	private _tapCanvas: { x: number; y: number } | null = null;
+	/** Sprint 7.5 Tier 2 — virtual stick knob position relative to its
+	 * center, in canvas pixels. Clamped to STICK_RADIUS. (0, 0) when no
+	 * touch is active. Renderer reads this to draw the knob. */
+	private _stickKnob: { dx: number; dy: number } = { dx: 0, dy: 0 };
+	/** Sprint 7.5 Tier 2 — true while a touch is held on the thrust
+	 * button (not just inside its bounds; tracked by touch identifier). */
+	private _thrustHeld = false;
 	private canvas: HTMLCanvasElement | null = null;
 	readonly isTouchDevice: boolean;
+
+	get stickKnob(): { dx: number; dy: number } {
+		return this._stickKnob;
+	}
+	get thrustHeld(): boolean {
+		return this._thrustHeld;
+	}
 
 	/** Sprint 7.5 Tier 1 — register the canvas element so touchend can
 	 * translate viewport CSS-pixel coordinates into canvas-internal
@@ -132,8 +159,10 @@ export class Input {
 				e.preventDefault();
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
-					const zone = this.getTouchZone(t.clientX, t.clientY);
+					const zone = this.classifyTouch(t.clientX, t.clientY);
 					this.touchActive.set(t.identifier, zone);
+					if (zone === "stick") this.updateStickKnob(t.clientX, t.clientY);
+					if (zone === "thrustBtn") this._thrustHeld = true;
 				}
 			},
 			{ passive: false },
@@ -145,8 +174,22 @@ export class Input {
 				e.preventDefault();
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
-					const zone = this.getTouchZone(t.clientX, t.clientY);
-					this.touchActive.set(t.identifier, zone);
+					const existing = this.touchActive.get(t.identifier);
+					// Sprint 7.5 Tier 2 — once a touch claims the stick or
+					// thrust button, it KEEPS that role even if the finger
+					// drags outside the control's hit zone. This is the
+					// expected mobile-game UX: pull the stick down past the
+					// edge and rotation still tracks. Only re-classify
+					// rotate/thrust legacy zones (which behave like the old
+					// drag-into-zone model).
+					if (existing === "stick") {
+						this.updateStickKnob(t.clientX, t.clientY);
+					} else if (existing === "thrustBtn") {
+						// Thrust button is binary; movement doesn't change state
+					} else {
+						const zone = this.classifyTouch(t.clientX, t.clientY);
+						this.touchActive.set(t.identifier, zone);
+					}
 				}
 			},
 			{ passive: false },
@@ -161,13 +204,29 @@ export class Input {
 					const zone = this.touchActive.get(t.identifier);
 					this.touchActive.delete(t.identifier);
 
-					// Sprint 7.5 Tier 1 — translate touchend to canvas
-					// coordinates so menu handlers can hit-test against
-					// rendered mission rows. Replaces the undiscoverable
-					// "tap upper third = select, middle third = scroll"
-					// Y-zone gesture. The new model: tap any visible
-					// mission row to highlight + launch it directly.
-					if (this.canvas) {
+					// Sprint 7.5 Tier 2 — release virtual stick / thrust button.
+					if (zone === "stick") {
+						this._stickKnob = { dx: 0, dy: 0 };
+					} else if (zone === "thrustBtn") {
+						// Multi-touch: another finger may still be on thrust.
+						let stillHeld = false;
+						for (const z of this.touchActive.values()) {
+							if (z === "thrustBtn") {
+								stillHeld = true;
+								break;
+							}
+						}
+						this._thrustHeld = stillHeld;
+					}
+
+					// Sprint 7.5 Tier 1 — tap-on-row hit testing for menu
+					// navigation. Skip if the touch was a virtual control
+					// (stick/thrust) — those aren't taps, they're held controls.
+					if (
+						zone !== "stick" &&
+						zone !== "thrustBtn" &&
+						this.canvas
+					) {
 						const rect = this.canvas.getBoundingClientRect();
 						const relX = (t.clientX - rect.left) / rect.width;
 						const relY = (t.clientY - rect.top) / rect.height;
@@ -184,7 +243,7 @@ export class Input {
 					// fires _touchRestart, NOT _touchMenuSelect — menu
 					// state now uses tapCanvas hit-testing in handlers.
 					const relYWindow = t.clientY / window.innerHeight;
-					if (relYWindow < 0.3) {
+					if (relYWindow < 0.3 && zone !== "stick" && zone !== "thrustBtn") {
 						this._touchRestart = true;
 					}
 				}
@@ -199,11 +258,68 @@ export class Input {
 		});
 	}
 
-	private getTouchZone(clientX: number, _clientY: number): TouchZone {
-		const relX = clientX / window.innerWidth;
-		if (relX < 0.3) return "left";
-		if (relX > 0.7) return "right";
-		return "thrust";
+	/**
+	 * Sprint 7.5 Tier 2 — convert a CSS-pixel touch position to canvas
+	 * coordinates and check which virtual control it lands on.
+	 *
+	 *   1. If inside the stick circle → "stick"
+	 *   2. If inside the thrust button circle → "thrustBtn"
+	 *   3. Otherwise (and not on a virtual control) → "none"
+	 *
+	 * The legacy left/right/thrust zone fallback is removed in this
+	 * sprint — visible virtual controls replace invisible zones. If the
+	 * canvas reference isn't set yet (very early in startup), fall back
+	 * to the old proportional-zone classification so keyboard-first
+	 * desktop dev sessions don't break.
+	 */
+	private classifyTouch(clientX: number, clientY: number): TouchZone {
+		if (!this.canvas) {
+			// Pre-canvas-init fallback. Should never matter on real mobile.
+			const relX = clientX / window.innerWidth;
+			if (relX < 0.3) return "left";
+			if (relX > 0.7) return "right";
+			return "thrust";
+		}
+		const rect = this.canvas.getBoundingClientRect();
+		const relX = (clientX - rect.left) / rect.width;
+		const relY = (clientY - rect.top) / rect.height;
+		if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return "none";
+		const canvasX = relX * 1280;
+		const canvasY = relY * 720;
+		const stickDx = canvasX - STICK_CENTER.x;
+		const stickDy = canvasY - STICK_CENTER.y;
+		if (stickDx * stickDx + stickDy * stickDy <= STICK_RADIUS * STICK_RADIUS) {
+			return "stick";
+		}
+		const thrustDx = canvasX - THRUST_CENTER.x;
+		const thrustDy = canvasY - THRUST_CENTER.y;
+		if (
+			thrustDx * thrustDx + thrustDy * thrustDy <=
+			THRUST_RADIUS * THRUST_RADIUS
+		) {
+			return "thrustBtn";
+		}
+		return "none";
+	}
+
+	/** Sprint 7.5 Tier 2 — translate a stick-touch's CSS-pixel position
+	 * to canvas coords and update the knob offset (clamped to STICK_RADIUS).
+	 * Called on touchstart and every touchmove for the stick touch. */
+	private updateStickKnob(clientX: number, clientY: number): void {
+		if (!this.canvas) return;
+		const rect = this.canvas.getBoundingClientRect();
+		const relX = (clientX - rect.left) / rect.width;
+		const relY = (clientY - rect.top) / rect.height;
+		const canvasX = relX * 1280;
+		const canvasY = relY * 720;
+		let dx = canvasX - STICK_CENTER.x;
+		let dy = canvasY - STICK_CENTER.y;
+		const dist = Math.sqrt(dx * dx + dy * dy);
+		if (dist > STICK_RADIUS) {
+			dx = (dx / dist) * STICK_RADIUS;
+			dy = (dy / dist) * STICK_RADIUS;
+		}
+		this._stickKnob = { dx, dy };
 	}
 
 	private hasTouchZone(zone: TouchZone): boolean {
@@ -214,18 +330,27 @@ export class Input {
 	}
 
 	getState(): InputState {
+		// Sprint 7.5 Tier 2 — virtual stick X-offset drives rotation.
+		// Past STICK_DEADZONE (25 px) the rotate input fires; below it,
+		// no rotation. Using a deadzone prevents accidental fire from
+		// finger jitter when the player intends to hold the stick centered.
+		const stickRotateLeft = this._stickKnob.dx < -STICK_DEADZONE;
+		const stickRotateRight = this._stickKnob.dx > STICK_DEADZONE;
 		const state: InputState = {
 			thrustUp:
 				this.keys.has("ArrowUp") ||
 				this.keys.has("KeyW") ||
+				this._thrustHeld ||
 				this.hasTouchZone("thrust"),
 			rotateLeft:
 				this.keys.has("ArrowLeft") ||
 				this.keys.has("KeyA") ||
+				stickRotateLeft ||
 				this.hasTouchZone("left"),
 			rotateRight:
 				this.keys.has("ArrowRight") ||
 				this.keys.has("KeyD") ||
+				stickRotateRight ||
 				this.hasTouchZone("right"),
 			restart: this._restartPressed || this._touchRestart,
 			menuUp: this._menuUpPressed,

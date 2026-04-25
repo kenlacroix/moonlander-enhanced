@@ -466,9 +466,15 @@ export class GameRenderer {
 			state.rcsTutorialFramesRemaining,
 		);
 
-		// Touch controls overlay
+		// Sprint 7.5 Tier 2 — visible virtual joystick + thrust button.
+		// Renderer reads the live stick knob position and thrust-held flag
+		// directly from the Input instance so the visible affordance
+		// always matches the actual physical-input state.
 		if (state.input.isTouchDevice) {
-			this.renderer.drawTouchControls();
+			this.renderer.drawTouchControls(
+				state.input.stickKnob,
+				state.input.thrustHeld,
+			);
 		}
 
 		if (state.forkReplay) {
@@ -634,6 +640,8 @@ export class GameRenderer {
 			CAMPAIGN.length,
 			getDailyDateLabel(),
 			getBestScore(getDailySeed()),
+			// Sprint 7.5 — touch devices get larger, more spaced rows.
+			state.input.isTouchDevice,
 		);
 	}
 
@@ -681,6 +689,8 @@ export class GameRenderer {
 			// Sprint 7.4 — pass cleanClears only for campaign mode so the
 			// star renders alongside [DONE] for missions cleared cleanly.
 			state.gameMode === "campaign" ? state.cleanClears : undefined,
+			// Sprint 7.5 — touch devices get larger rows for 44px hit targets.
+			state.input.isTouchDevice,
 		);
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {
