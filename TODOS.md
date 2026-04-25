@@ -25,6 +25,26 @@ Folds in pre-existing P1 mobile retest TODO (Sprint 7.2 mobile touch-input retes
 
 ---
 
+## P3 — Gamepad API support (in-game)
+
+Captured 2026-04-24 from user observation about physical controllers.
+
+Browser Gamepad API works in Chrome/Firefox/Safari with zero user-side install. Plug in any USB or Bluetooth gamepad (Xbox/PS4/8BitDo/SNES-style USB) and the browser exposes `navigator.getGamepads()`. MoonLander adds it as a third input source alongside keyboard + touch.
+
+- **Stick mapping:** left stick X-axis → rotation (deadzone ~0.15), right trigger → thrust (analog, maps to `thrustUp` boolean above ~0.3 threshold)
+- **Button mapping:** A/X (south button) → thrust as well (so single-button play works), Start → menuSelect, Back/Share → menuBack, B/Circle → restart
+- **Per-frame poll:** integrate into `Input.ts` `getState()` — gamepad state OR keyboard state OR touch state, with a "last input source" indicator for HUD
+- **Connection toast:** "GAMEPAD CONNECTED: Xbox Wireless Controller" appears for 2 sec on first connection per session
+- **Vibration feedback (rumble):** light buzz on RCS firing, heavy thump on crash, sustained low rumble during gravity storms (uses `gamepad.vibrationActuator`)
+
+**Why P3 not higher:** small audience (estimated 3-5% of players plug in a gamepad), but the implementation is genuinely small (~50-80 LOC) and the user experience win is real. Pair with Sprint 7.5 (Mobile Quality) since both touch the input system.
+
+**Effort:** S (CC: ~1.5-2 hr — Input.ts integration + vibration patterns + connection UI)
+**Depends on:** Nothing.
+**Note:** This is the off-the-shelf gamepad path. The DIY-controller-for-learning-to-code angle is a separate side project — see `SIDE_PROJECTS.md` at repo root.
+
+---
+
 ## P2 — Playtest observations 2026-04-24 (5 ideas captured for tracking)
 
 ### Procedural terrain variety — second-algorithm pass
