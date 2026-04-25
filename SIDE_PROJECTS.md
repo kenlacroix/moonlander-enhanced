@@ -84,6 +84,121 @@ The buy-test-decide loop costs $15 + 4 hours. Cheapest possible signal on whethe
 
 ---
 
+## AI-Enhanced Features (the differentiation layer)
+
+The "AI-enhanced controller for an AI-enhanced game" framing only works if the AI does real work, not chatbot decoration. Most DIY-controller tutorials slap an LLM on the box and call it AI. The interesting question for THIS project is: what's uniquely possible because MoonLander Enhanced already has the AI substrate?
+
+The features below are ranked by how much they leverage MoonLander's existing infrastructure (TF.js DQN agent, Telemetry recording, LLM persona pipeline, Ghost Replay system) vs. how much new work they require.
+
+### Tier 1 — Ship in v1 (uses existing MoonLander infrastructure)
+
+#### A. Personalized RL clone — "your AI plays you"
+
+The single most differentiated angle. MoonLander already has a TF.js DQN agent (`src/ai/RLAgent.ts`) that trains in-browser. Train one on **your specific controller's input stream** — including reaction time, your wiring's noise floor, your hand-tremor patterns, your characteristic over- or under-correction.
+
+The RL agent doesn't just learn to fly the lander; it learns to fly *like you*. After 50 flights with your controller, Ghost Replay shows two ghosts: your real best run, and your AI-clone playing on a model of you. Race yourself. Watch your AI clone make the same mistake you'd make.
+
+**Why MoonLander uniquely enables this:**
+- TF.js training pipeline already exists (Sprint 2.5 + 2.7)
+- Telemetry recording already at 4 Hz (`src/systems/Telemetry.ts`)
+- Ghost replay infrastructure already in place
+- Save-state for AI weights in IndexedDB already shipped (Sprint 2.7)
+
+**New work:** ~3-4 hours — capture controller input stream alongside game state during training, feed both to AgentEnv, store per-controller-fingerprint weight set. The hard part (training infrastructure) is done.
+
+**Demo moment:** "Watch this — that's MY AI." Your controller. Your DQN. Your style.
+
+#### B. Hoshi as build tutor
+
+Sprint 7.4 just shipped a NASA Descent Systems engineer character with an offline-first LLM persona prompt (`src/api/CampaignChatter.ts` + `src/api/MissionBriefing.ts`). Reuse the same character voice for the hardware tutorial.
+
+Tutorial page voice:
+> "FLIGHT, Hoshi. Today we're wiring the accelerometer to your micro:bit. Solder the data line to pin 16. While the joint cools, let me tell you about how Apollo's hand controller had four mechanical backups stacked on top of each other — same redundancy logic you're about to build with two buttons."
+
+**Why MoonLander uniquely enables this:**
+- Hoshi character voice + banned-phrase list + persona prompt ALL EXIST
+- LLM streaming infrastructure with offline fallback already shipped
+- Voice purity tests + voice-contamination guard already enforce consistency
+
+**New work:** ~2 hours — extend the persona prompt with hardware-tutorial context, add a "Hoshi mode" UI on the tutorial page that wraps prose in his voice. The character work is done.
+
+**Demo moment:** The same engineer from your campaign briefing is now teaching you to solder. Continuity across game and tutorial = a coherent universe instead of two adjacent products.
+
+#### C. Telemetry-driven firmware tuning
+
+Every flight is already logged at 4Hz with altitude, vy, vx, fuel, angle, angular rate. After 20 flights with a DIY controller, an LLM analyzes the patterns and writes back to the player.
+
+Example output:
+> "Your rotations consistently overshoot by 3-4° before you counter-correct. That's a damping problem. Here's a 2-line patch for your firmware:
+> ```python
+> reading = accel.x * 0.7 + last_reading * 0.3
+> ```
+> Reflash and try Mission 3 again."
+
+The game becomes a feedback loop into the player's own hardware. Each tuning pass measurably improves their flights.
+
+**Why MoonLander uniquely enables this:**
+- Telemetry already records the right metrics at the right cadence
+- Flight Recorder already generates per-flight summaries (`src/systems/FlightRecorder.ts`)
+- Crash analysis pipeline already exists (`src/api/CrashExplainer.ts`) — same LLM-with-rule-based-fallback pattern
+
+**New work:** ~3 hours — telemetry-to-firmware-recommendation prompt, web UI showing "your last 20 flights" with the suggested patch, copy-to-clipboard button. The data pipeline is already there; this is just one more consumer of it.
+
+**Demo moment:** Buy a kit, build a controller, fly badly, get a personalized firmware patch, reflash, fly better. Tight feedback loop.
+
+### Tier 2 — Post-v1 (real but heavier)
+
+#### D. AI debugging buddy
+
+Plug in micro:bit, paste serial output into a chat field, LLM has full schematic + firmware context (you wrote it together) and diagnoses issues:
+> "Your accelerometer is reporting 0xFF every read. Pin 19 isn't actually wired to GND — check your soldering on the second-from-left pad."
+
+Self-paced learners die at the "why isn't this working" wall. This unlocks them. **Generic tutorial sites can't do this** because they don't have your specific schematic and firmware in context. The MoonLander tutorial path knows exactly what code you ran because the tutor just generated it for you (Tier 1 feature B).
+
+**New work:** ~4-5 hours — serial port WebUSB capture, chat UI, prompt engineering for diagnosis. No MoonLander dependencies; could be a standalone web app.
+
+#### E. Adaptive co-pilot — TinyML on the chip
+
+Tiny ML model running ON the controller itself (TensorFlow Lite Micro fits on a Pico or ESP32). Smooths your input, or takes over briefly during anomalies (gravity storm hits, micro:bit assist-stabilizes for 200ms while you re-orient).
+
+The "learn from your style" part lives on the hardware. Slick. The model is exported from MoonLander's TF.js training (Tier 1 feature A) — you train your AI clone in the browser, then quantize-and-flash a smaller version onto your controller.
+
+**Why this is hard:** quantization-aware training, model size constraints, uploading model weights via WebUSB, on-chip inference timing. Real engineering project, ~2-3 weeks for someone new to TinyML.
+
+**Why this is the cool one:** the controller becomes an AI artifact. It carries a model trained on you, running on a $4 chip, augmenting your gameplay in real time.
+
+#### F. AI vision — webcam sees your breadboard
+
+Laptop webcam looks at your breadboard. Computer vision identifies "two buttons, a potentiometer, an accelerometer" and *generates a firmware mapping for you*. The user just shows the camera what they built and the firmware writes itself.
+
+Closes the "I don't know what this circuit is for" gap for true beginners. Scope-expensive — needs a vision model fine-tuned on breadboard photos, or a multi-modal LLM with fast enough inference for real-time. Probably $$$ in API calls per session unless cached aggressively.
+
+**New work:** ~6-8 hours minimum, probably more. Real research project, not a build.
+
+### Tier 3 — Speculative (interesting but won't ship)
+
+#### G. Adaptive haptics via on-chip ML
+Train a tiny model on what flight conditions a player wants haptic feedback for. Different vibration patterns per player preference, learned not configured. Cool but niche; most players will be fine with hardcoded patterns.
+
+#### H. Personalized curriculum
+After Module 1 (button + accelerometer), LLM looks at gameplay and suggests: "Your fuel management is your weak spot — let's add an analog throttle next." Personalized progression. Useful only if the curriculum is large enough that personalization matters; in v1 with 3-5 modules, just sequencing them matters more.
+
+### What I'd actually pick for v1
+
+**Tier 1 features A + B + C, in that order.** A is the differentiator (personalized RL clone). B is the polish that ties it back to MoonLander narratively (Hoshi continuity). C is the genuinely useful loop (firmware tuning from flight data).
+
+**All three reuse infrastructure that already exists in MoonLander Enhanced.** Without it, you'd be spending ~30 hours building TF.js training pipelines, telemetry systems, and LLM persona infrastructure before you could even start on the hardware-tutorial part. Because MoonLander has them, the hardware tutorial inherits all of it for free.
+
+That's the honest answer to "what would AI-enhanced DIY look like for THIS project specifically": a controller that **gets better the longer you use it**, narrated by **a character who already exists**, that produces **firmware patches generated from real flight data**. Not a chatbot strapped to a breadboard.
+
+### What this rules out
+
+- "Just slap GPT on the assembly instructions" — every other DIY tutorial site does this. It's not differentiated and the LLM has no context about what you actually built.
+- "Make the controller voice-controlled" — adds zero value, eats a microphone budget, fails on noisy desks.
+- "Generative AI controller designs" — the user wants to learn to build, not have the design picked for them. AI's role is to teach and tune, not to take over creative decisions.
+
+---
+
 ## Related ideas (lighter sketches)
 
 These are smaller side-project notes adjacent to MoonLander Enhanced. Add detail if and when they get serious.
