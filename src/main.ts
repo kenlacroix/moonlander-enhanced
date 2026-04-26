@@ -55,4 +55,48 @@ const shareConfig = readShareConfigFromUrl();
 		shareConfig ?? undefined,
 	);
 	game.start();
+
+	// Sprint 7.5 Tier 4 — auto-fullscreen on first touch. Chrome's URL
+	// bar eats ~10-15% of phone landscape height even after collapse;
+	// requesting Fullscreen API hides it entirely. Skip if:
+	//   - not a touch device (desktop users don't expect fullscreen)
+	//   - already in standalone display mode (PWA install — fullscreen
+	//     already active via manifest "display": "fullscreen")
+	//   - in embed mode (iframe context — fullscreen would break host)
+	//
+	// One-shot: arm a single touchend listener that requests fullscreen
+	// on first user gesture (browsers require user activation for the
+	// API), then removes itself. Subsequent flights stay fullscreen for
+	// the session unless the user explicitly exits via system back.
+	//
+	// iOS Safari only supports fullscreen on <video> elements, not
+	// arbitrary HTML — the call below is a silent no-op there. iOS users
+	// get fullscreen via PWA install only.
+	const isStandalone =
+		window.matchMedia("(display-mode: standalone)").matches ||
+		window.matchMedia("(display-mode: fullscreen)").matches;
+	const isTouchDevice =
+		"ontouchstart" in window || navigator.maxTouchPoints > 0;
+	if (isTouchDevice && !isStandalone && !embedMode) {
+		const tryFullscreen = () => {
+			window.removeEventListener("touchend", tryFullscreen);
+			window.removeEventListener("click", tryFullscreen);
+			const el = document.documentElement as HTMLElement & {
+				webkitRequestFullscreen?: () => Promise<void>;
+			};
+			if (el.requestFullscreen) {
+				el.requestFullscreen().catch(() => {
+					/* user denied / browser refused — silent fallback */
+				});
+			} else if (el.webkitRequestFullscreen) {
+				try {
+					el.webkitRequestFullscreen();
+				} catch {
+					/* webkit safari quirk */
+				}
+			}
+		};
+		window.addEventListener("touchend", tryFullscreen, { once: true });
+		window.addEventListener("click", tryFullscreen, { once: true });
+	}
 })();
