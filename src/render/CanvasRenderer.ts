@@ -528,6 +528,12 @@ export class CanvasRenderer implements IGameplayRenderer {
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
+		// Sprint 7.5 Tier 4 — touch devices get 1.45x font scaling on
+		// title screen so option names + descriptions are legible at
+		// phone-landscape canvas downscale. Helper mirrors HUD.ts pattern.
+		const fMul = isTouch ? 1.45 : 1;
+		const tf = (px: number, bold = false): string =>
+			`${bold ? "bold " : ""}${Math.round(px * fMul)}px "Courier New", monospace`;
 
 		// Mode options
 		const dailyBestLabel = dailyBestScore ? `  Best: ${dailyBestScore}` : "";
@@ -549,15 +555,25 @@ export class CanvasRenderer implements IGameplayRenderer {
 		// first selection box; anchoring titles relative to firstRowY
 		// keeps the layout stable as options grow.
 		ctx.fillStyle = "#00ff88";
-		ctx.font = 'bold 48px "Courier New", monospace';
+		ctx.font = tf(48, true);
 		ctx.textAlign = "center";
 		const extraRows = Math.max(0, options.length - 5);
 		const titleY = CANVAS_HEIGHT / 2 - 120 - (extraRows * 50) / 2;
 		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, titleY);
 
 		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.font = '14px "Courier New", monospace';
+		ctx.font = tf(14);
 		ctx.fillText("A LUNAR DESCENT SIMULATOR", CANVAS_WIDTH / 2, titleY + 20);
+		// Touch hint — explains the tap interaction pattern for new players.
+		if (isTouch) {
+			ctx.fillStyle = "#00ff88";
+			ctx.font = tf(13);
+			ctx.fillText(
+				"TAP A MODE TO LAUNCH",
+				CANVAS_WIDTH / 2,
+				titleY + Math.round(40 * fMul),
+			);
+		}
 		const descriptions = [
 			"10 missions. Pick any. Beat your ghost.",
 			`5 missions, escalating difficulty. ${completedCount}/${totalCampaign} complete.`,
@@ -607,25 +623,31 @@ export class CanvasRenderer implements IGameplayRenderer {
 			}
 
 			ctx.fillStyle = isSelected ? "#00ff88" : "#666666";
-			ctx.font = `bold 22px "Courier New", monospace`;
+			ctx.font = tf(22, true);
 			ctx.textAlign = "center";
 			ctx.fillText(options[i], CANVAS_WIDTH / 2, y + 8);
 
 			ctx.fillStyle = isSelected
 				? "rgba(255, 255, 255, 0.5)"
 				: "rgba(255, 255, 255, 0.25)";
-			ctx.font = '13px "Courier New", monospace';
-			ctx.fillText(descriptions[i], CANVAS_WIDTH / 2, y + 26);
+			ctx.font = tf(13);
+			ctx.fillText(
+				descriptions[i],
+				CANVAS_WIDTH / 2,
+				y + Math.round(26 * fMul),
+			);
 		}
 
-		// Controls
-		ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText(
-			"[UP/DOWN] Select    [ENTER] Start    [S] AI Settings",
-			CANVAS_WIDTH / 2,
-			CANVAS_HEIGHT - 30,
-		);
+		// Controls — desktop only. Touch users see "TAP TO LAUNCH" near title.
+		if (!isTouch) {
+			ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+			ctx.font = '14px "Courier New", monospace';
+			ctx.fillText(
+				"[UP/DOWN] Select    [ENTER] Start    [S] AI Settings",
+				CANVAS_WIDTH / 2,
+				CANVAS_HEIGHT - 30,
+			);
+		}
 
 		ctx.restore();
 	}
@@ -642,16 +664,25 @@ export class CanvasRenderer implements IGameplayRenderer {
 	): void {
 		const ctx = this.ctx;
 		ctx.save();
+		// Sprint 7.5 Tier 4 — touch fonts scale 1.5x for legibility.
+		const fMul = isTouch ? 1.5 : 1;
+		const mf = (px: number, bold = false): string =>
+			`${bold ? "bold " : ""}${Math.round(px * fMul)}px "Courier New", monospace`;
+		const dy26 = Math.round(26 * fMul);
 
 		// Title
 		ctx.fillStyle = "#00ff88";
-		ctx.font = 'bold 32px "Courier New", monospace';
+		ctx.font = mf(32, true);
 		ctx.textAlign = "center";
 		ctx.fillText("MOONLANDER", CANVAS_WIDTH / 2, 60);
 
 		ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText("SELECT MISSION", CANVAS_WIDTH / 2, 90);
+		ctx.font = mf(14);
+		ctx.fillText(
+			isTouch ? "TAP A MISSION TO LAUNCH" : "SELECT MISSION",
+			CANVAS_WIDTH / 2,
+			90,
+		);
 
 		// Sprint 7.5 — use shared geometry so the rendered row
 		// positions match what StateHandlers.updateMenu hit-tests.
@@ -670,34 +701,38 @@ export class CanvasRenderer implements IGameplayRenderer {
 				!campaignProgress.has(m.id - 1);
 			const isCompleted = campaignProgress?.has(m.id) ?? false;
 
-			// Selection highlight. Box is generous enough for the dual-track
-			// BEST / AUTHENTIC score stack on the right and the description
-			// line on the left without clipping descenders or glyph tops.
+			// Selection highlight. Box height matches the lineHeight of
+			// the geometry helper so the box always wraps the row's text
+			// cleanly on both desktop and touch.
 			if (isSelected && !isLocked) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
-				ctx.fillRect(CANVAS_WIDTH / 2 - 340, y - 16, 680, 48);
+				ctx.fillRect(
+					CANVAS_WIDTH / 2 - 340,
+					y - 16,
+					680,
+					lineHeight,
+				);
 
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
-				ctx.strokeRect(CANVAS_WIDTH / 2 - 340, y - 16, 680, 48);
+				ctx.strokeRect(
+					CANVAS_WIDTH / 2 - 340,
+					y - 16,
+					680,
+					lineHeight,
+				);
 			}
 
 			// Status indicator for campaign
 			ctx.textAlign = "left";
 			if (campaignProgress !== undefined) {
-				ctx.font = '14px "Courier New", monospace';
+				ctx.font = mf(14);
 				if (isCompleted) {
 					ctx.fillStyle = "#00ff88";
 					ctx.fillText("[DONE]", CANVAS_WIDTH / 2 - 300, y + 6);
-					// Sprint 7.4 — clean-clear star. Renders next to [DONE] when
-					// the mission was completed with a `clean` FlightOutcome
-					// (not bounced). Bright gold to distinguish from the
-					// completion green; absence of star on a [DONE] mission is
-					// the visible "you bounced this — try again for the star"
-					// signal that drives Tier 3 replay value.
 					if (cleanClears?.has(m.id)) {
 						ctx.fillStyle = "#ffd84a";
-						ctx.font = 'bold 16px "Courier New", monospace';
+						ctx.font = mf(16, true);
 						ctx.fillText("\u2605", CANVAS_WIDTH / 2 - 240, y + 6);
 					}
 				} else if (isLocked) {
@@ -709,7 +744,7 @@ export class CanvasRenderer implements IGameplayRenderer {
 				}
 			} else {
 				ctx.fillStyle = isSelected ? "#00ff88" : "#888888";
-				ctx.font = 'bold 16px "Courier New", monospace';
+				ctx.font = mf(16, true);
 				ctx.fillText(
 					`${String(m.id).padStart(2, "0")}`,
 					CANVAS_WIDTH / 2 - 300,
@@ -717,18 +752,13 @@ export class CanvasRenderer implements IGameplayRenderer {
 				);
 			}
 
-			// Sprint 7.1 — archetype glyph. Small unicode character
-			// prepended to the mission name in archetype bias color.
-			// Players recognize terrain character at a glance (Apollo 11
-			// rolling vs Luna 9 crater-field vs Artemis III mesa) before
-			// picking. When the mission has no archetype set, no glyph
-			// renders.
+			// Sprint 7.1 — archetype glyph.
 			const archetype = m.difficulty?.archetype;
 			if (archetype && !isLocked) {
 				const glyphInfo = ARCHETYPE_GLYPHS[archetype];
 				if (glyphInfo) {
 					ctx.fillStyle = isSelected ? glyphInfo.color : glyphInfo.dimColor;
-					ctx.font = 'bold 16px "Courier New", monospace';
+					ctx.font = mf(16, true);
 					ctx.fillText(glyphInfo.glyph, CANVAS_WIDTH / 2 - 245, y + 6);
 				}
 			}
@@ -736,20 +766,23 @@ export class CanvasRenderer implements IGameplayRenderer {
 			// Mission name
 			const dimmed = isLocked;
 			ctx.fillStyle = dimmed ? "#444444" : isSelected ? "#ffffff" : "#aaaaaa";
-			ctx.font = `${isSelected && !isLocked ? "bold " : ""}16px "Courier New", monospace`;
+			ctx.font = mf(16, isSelected && !isLocked);
 			ctx.fillText(m.name, CANVAS_WIDTH / 2 - 220, y + 6);
 
-			// Description
+			// Description — only render when there's vertical room. On
+			// touch the larger lineHeight gives ~28px clearance for the
+			// description below the name; on desktop this matches the
+			// legacy y+22 baseline.
 			ctx.fillStyle = dimmed
 				? "rgba(255, 255, 255, 0.15)"
 				: isSelected
 					? "rgba(255, 255, 255, 0.6)"
 					: "rgba(255, 255, 255, 0.3)";
-			ctx.font = '12px "Courier New", monospace';
+			ctx.font = mf(12);
 			ctx.fillText(
 				isLocked ? "Complete previous mission to unlock" : m.description,
 				CANVAS_WIDTH / 2 - 220,
-				y + 22,
+				y + (isTouch ? Math.round(22 * fMul) : 22),
 			);
 
 			// Best score — vanilla on the first line, Authentic best
@@ -760,30 +793,32 @@ export class CanvasRenderer implements IGameplayRenderer {
 				ctx.textAlign = "right";
 				if (best !== undefined) {
 					ctx.fillStyle = "#00ff88";
-					ctx.font = '14px "Courier New", monospace';
+					ctx.font = mf(14);
 					ctx.fillText(`BEST: ${best}`, CANVAS_WIDTH / 2 + 300, y + 4);
 				}
 				if (authBest !== undefined) {
 					ctx.fillStyle = ERA_COLORS.APOLLO_AMBER;
-					ctx.font = '11px "Courier New", monospace';
+					ctx.font = mf(11);
 					ctx.fillText(
 						`AUTHENTIC: ${authBest}`,
 						CANVAS_WIDTH / 2 + 300,
-						y + 20,
+						y + Math.round(20 * fMul),
 					);
 				}
 			}
 		}
 
-		// Controls hint
-		ctx.textAlign = "center";
-		ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.font = '14px "Courier New", monospace';
-		ctx.fillText(
-			"[UP/DOWN] Select    [ENTER] Launch    [I] Import ghost    [ESC] Back",
-			CANVAS_WIDTH / 2,
-			CANVAS_HEIGHT - 30,
-		);
+		// Controls hint — desktop only. Touch users see "TAP A MISSION TO LAUNCH" near top.
+		if (!isTouch) {
+			ctx.textAlign = "center";
+			ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+			ctx.font = '14px "Courier New", monospace';
+			ctx.fillText(
+				"[UP/DOWN] Select    [ENTER] Launch    [I] Import ghost    [ESC] Back",
+				CANVAS_WIDTH / 2,
+				CANVAS_HEIGHT - 30,
+			);
+		}
 
 		// Sprint 5.5 — Authentic Mode indicator for historic mission-select.
 		// Only rendered when the caller passes authenticInfo (i.e. gameMode
