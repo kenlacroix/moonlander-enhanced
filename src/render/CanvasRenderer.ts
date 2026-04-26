@@ -604,7 +604,30 @@ export class CanvasRenderer implements IGameplayRenderer {
 			const y = firstRowY + i * rowSpacing;
 			const isSelected = i === selection;
 
-			if (isSelected) {
+			// Sprint 7.5 Tier 5 — every option looks like a button on
+			// touch (subtle outline + faint fill). Selected row gets a
+			// stronger highlight on top.
+			if (isTouch) {
+				ctx.fillStyle = isSelected
+					? "rgba(0, 255, 136, 0.12)"
+					: "rgba(255, 255, 255, 0.04)";
+				ctx.fillRect(
+					CANVAS_WIDTH / 2 - boxHalfW,
+					y - 14,
+					boxHalfW * 2,
+					rowHeight,
+				);
+				ctx.strokeStyle = isSelected
+					? "#00ff88"
+					: "rgba(255, 255, 255, 0.18)";
+				ctx.lineWidth = isSelected ? 2 : 1;
+				ctx.strokeRect(
+					CANVAS_WIDTH / 2 - boxHalfW,
+					y - 14,
+					boxHalfW * 2,
+					rowHeight,
+				);
+			} else if (isSelected) {
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
 				ctx.fillRect(
 					CANVAS_WIDTH / 2 - boxHalfW,
@@ -701,10 +724,33 @@ export class CanvasRenderer implements IGameplayRenderer {
 				!campaignProgress.has(m.id - 1);
 			const isCompleted = campaignProgress?.has(m.id) ?? false;
 
-			// Selection highlight. Box height matches the lineHeight of
-			// the geometry helper so the box always wraps the row's text
-			// cleanly on both desktop and touch.
-			if (isSelected && !isLocked) {
+			// Sprint 7.5 Tier 5 — touch devices show a subtle button-like
+			// outline + faint fill on EVERY tappable row (not just the
+			// selected one), so the whole list reads as a list of buttons
+			// instead of just text. Selected row gets a stronger outline
+			// + brighter fill on top.
+			if (isTouch && !isLocked) {
+				ctx.fillStyle = isSelected
+					? "rgba(0, 255, 136, 0.12)"
+					: "rgba(255, 255, 255, 0.04)";
+				ctx.fillRect(
+					CANVAS_WIDTH / 2 - 340,
+					y - 16,
+					680,
+					lineHeight,
+				);
+				ctx.strokeStyle = isSelected
+					? "#00ff88"
+					: "rgba(255, 255, 255, 0.18)";
+				ctx.lineWidth = isSelected ? 2 : 1;
+				ctx.strokeRect(
+					CANVAS_WIDTH / 2 - 340,
+					y - 16,
+					680,
+					lineHeight,
+				);
+			} else if (isSelected && !isLocked) {
+				// Desktop: only the selected row gets a highlight (legacy).
 				ctx.fillStyle = "rgba(0, 255, 136, 0.1)";
 				ctx.fillRect(
 					CANVAS_WIDTH / 2 - 340,
@@ -712,7 +758,6 @@ export class CanvasRenderer implements IGameplayRenderer {
 					680,
 					lineHeight,
 				);
-
 				ctx.strokeStyle = "#00ff88";
 				ctx.lineWidth = 1;
 				ctx.strokeRect(

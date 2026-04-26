@@ -268,17 +268,21 @@ export class GameRenderer {
 		ctx.restore();
 	}
 
-	private drawChatterCaption(text: string): void {
+	private drawChatterCaption(text: string, isTouch = false): void {
 		const ctx = this.renderer.ctx;
 		ctx.save();
-		ctx.font = "13px 'Courier New', monospace";
+		// Sprint 7.5 Tier 5 — bump chatter font on touch. The caption is
+		// the only narrative beat during flight; at 13 px on phone scale
+		// (~7 CSS px) it was unreadable.
+		const fontPx = isTouch ? 20 : 13;
+		ctx.font = `${fontPx}px 'Courier New', monospace`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "top";
-		const padX = 14;
-		const padY = 6;
+		const padX = isTouch ? 18 : 14;
+		const padY = isTouch ? 9 : 6;
 		const metrics = ctx.measureText(text);
 		const w = metrics.width + padX * 2;
-		const h = 22;
+		const h = isTouch ? 32 : 22;
 		const x = 1280 / 2 - w / 2;
 		const y = 80;
 		ctx.fillStyle = "rgba(0,0,0,0.65)";
@@ -312,23 +316,25 @@ export class GameRenderer {
 	private drawCampaignChatter(
 		line: { speaker: "hoshi" | "chen"; text: string },
 		showSkipHint: boolean,
+		isTouch = false,
 	): void {
 		const ctx = this.renderer.ctx;
 		ctx.save();
-		ctx.font = "13px 'Courier New', monospace";
+		const fontPx = isTouch ? 20 : 13;
+		ctx.font = `${fontPx}px 'Courier New', monospace`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "top";
 		const prefix = line.speaker === "hoshi" ? "FLIGHT: " : "CAPCOM: ";
 		const fullText = prefix + line.text;
-		const padX = 14;
-		const padY = 6;
+		const padX = isTouch ? 18 : 14;
+		const padY = isTouch ? 9 : 6;
 		const metrics = ctx.measureText(fullText);
 		const w = metrics.width + padX * 2;
-		const h = 22;
+		const h = isTouch ? 32 : 22;
 		const x = 1280 / 2 - w / 2;
-		const y = 110;
-		// Box outlined per speaker. Hoshi gets a green-cyan tone (engineer
-		// at his console); Chen gets warm amber (radio-fixed-width feel).
+		// Position 32 px below MissionChatter slot when touch (taller box),
+		// 30 px below on desktop. So the two systems can't visually fuse.
+		const y = isTouch ? 122 : 110;
 		const borderColor = line.speaker === "hoshi" ? "#7fc8b8" : "#d8a868";
 		const textColor = line.speaker === "hoshi" ? "#c8f0e8" : "#f0d8a8";
 		ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -341,9 +347,14 @@ export class GameRenderer {
 		ctx.fillStyle = textColor;
 		ctx.fillText(fullText, 1280 / 2, y + padY - 1);
 		if (showSkipHint) {
-			ctx.font = "10px 'Courier New', monospace";
+			const hintPx = isTouch ? 14 : 10;
+			ctx.font = `${hintPx}px 'Courier New', monospace`;
 			ctx.fillStyle = "rgba(255,255,255,0.4)";
-			ctx.fillText("[SPACE] SKIP", 1280 / 2, y + h + 4);
+			ctx.fillText(
+				isTouch ? "TAP TO SKIP" : "[SPACE] SKIP",
+				1280 / 2,
+				y + h + 4,
+			);
 		}
 		ctx.restore();
 	}
@@ -485,16 +496,16 @@ export class GameRenderer {
 		}
 
 		if (state.missionChatterText) {
-			this.drawChatterCaption(state.missionChatterText);
+			this.drawChatterCaption(
+				state.missionChatterText,
+				state.input.isTouchDevice,
+			);
 		}
-		// Sprint 7.4 — Campaign chatter renders below MissionChatter's slot
-		// with speaker-prefix styling. Both can be present on a flight
-		// mode-mismatch case (gameMode is exclusive in practice, so this
-		// is defensive). Skip hint shows when a multi-line queue is mid-display.
 		if (state.campaignChatterLine) {
 			this.drawCampaignChatter(
 				state.campaignChatterLine,
 				state.campaignHasQueuedLines,
+				state.input.isTouchDevice,
 			);
 		}
 
