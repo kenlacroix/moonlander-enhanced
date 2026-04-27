@@ -144,8 +144,18 @@ export class AITheaterPanel {
 		}).join("");
 
 		this.panel.innerHTML = `
-			<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
-				AI THEATER
+			<div style="display:flex;align-items:center;gap:8px;justify-content:center;position:relative">
+				<div style="color:#00ff88;font-size:16px;font-weight:bold;text-align:center;letter-spacing:2px">
+					AI THEATER
+				</div>
+				<button id="at-exit" aria-label="Exit AI Theater"
+					style="position:absolute;right:0;top:50%;transform:translateY(-50%);
+					min-width:44px;min-height:32px;background:#1a1a1a;color:#ff6677;
+					border:1px solid #ff6677;padding:4px 10px;cursor:pointer;
+					font-family:inherit;font-size:11px;border-radius:3px;letter-spacing:1px"
+					title="Exit AI Theater (Esc / M)">
+					EXIT
+				</button>
 			</div>
 			<div id="at-world-label" style="color:#aaa;font-size:11px;text-align:center;margin-top:-8px">
 				WORLD: MOON · g=1.62
@@ -312,6 +322,14 @@ export class AITheaterPanel {
 		this.chartCanvas.addEventListener("click", (e) => this.handleChartClick(e));
 		this.forkBtn.addEventListener("click", () => this.triggerFork());
 		this.watchBtn.addEventListener("click", () => this.onWatchBest?.());
+		const exitBtn = this.panel.querySelector("#at-exit") as HTMLButtonElement;
+		// Mobile lacks an Esc key, so the panel needs a tappable exit. The
+		// existing menuBack flow in StateHandlers.ts listens for Esc/M via
+		// Input.ts; dispatching a synthetic Escape keydown reuses that path
+		// without threading a new callback through Game/AITheater.
+		exitBtn.addEventListener("click", () => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape" }));
+		});
 		this.watchBtn.addEventListener("mouseenter", () => {
 			if (!this.watchBtn.disabled) this.watchBtn.style.background = "#00ff8822";
 		});

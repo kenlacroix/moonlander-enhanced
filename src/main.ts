@@ -17,6 +17,9 @@ const params = new URLSearchParams(window.location.search);
 const urlSeed = params.get("seed");
 const embedMode = params.get("embed") === "1";
 const customTerrain = params.get("custom");
+if (embedMode) {
+	document.body.classList.add("embed");
+}
 // Sprint 7.1 PR 1.5 — `?cfg=<base64url>` carries a full ShareConfig
 // (seed + archetype + optional palette). Takes precedence over
 // `?seed=` when both are present — the payload is the richer signal.

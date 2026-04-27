@@ -12,19 +12,19 @@ Live mobile testing on canyou.land branch preview 2026-04-24 surfaced two founda
 
 ### Tier 1 — Foundational blockers (fix first)
 
-- [ ] **Canvas viewport stretch on mobile.** Game canvas renders at fixed 1280×720 internal resolution but no CSS scaling — overflows phone landscape viewport. Add `aspect-ratio: 16/9; max-width: 100vw; max-height: 100vh; width: auto; height: auto` to canvas elements so it scales to fit landscape phone screens.
-- [ ] **Mobile menu navigable.** Current behavior: tap middle = menuDown, tap upper 30% = menuSelect + restart (undiscoverable). Fix: tap-on-mission-row directly highlights AND launches that mission. Hit-test against rendered row positions in canvas coordinates. Mirrors mobile-list UX everywhere else.
+- [x] **Canvas viewport stretch on mobile.** Pure-CSS aspect-ratio sizing on `#game-stage` (commit b4a347e).
+- [x] **Mobile menu navigable.** Tap-on-row hit testing via `menuLayout.ts` + bigger menu rows (commits b4a347e, 8bb2fc8, d6d1879).
 
 ### Tier 2 — Once Tier 1 unblocks navigation
 
-- [ ] **Touch input retest under v3 physics.** Sprint 7.2 introduced rigid-body rotation + RCS — two-axis attitude management with no tactile feedback may regress feel. User-validated suggestion: dial/joystick-style on-screen control instead of left/right zones. Options: heavier angular damping on touch, relaxed `MAX_LANDING_ANGULAR_RATE` on mobile, virtual stick widget, or first-spin tutorial card.
-- [ ] **Sprint 7.4 chatter overlay validation at 360-414px.** Speaker prefix box may overflow narrow widths. Already structured in code but needs visual verification.
-- [ ] **Portrait overlay polish:** v0.6.2.3 added portrait-orientation overlay; verify all entry points (embed, shared seed URL, daily challenge, Random Mission).
-- [ ] **AI Theater mobile fallback:** split-screen doesn't fit; sequential mode below ~768px viewport.
-- [ ] **HUD readability at 360px wide:** v3's added ROT readout + RCS meter may overflow.
-- [ ] **Touch hit areas ≥44px** for all on-screen control buttons.
-- [ ] **Performance check:** sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer.
-- [ ] **Audio autoplay gate:** Web Audio first-touch unlock works on mobile Safari + Chrome across pause/resume cycles.
+- [x] **Touch input retest under v3 physics.** Virtual joystick + thrust button (commit 01b15be).
+- [x] **Sprint 7.4 chatter overlay validation at 360-414px.** Bigger chatter text on touch (commit d6d1879).
+- [x] **Portrait overlay polish:** Suppressed in embed mode (`body.embed #rotate-nag` rule); fires correctly for all other entry points via global CSS media query.
+- [x] **AI Theater mobile fallback:** Below 900px the panel goes 100% width and overlays the canvas; always-visible EXIT button in the panel header (replaces the keyboard-only Esc/M).
+- [x] **HUD readability at 360px wide:** Bigger touch HUD (commit 470ad9f).
+- [x] **Touch hit areas ≥44px** every menu row tappable + 44px fullscreen button (commits d6d1879, 8bb2fc8).
+- [x] **Audio autoplay gate:** `Audio.resumeIfSuspended()` called on every user gesture; recovers context after lock-screen / app-switch suspends it.
+- [ ] **Performance check:** sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer. Last open Tier 2 item — needs real-device measurement.
 
 **Effort:** Tier 1 ~1 hr CC, Tier 2 ~3-4 hr CC depending on dial-control complexity.
 **Priority:** P1 — mobile is 30%+ of sessions; canyou.land is public; v0.6.4.0 deployed to branch preview.

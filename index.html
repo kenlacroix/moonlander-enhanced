@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>MoonLander</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#00ff88" />
@@ -103,6 +103,24 @@
                     }
                     @media (orientation: portrait) and (pointer: coarse) {
                       #rotate-nag { display: flex; }
+                    }
+                    /* Embed mode: the embedder controls iframe size.
+                       Asking the user to rotate their phone won't change
+                       a fixed-portrait iframe in someone's blog post, so
+                       the nag becomes a useless blackout. main.ts adds
+                       `body.embed` when `?embed=1` is present. */
+                    body.embed #rotate-nag { display: none !important; }
+                    /* Sprint 7.5 — AI Theater mobile fallback. Below
+                       900px viewport, the 360px right-side panel
+                       crowds the canvas down to ~480px wide on most
+                       phones. Take the full width instead and let the
+                       panel cover the canvas; user exits via the
+                       always-visible EXIT button in the panel header. */
+                    @media (max-width: 900px) {
+                      #ai-theater-panel {
+                        width: 100% !important;
+                        border-left: none !important;
+                      }
                     }
                     /* Respect prefers-reduced-motion for accessibility —
                        users who've asked for less animation still get

@@ -37,6 +37,20 @@ export class Audio {
 		this.thrusterOsc.start();
 	}
 
+	/** Resume the AudioContext if it was suspended.
+	 *
+	 * Mobile browsers suspend the context when the page is backgrounded
+	 * (lock screen, app switch). On return, calling `ctx.resume()` from
+	 * inside a user gesture restores audio. Call this on every gesture
+	 * — it's a no-op when the context is already running. */
+	resumeIfSuspended(): void {
+		if (this.ctx?.state === "suspended") {
+			this.ctx.resume().catch(() => {
+				/* iOS Safari sometimes rejects outside a gesture; harmless */
+			});
+		}
+	}
+
 	/** Ramp thruster hum on/off */
 	setThruster(on: boolean): void {
 		if (!this.ctx || !this.thrusterGain) return;

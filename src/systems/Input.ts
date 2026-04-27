@@ -36,11 +36,16 @@ type TouchZone = "left" | "right" | "thrust" | "stick" | "thrustBtn" | "none";
  * 100-px thrust button radius. Far above the iOS 44-px hit target
  * minimum even at 30%-scale on a small phone.
  */
-export const STICK_CENTER = { x: 220, y: 540 };
-export const STICK_RADIUS = 100;
+// Pushed close to the canvas corners (1280x720) so on landscape phones
+// — which letterbox the 16:9 canvas inside a 20-22:9 viewport — the
+// visible affordance is near the screen edge where thumbs naturally
+// rest. Letterbox-fallback in classifyTouch handles taps outside the
+// canvas; this is just where the on-canvas dot is drawn.
+export const STICK_CENTER = { x: 140, y: 600 };
+export const STICK_RADIUS = 110;
 export const STICK_DEADZONE = 25;
-export const THRUST_CENTER = { x: 1060, y: 540 };
-export const THRUST_RADIUS = 100;
+export const THRUST_CENTER = { x: 1140, y: 600 };
+export const THRUST_RADIUS = 110;
 
 export class Input {
 	private keys = new Set<string>();
@@ -152,11 +157,21 @@ export class Input {
 			this.keys.delete(e.code);
 		});
 
+		// `e.preventDefault()` on touchstart blocks the browser from
+		// synthesizing a click event for that touch. Apply it only when
+		// the touch lands on the canvas / virtual controls so DOM
+		// buttons (fullscreen toggle, AI Theater EXIT/EXPLAIN/COMPACT,
+		// share-card download, etc.) keep firing on tap.
+		const isInteractiveTarget = (target: EventTarget | null): boolean =>
+			target instanceof Element &&
+			target.closest("button, a, input, select, textarea, [role='button']") !==
+				null;
+
 		// Touch events
 		window.addEventListener(
 			"touchstart",
 			(e) => {
-				e.preventDefault();
+				if (!isInteractiveTarget(e.target)) e.preventDefault();
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
 					const zone = this.classifyTouch(t.clientX, t.clientY);
@@ -171,7 +186,7 @@ export class Input {
 		window.addEventListener(
 			"touchmove",
 			(e) => {
-				e.preventDefault();
+				if (!isInteractiveTarget(e.target)) e.preventDefault();
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
 					const existing = this.touchActive.get(t.identifier);
@@ -198,7 +213,7 @@ export class Input {
 		window.addEventListener(
 			"touchend",
 			(e) => {
-				e.preventDefault();
+				if (!isInteractiveTarget(e.target)) e.preventDefault();
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
 					const zone = this.touchActive.get(t.identifier);
@@ -283,7 +298,20 @@ export class Input {
 		const rect = this.canvas.getBoundingClientRect();
 		const relX = (clientX - rect.left) / rect.width;
 		const relY = (clientY - rect.top) / rect.height;
-		if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return "none";
+		// Letterbox fallback: phones in landscape are typically 20-22:9
+		// while the canvas is 16:9, leaving black bars on left and right
+		// where the player's thumbs naturally rest. Off-canvas taps in
+		// the bottom half of the viewport route to the nearest virtual
+		// control so the stick + thrust button are reachable from the
+		// screen edge. Top-half off-canvas taps stay "none" so DOM
+		// overlays (fullscreen button, EXIT in AI Theater) still work.
+		if (relX < 0 || relX > 1 || relY < 0 || relY > 1) {
+			const vpRelY = clientY / window.innerHeight;
+			if (vpRelY > 0.4 && (relX < 0 || relX > 1)) {
+				return relX < 0 ? "stick" : "thrustBtn";
+			}
+			return "none";
+		}
 		const canvasX = relX * 1280;
 		const canvasY = relY * 720;
 		const stickDx = canvasX - STICK_CENTER.x;

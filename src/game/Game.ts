@@ -683,16 +683,20 @@ export class Game {
 
 	private onBeforeFrame(): void {
 		this.currentInput = this.input.getState();
-		if (
-			!this.audioInitialized &&
-			(this.currentInput.thrustUp ||
-				this.currentInput.rotateLeft ||
-				this.currentInput.rotateRight ||
-				this.currentInput.restart ||
-				this.currentInput.menuSelect)
-		) {
+		const userActed =
+			this.currentInput.thrustUp ||
+			this.currentInput.rotateLeft ||
+			this.currentInput.rotateRight ||
+			this.currentInput.restart ||
+			this.currentInput.menuSelect;
+		if (!this.audioInitialized && userActed) {
 			this.audio.init();
 			this.audioInitialized = true;
+		} else if (this.audioInitialized && userActed) {
+			// Mobile browsers suspend the AudioContext when the tab is
+			// backgrounded (lock screen, app switch). Resume on the next
+			// user gesture — no-op when the context is already running.
+			this.audio.resumeIfSuspended();
 		}
 	}
 

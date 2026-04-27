@@ -7,6 +7,12 @@ import type { Mission } from "../game/Missions";
 import type { Particle } from "../game/Particles";
 import type { LandingPad, TerrainData } from "../game/Terrain";
 import type { RetroVectorSkin } from "../graphics/skins/RetroVector";
+import {
+	STICK_CENTER,
+	STICK_RADIUS,
+	THRUST_CENTER,
+	THRUST_RADIUS,
+} from "../systems/Input";
 import { getMissionListGeometry, getTitleGeometry } from "../utils/menuLayout";
 import type { TelemetryFrame } from "../systems/Telemetry";
 import {
@@ -1633,9 +1639,12 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.save();
 
 		// --- Virtual joystick (left) ---
-		const stickX = 220;
-		const stickY = 540;
-		const stickRadius = 100;
+		// Position + radius come from the same constants Input.ts uses
+		// for hit testing, so the visible affordance always matches the
+		// active hit zone.
+		const stickX = STICK_CENTER.x;
+		const stickY = STICK_CENTER.y;
+		const stickRadius = STICK_RADIUS;
 
 		// Outer ring (boundary of the stick's hit zone)
 		ctx.globalAlpha = 0.35;
@@ -1683,9 +1692,9 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.fillText("ROTATE", stickX, stickY + stickRadius + 18);
 
 		// --- Thrust button (right) ---
-		const thrustX = 1060;
-		const thrustY = 540;
-		const thrustRadius = 100;
+		const thrustX = THRUST_CENTER.x;
+		const thrustY = THRUST_CENTER.y;
+		const thrustRadius = THRUST_RADIUS;
 
 		ctx.globalAlpha = thrustHeld ? 0.85 : 0.45;
 		ctx.fillStyle = thrustHeld ? "#ff8833" : "#5a2810";
