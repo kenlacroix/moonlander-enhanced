@@ -39,13 +39,15 @@ export class HUD {
 		isTouch = false,
 	): void {
 		ctx.save();
-		// Sprint 7.5 — touch devices get 1.6x larger HUD readouts.
+		// Sprint 7.5 — touch devices get 2.0x larger HUD readouts.
 		// The canvas is letterboxed to fit phone landscape, so the
-		// rendered canvas height is ~390 CSS pixels (down from 720
-		// internal). At legacy 14-px font, readouts become ~7.5 CSS
-		// pixels tall — unreadable. 1.6x scaling brings primary
-		// readouts to ~12 CSS pixels, comfortably legible on phone.
-		const fontMul = isTouch ? 1.6 : 1;
+		// rendered canvas height is ~412 CSS pixels (down from 720
+		// internal) — a ~57% scale factor. At legacy 14-px font,
+		// readouts become ~8 CSS pixels tall — unreadable while flying.
+		// Pixel-playtest 2026-04-29: 1.6x (~12.5 CSS px) was still
+		// "small and hard to read"; 2.0x lands at ~16 CSS px, the
+		// floor of comfortable glanceable reading on a phone.
+		const fontMul = isTouch ? 2.0 : 1;
 		const f = (px: number, bold = false): string =>
 			`${bold ? "bold " : ""}${Math.round(px * fontMul)}px "Courier New", monospace`;
 		ctx.font = f(14);
@@ -54,6 +56,12 @@ export class HUD {
 		const x = 20;
 		let y = 20;
 		const lineHeight = Math.round(22 * fontMul);
+		// Value-column offset must scale with fontMul. At 14-px font
+		// "V-SPD"/"H-SPD"/"ANGLE" labels fit in ~50 canvas px, so 60 was
+		// safe. At 2.0x they widen to ~100 px and collide with the value
+		// (Pixel-playtest 2026-04-29: "V-SPD90.8 m/s" rendered as a
+		// single mashed token). Scale proportionally.
+		const valueOffset = Math.round(60 * fontMul);
 
 		// Altitude (distance from bottom of screen — approximate).
 		// Authentic (Apollo era only): readout blanks to "---" when lander is
@@ -62,14 +70,14 @@ export class HUD {
 		// the BLACKOUT trigger uses true AGL via Physics.getTerrainHeightAt.
 		const blackedOut = isAltitudeBlackedOut(authenticState, lander, terrain);
 		if (blackedOut) {
-			this.drawLabel(ctx, x, y, "ALT", "---");
+			this.drawLabel(ctx, x, y, "ALT", "---", false, valueOffset);
 			if (authenticState && !authenticState.lowAltMessage.shown) {
 				authenticState.lowAltMessage.shown = true;
 				authenticState.lowAltMessage.framesRemaining = 60;
 			}
 		} else {
 			const altitude = Math.max(0, CANVAS_HEIGHT - lander.y - 100).toFixed(0);
-			this.drawLabel(ctx, x, y, "ALT", `${altitude} m`);
+			this.drawLabel(ctx, x, y, "ALT", `${altitude} m`, false, valueOffset);
 		}
 		y += lineHeight;
 
@@ -83,13 +91,14 @@ export class HUD {
 			"V-SPD",
 			`${lander.vy >= 0 ? "+" : "-"}${vyAbs} m/s`,
 			vyWarn,
+			valueOffset,
 		);
 		y += lineHeight;
 
 		// Horizontal speed
 		const hSpeed = Math.abs(lander.vx).toFixed(1);
 		const hWarn = Math.abs(lander.vx) > MAX_LANDING_SPEED;
-		this.drawLabel(ctx, x, y, "H-SPD", `${hSpeed} m/s`, hWarn);
+		this.drawLabel(ctx, x, y, "H-SPD", `${hSpeed} m/s`, hWarn, valueOffset);
 		y += lineHeight;
 
 		// Angle — warn if too tilted
@@ -97,20 +106,28 @@ export class HUD {
 		const angleWarn =
 			Math.abs(lander.angle % 360) > MAX_LANDING_ANGLE &&
 			Math.abs(lander.angle % 360) < 360 - MAX_LANDING_ANGLE;
-		this.drawLabel(ctx, x, y, "ANGLE", `${angle}°`, angleWarn);
+		this.drawLabel(ctx, x, y, "ANGLE", `${angle}°`, angleWarn, valueOffset);
 		y += lineHeight;
 
 		// Fuel — warn if low
 		const fuelPct = ((lander.fuel / STARTING_FUEL) * 100).toFixed(0);
 		const fuelWarn = lander.fuel < STARTING_FUEL * 0.2;
 		const fuelText = fuelLeak ? `${fuelPct}% LEAK!` : `${fuelPct}%`;
-		this.drawLabel(ctx, x, y, "FUEL", fuelText, fuelWarn || fuelLeak);
+		this.drawLabel(
+			ctx,
+			x,
+			y,
+			"FUEL",
+			fuelText,
+			fuelWarn || fuelLeak,
+			valueOffset,
+		);
 		y += lineHeight;
 
 		// Fuel bar
 		const barWidth = 120;
 		const barHeight = 8;
-		const barX = x + 60;
+		const barX = x + valueOffset;
 		ctx.strokeStyle = COLOR_HUD;
 		ctx.lineWidth = 1;
 		ctx.strokeRect(barX, y, barWidth, barHeight);
@@ -128,7 +145,7 @@ export class HUD {
 				STARTING_RCS * (lander.landerType.rcsMultiplier ?? 1);
 			const rcsPct = ((lander.rcs / rcsMaxFromType) * 100).toFixed(0);
 			const rcsWarn = lander.rcs < rcsMaxFromType * 0.1;
-			this.drawLabel(ctx, x, y, "RCS", `${rcsPct}%`, rcsWarn);
+			this.drawLabel(ctx, x, y, "RCS", `${rcsPct}%`, rcsWarn, valueOffset);
 			y += lineHeight;
 			ctx.strokeStyle = COLOR_HUD;
 			ctx.lineWidth = 1;
@@ -158,7 +175,7 @@ export class HUD {
 				ctx.fillStyle = rateColor;
 				ctx.fillText(
 					`${rate.toFixed(1)}°/s / ${gate.toFixed(1)}°/s`,
-					x + 60,
+					x + valueOffset,
 					y,
 				);
 			}
@@ -167,7 +184,7 @@ export class HUD {
 		// Wind indicator
 		if (windLabel) {
 			y += lineHeight;
-			this.drawLabel(ctx, x, y, "WIND", windLabel);
+			this.drawLabel(ctx, x, y, "WIND", windLabel, false, valueOffset);
 		}
 
 		// Autopilot indicator
@@ -177,16 +194,16 @@ export class HUD {
 			ctx.textAlign = "left";
 			ctx.fillText("AUTO", x, y);
 			ctx.fillStyle = "#ffaa00";
-			ctx.fillText("ENGAGED  [P] off", x + 60, y);
+			ctx.fillText("ENGAGED  [P] off", x + valueOffset, y);
 		}
 
 		// Alien effect warning
 		if (alienEffect) {
 			y += lineHeight;
-			this.drawLabel(ctx, x, y, "ALIEN", alienEffect, true);
+			this.drawLabel(ctx, x, y, "ALIEN", alienEffect, true, valueOffset);
 			// Override color to alien green
 			ctx.fillStyle = "#88ffaa";
-			ctx.fillText(alienEffect, x + 60, y);
+			ctx.fillText(alienEffect, x + valueOffset, y);
 		}
 
 		// Gravity storm warning
@@ -351,12 +368,13 @@ export class HUD {
 		label: string,
 		value: string,
 		warn = false,
+		valueOffset = 60,
 	): void {
 		ctx.fillStyle = "rgba(0, 255, 136, 0.6)";
 		ctx.textAlign = "left";
 		ctx.fillText(label, x, y);
 		ctx.fillStyle = warn ? COLOR_HUD_WARNING : COLOR_HUD;
-		ctx.fillText(value, x + 60, y);
+		ctx.fillText(value, x + valueOffset, y);
 	}
 }
 
