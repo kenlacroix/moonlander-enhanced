@@ -304,6 +304,20 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.status = "menu";
 		return;
 	}
+	// AI Theater is the only post-flight surface where menuBack should
+	// also fire on non-playing state — the user lands or crashes, the
+	// panel keeps training, and they need a way out without restarting
+	// first. The synthetic Escape from the panel's EXIT button takes
+	// this path on touch (no real Esc key).
+	if (input.menuBack && game.aiTheater.isActive) {
+		game.audio.setThruster(false);
+		game.audio.soundtrack.stop();
+		game.aiTheater.stop();
+		game.aiTheaterComparison = null;
+		game.currentFlight = null;
+		game.status = "menu";
+		return;
+	}
 	// Auto-landing missions (Luna 9) default the autopilot ON for
 	// spectator-mode descent. But the PID doesn't always converge on
 	// Luna 9's craft profile (low thrust 0.85x + low mass 0.7x) and
