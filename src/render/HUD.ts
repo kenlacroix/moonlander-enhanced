@@ -39,13 +39,15 @@ export class HUD {
 		isTouch = false,
 	): void {
 		ctx.save();
-		// Sprint 7.5 — touch devices get 1.6x larger HUD readouts.
+		// Sprint 7.5 — touch devices get 2.0x larger HUD readouts.
 		// The canvas is letterboxed to fit phone landscape, so the
-		// rendered canvas height is ~390 CSS pixels (down from 720
-		// internal). At legacy 14-px font, readouts become ~7.5 CSS
-		// pixels tall — unreadable. 1.6x scaling brings primary
-		// readouts to ~12 CSS pixels, comfortably legible on phone.
-		const fontMul = isTouch ? 1.6 : 1;
+		// rendered canvas height is ~412 CSS pixels (down from 720
+		// internal) — a ~57% scale factor. At legacy 14-px font,
+		// readouts become ~8 CSS pixels tall — unreadable while flying.
+		// Pixel-playtest 2026-04-29: 1.6x (~12.5 CSS px) was still
+		// "small and hard to read"; 2.0x lands at ~16 CSS px, the
+		// floor of comfortable glanceable reading on a phone.
+		const fontMul = isTouch ? 2.0 : 1;
 		const f = (px: number, bold = false): string =>
 			`${bold ? "bold " : ""}${Math.round(px * fontMul)}px "Courier New", monospace`;
 		ctx.font = f(14);
