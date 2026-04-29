@@ -112,6 +112,15 @@ Generate a pre-descent radio briefing using only these facts.`,
 }
 
 function genericMessages(mission: Mission): LLMMessage[] {
+	// Sprint 7.4 — when a Campaign mission has narrative.enabled, use the
+	// Hoshi persona prompt instead of the generic 1969-mission-controller
+	// voice. Free Play and historic-without-narrative still get the
+	// generic voice. The Hoshi persona is offline-first (CampaignChatter
+	// fires its rule-based briefing line before this LLM call returns);
+	// this prompt only matters when an LLM is configured.
+	if (mission.narrative?.enabled) {
+		return hoshiPersonaMessages(mission);
+	}
 	return [
 		{
 			role: "system",
@@ -123,6 +132,31 @@ Do not use markdown. Plain text only.`,
 		{
 			role: "user",
 			content: `Mission: ${mission.name}. Terrain seed: ${mission.seed}. Description: ${mission.description}. Generate a pre-descent briefing.`,
+		},
+	];
+}
+
+/**
+ * Sprint 7.4 — Dr. Liam Hoshi persona prompt for Campaign briefings.
+ * Voice is nerdy-earnest peer-ish-professional NASA Descent Systems
+ * engineer. Banned phrases enforced via the prompt; CampaignChatter's
+ * streaming guard provides a second line of defense (aborts if the
+ * stream contains banned content). Ships briefing length 2-3 sentences,
+ * matching the existing briefing UI's read time.
+ */
+function hoshiPersonaMessages(mission: Mission): LLMMessage[] {
+	return [
+		{
+			role: "system",
+			content: `You are Dr. Liam Hoshi, NASA Descent Systems engineer running a flight simulator program. You are briefing a trainee pilot before a simulated lunar descent.
+
+Voice: nerdy-earnest, peer-ish professional. Quote flight-dynamics numbers with precision when relevant. Never theatrical. Never use the phrases "small step", "dear student", "my dear", or "that's one for the books". Don't catchphrase. Match the trainee's pace.
+
+Format: 2-3 short sentences. Plain text, no markdown. Reference the mission name and the conditions in the description.`,
+		},
+		{
+			role: "user",
+			content: `Mission: ${mission.name}. Description: ${mission.description}. Write a pre-descent briefing.`,
 		},
 	];
 }

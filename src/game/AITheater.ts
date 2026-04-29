@@ -362,7 +362,12 @@ export class AITheater {
 		const canvas = document.getElementById("game-canvas");
 		if (!canvas) return;
 
-		if (split) {
+		// On narrow viewports the panel goes full-width (see index.html
+		// media query) and overlays the canvas — no point shrinking
+		// what's already covered. Keeps the canvas at native landscape
+		// ratio for when the user exits AI Theater.
+		const isNarrow = window.matchMedia("(max-width: 900px)").matches;
+		if (split && !isNarrow) {
 			canvas.style.maxWidth = `calc(100vw - 360px)`;
 		} else {
 			canvas.style.maxWidth = "";

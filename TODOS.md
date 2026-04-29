@@ -4,6 +4,118 @@ Deferred work from CEO reviews (2026-04-13, 2026-04-14). Items not in current sc
 
 ---
 
+## P1 — Mobile Quality (Sprint 7.5) — ACTIVE
+
+Captured 2026-04-24 from user observation: "we need to thoroughly test and adjust for mobile use." Browser-only for now; Android-app wrap is a future thing.
+
+Live mobile testing on canyou.land branch preview 2026-04-24 surfaced two foundational blockers (canvas viewport not scaling to phone, menu unnavigable via touch). Until these land, the rest of the audit is blocked because there's nothing to navigate to.
+
+### Tier 1 — Foundational blockers (fix first)
+
+- [x] **Canvas viewport stretch on mobile.** Pure-CSS aspect-ratio sizing on `#game-stage` (commit b4a347e).
+- [x] **Mobile menu navigable.** Tap-on-row hit testing via `menuLayout.ts` + bigger menu rows (commits b4a347e, 8bb2fc8, d6d1879).
+
+### Tier 2 — Once Tier 1 unblocks navigation
+
+- [x] **Touch input retest under v3 physics.** Virtual joystick + thrust button (commit 01b15be).
+- [x] **Sprint 7.4 chatter overlay validation at 360-414px.** Bigger chatter text on touch (commit d6d1879).
+- [x] **Portrait overlay polish:** Suppressed in embed mode (`body.embed #rotate-nag` rule); fires correctly for all other entry points via global CSS media query.
+- [x] **AI Theater mobile fallback:** Below 900px the panel goes 100% width and overlays the canvas; always-visible EXIT button in the panel header (replaces the keyboard-only Esc/M).
+- [x] **HUD readability at 360px wide:** Bigger touch HUD (commit 470ad9f).
+- [x] **Touch hit areas ≥44px** every menu row tappable + 44px fullscreen button (commits d6d1879, 8bb2fc8).
+- [x] **Audio autoplay gate:** `Audio.resumeIfSuspended()` called on every user gesture; recovers context after lock-screen / app-switch suspends it.
+- [ ] **Performance check:** sustained 60fps on mid-tier Android (Pixel 6a class) under WebGL renderer. Last open Tier 2 item — needs real-device measurement.
+
+**Effort:** Tier 1 ~1 hr CC, Tier 2 ~3-4 hr CC depending on dial-control complexity.
+**Priority:** P1 — mobile is 30%+ of sessions; canyou.land is public; v0.6.4.0 deployed to branch preview.
+**Depends on:** Tier 1 lands first or Tier 2 work blocks on inability to navigate to test screens.
+
+---
+
+## P3 — Gamepad API support (in-game)
+
+Captured 2026-04-24 from user observation about physical controllers.
+
+Browser Gamepad API works in Chrome/Firefox/Safari with zero user-side install. Plug in any USB or Bluetooth gamepad (Xbox/PS4/8BitDo/SNES-style USB) and the browser exposes `navigator.getGamepads()`. MoonLander adds it as a third input source alongside keyboard + touch.
+
+- **Stick mapping:** left stick X-axis → rotation (deadzone ~0.15), right trigger → thrust (analog, maps to `thrustUp` boolean above ~0.3 threshold)
+- **Button mapping:** A/X (south button) → thrust as well (so single-button play works), Start → menuSelect, Back/Share → menuBack, B/Circle → restart
+- **Per-frame poll:** integrate into `Input.ts` `getState()` — gamepad state OR keyboard state OR touch state, with a "last input source" indicator for HUD
+- **Connection toast:** "GAMEPAD CONNECTED: Xbox Wireless Controller" appears for 2 sec on first connection per session
+- **Vibration feedback (rumble):** light buzz on RCS firing, heavy thump on crash, sustained low rumble during gravity storms (uses `gamepad.vibrationActuator`)
+
+**Why P3 not higher:** small audience (estimated 3-5% of players plug in a gamepad), but the implementation is genuinely small (~50-80 LOC) and the user experience win is real. Pair with Sprint 7.5 (Mobile Quality) since both touch the input system.
+
+**Effort:** S (CC: ~1.5-2 hr — Input.ts integration + vibration patterns + connection UI)
+**Depends on:** Nothing.
+**Note:** This is the off-the-shelf gamepad path. The DIY-controller-for-learning-to-code angle is a separate side project — see `SIDE_PROJECTS.md` at repo root.
+
+---
+
+## P2 — Playtest observations 2026-04-24 (5 ideas captured for tracking)
+
+### Procedural terrain variety — second-algorithm pass
+**What:** Levels still feel samey across Free Play / Campaign / Historic because all 5 archetypes (`rolling`, `crater-field`, `spires`, `mesa`, `flats`) run on the same midpoint-displacement core with cosmetic biasing. Add a *second* generator (Voronoi craters for `crater-field`, ridged-noise for `spires`, domain-warped fBm for `mesa`) and dispatch by archetype.
+- **Reconciling with "accuracy":** Historic missions and Authentic Mode keep their curated deterministic path (`specialFeature: "rille" | "valley"` + Apollo-site-faithful seeds stay byte-identical). Procedural variety lands in Free Play + Random Mission only — historic seeds remain pinned by the existing regression test (`tests/terrain.test.ts` seed 1969 / 4217 / 7001 byte-identical pin).
+- **Why:** Sprint 7.1 added archetype labels and palettes but the geometry underneath is mostly the same shape. Player observation: "the terrain is mostly flat with a few spikes or mountains."
+- **Effort:** L (CC: ~3-4 hr — new generator module + per-archetype dispatcher + ghost-replay schema check + pad-placement edge cases on non-monotone terrain)
+- **Priority:** P2 (real product gap, but post-Sprint 7.4)
+- **Depends on:** Nothing structurally. Cleanest after Sprint 7.4 lands so Campaign archetype-wiring isn't fighting the new generator.
+
+### Dismissible "what's new" banner on title screen
+**What:** When the build's `VERSION` is newer than `localStorage["moonlander-last-seen-version"]`, show a small corner toast on title screen with the latest changelog entry. Click-X dismisses; sets the seen-version to current. Pulls from a new `src/data/whatsNew.ts` keyed by version (1-2 sentence summary per release).
+- **Why:** Player observation: "I would like a change log that the user can dismiss but just a heads up something has changed." Solo dev shipping aggressively (28 versions since Sprint 5) — players currently have no signal that anything changed between sessions.
+- **Effort:** S (CC: ~30-45 min including the data file + dismiss persistence + first-time-ever case where last-seen is undefined)
+- **Priority:** P2 (low effort, real signal; pair with `/document-release` so changelog updates stay disciplined)
+- **Depends on:** Nothing.
+
+### Pause-screen ambient music layer (extend Soundtrack.ts)
+**What:** `src/systems/Soundtrack.ts` already does 3-layer Web Audio synthesis (bass, melody, drums) with adaptive intensity. Add a 4th "menu/pause" mode: slow the bass ~50%, add a sparse arpeggio voice, drop drums entirely. Triggered on pause + menu states.
+- **Why:** Player observation: "AI synth music on the pause screen?" — the existing soundtrack subsystem covers this without ML. True neural synth (Magenta.js MusicVAE) stays in Sprint 9 territory; this is the right scope match for "ambient menu music" without 10-30MB model downloads.
+- **Effort:** S (CC: ~45-60 min — new oscillator config + state hook into Game state machine for paused/title)
+- **Priority:** P3 (polish, not blocking)
+- **Depends on:** Nothing.
+
+### Animated character portraits for narrative dialogue (Sprint 7.5 candidate)
+**What:** Single SVG-or-pixel-art bust per character (Hoshi + Chen + future instructors), with 2-3 frame mouth animation driven by the same chatter-event timing already used by `MissionChatter`. Renders next to the dialogue line during briefing, in-flight chatter, and post-landing analysis.
+- **Why:** Player observation: "can we have a likeness of the character talking display on screen and be animated while talking?" — Tier 3 design doc explicitly rejected portraits as scope-creep for one focused sprint. This is the natural Sprint 7.5 successor once Tier 3's voice is validated by playtest.
+- **Effort:** M (CC: ~2-3 hr code; **art is the gate** — needs commissioned art, AI-gen art, or pixel-art pass before code can ship)
+- **Priority:** P2 after Sprint 7.4 ships and Hoshi/Chen voice is validated
+- **Depends on:** Sprint 7.4 shipped + playtest confirming voice works + art assets sourced
+
+### LLM-rewritten dialogue per-run (Sprint 7.4 enhancement)
+**What:** Tier 3 design doc has Hoshi as offline-first (rule-based templates) with LLM enhancement as optional polish. This item flags the LLM polish path explicitly: keep the rule-based templates as a "skeleton" (consistent arc, fixed beats per mission), let the LLM rewrite each line per-run using the player's actual flight numbers as context (RCS burn ms, fuel margin, AGL at first thrust, hazard-fired y/n).
+- **Why:** Player observation: "for the story, can we use AI to make it unique but still mostly the same using LLM?" — gives uniqueness without arc drift, since the skeleton constrains tone and beats.
+- **Effort:** S (CC: ~45-60 min — already-designed prompt structure in Tier 3 doc; this is the "MissionBriefing-style streaming LLM with rule-based fallback" pattern reused)
+- **Priority:** P2 — should ship as part of Sprint 7.4 if budget allows, else as a follow-up PR
+- **Depends on:** Sprint 7.4 Part A (rule-based skeleton) shipped first
+
+---
+
+## P3 — Tier 3 follow-ups (from /plan-eng-review 2026-04-24)
+
+Tracked from eng review of Tier 3 design doc (`~/.gstack/projects/kenlacroix-moonlander-enhanced/root-main-design-20260424-150313.md`). Not in Tier 3 sprint scope.
+
+### Apollo 13 + Historic-mission Tier 3 dialogue
+- **What:** Extend the Hoshi/Chen voice to non-Campaign modes. Apollo 13 is survive-mode, would need a different voice (not landing-focused). Historic landings already use the `MissionChatter` + `MissionFacts` path — they don't need Hoshi, but might benefit from a "bounced vs clean" distinction eventually.
+- **Why:** Tier 3 only ships Campaign dialogue. Historic missions stay as-is, which is consistent but makes Hoshi Campaign-only.
+- **Effort:** M (CC: ~3-4 hr for Apollo 13 specifically; Historic extension is another ~2-3 hr)
+- **Depends on:** Tier 3 shipping and playtest confirming the Hoshi/Chen voice works.
+
+### Second named instructor (Tier 4 narrative)
+- **What:** Currently the `Mission.narrative?: { enabled: true }` field is narrow — Hoshi is the only instructor hardcoded in CampaignChatter. Adding a second instructor (different voice for a future mission arc) requires extending the type AND the BaseChatter refactor from E1 option C.
+- **Why:** If Tier 4 ever adds a second voice (e.g., a female instructor for Artemis missions, or a veteran for advanced campaigns), the design accommodates it but the type needs widening.
+- **Effort:** M (CC: ~3-4 hr for refactor + type extension; writing per-instructor dialogue is separate)
+- **Depends on:** Confirming a second instructor is actually wanted after playtest of Tier 3.
+
+### Post-Tier-3 difficulty tuning pass
+- **What:** If Campaign Mission 5 (v3 physics + gravity-storm torque + aliens + storms + v0.6.3.1 angular impulses) feels grindy after playtest, tune `MAX_STORM_TORQUE` (currently 5°/s at `src/game/GravityStorm.ts`) or landing tolerances.
+- **Why:** Tier 3 doesn't touch mechanics, but stacking v3 physics on v0.6.3.1 torque creates compounding difficulty. Playtest feedback will reveal whether the stack is "hard but fair" or "grind."
+- **Effort:** S (CC: ~30 min per iteration on torque constant + playtest loop)
+- **Depends on:** Tier 3 shipping + user playtest of Mission 5 end-to-end.
+
+---
+
 ## P3 — Polish
 
 ### Sprint 5.5 follow-ups (from /review pre-ship audit)

@@ -2,6 +2,40 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.4.0] - 2026-04-24 (Sprint 7.4 — Campaign Narrative)
+
+The 5-mission Campaign now has a story arc instead of just five difficulty steps. Two characters speak: Dr. Liam Hoshi (NASA Descent Systems engineer) handles pre-mission briefings and post-landing analysis; CapCom Maya Chen reads in-flight radio callouts. Hoshi's posture warms across the arc — polite Mission 1, "first nice one" Mission 2, mom-name-drop Mission 3 (Hadley Rille), self-aware Mission 4 ("this one's my fault"), payoff Mission 5 ("I wasn't sure anybody could do that"). Voice-only — no portraits this sprint (those are Sprint 7.6, blocked on art).
+
+### Added
+- **`src/data/campaignDialogue.ts`** — single source of truth for ~35 unique dialogue lines indexed by mission ID + event key + outcome variant. Voice rules enforced by tests.
+- **`src/api/CampaignChatter.ts`** — Campaign chatter pipeline composing (not inheriting) the MissionChatter pattern. Briefing → flight-start → in-flight Chen callouts → post-landing Hoshi analysis with branching by FlightOutcome. Two new triggers (`alien-spawn`, `storm-start`) wired from `Game.ts` onFixedUpdate. Skippable via Space/click on the multi-line post-landing queue.
+- **`src/game/FlightOutcome.ts`** — `clean` / `bounced` / `crashed` / `timeout` narrative outcome label. `classifyLanding` decides clean-vs-bounced based on pad-centering (≤40 px) AND tolerances staying outside the worst 20% of each gate (vy, vx, angle, angular rate). Bounced never demotes a landing — `lander.status = "landed"` and Campaign progression both update independently of the narrative label.
+- **`cleanClears: Set<number>`** save state in `Missions.ts`. Parallel to existing `campaignCompleted`. Mission menu renders a gold ★ next to `[DONE]` for missions cleared cleanly. Bouncing a landing leaves the ★ off — visible "try again for the star" replay signal.
+- **Per-mission narrative flag** on the `Mission` type (`narrative?: { enabled: boolean }`). Free Play, Historic, and AI Theater never reach the Campaign chatter path.
+- **Hoshi LLM persona prompt** in `MissionBriefing.ts`. Offline-first (rule-based briefing fires immediately); LLM enhancement streams in-place if configured. Voice-contamination guard aborts the stream if it contains banned phrases or violates Chen's no-first-person rule.
+- **35 new tests** in `tests/campaign-chatter.test.ts`, `tests/flight-outcome.test.ts`, `tests/campaign-narrative-regression.test.ts`. Covers: dialogue table coverage, voice purity, branching by outcome, fallback chains, briefing-then-flight-start sequencing, save state round-trip, and the load-bearing regression that `bounced` never demotes a landing. 491 tests total (was 456).
+
+### Changed
+- **Campaign archetype + palette wiring** (the Sprint 7.1 gap noted in roadmap). All 5 Campaign missions now have curated palettes and archetype-driven terrain that pair with Hoshi's briefing tone:
+  - M1 FIRST CONTACT — neutral grey, rolling
+  - M2 ROUGH APPROACH — dusty tan, crater-field
+  - M3 FUEL CRISIS — rust-red Hadley-adjacent, spires
+  - M4 NEEDLE THREADING — cool blue-grey precision, mesa
+  - M5 THE IMPOSSIBLE — dark crimson, spires
+- **Mission menu** renders the ★ icon next to `[DONE]` when a Campaign mission is in `cleanClears`. Gold (#ffd84a), bold, positioned just inside the [DONE] checkmark.
+- **In-flight chatter overlay** now renders Campaign chatter with speaker prefixes (`FLIGHT:` for Hoshi in pale green-cyan, `CAPCOM:` for Chen in warm amber). Position 30 px below the existing MissionChatter slot. `[SPACE] SKIP` hint shows when a multi-line queue is active.
+
+### Not changed
+- **MissionChatter for Historic missions stays pristine.** Sprint 7.4 added a new class instead of extending the existing one (eng review E1 — composition over inheritance). Apollo / Artemis / Luna 9 dialogue paths byte-identical to v0.6.3.1.
+- **Existing `lander.status` and `Game.status` enums.** `bounced` lives only on `FlightOutcome.result` — a narrative label, not a gameplay state. No save-schema regression on existing saves.
+- **Campaign progression gate.** `campaignCompleted` updates on any `landed` result, regardless of clean/bounced. Eng review E2 IRON RULE: bounced never demotes a landing — verified by `tests/campaign-narrative-regression.test.ts`.
+- **Ghost replay determinism.** Dialogue is cosmetic; no new RNG, no save-state in ghosts.
+
+### Deferred
+- **Animated character portraits** — Sprint 7.6 (art-blocked).
+- **Apollo 13 + Historic Tier 3 dialogue** — Hoshi/Chen voice extension to non-Campaign modes. Tracked in TODOS.md.
+- **Second instructor (Tier 4)** — Mission.narrative type widening for a future second-character arc.
+
 ## [0.6.3.1] - 2026-04-24 (Gravity storms now torque the lander)
 
 Gravity storms have been in the game since Sprint 2 but only did two things: change gravity multiplier for ~8 seconds and wobble the terrain cosmetically. Under v3 rigid-body physics, they finally do what the design always implied — knock your attitude around. With v0.6.3.0 making Free Play hazards opt-in, this lands as a quality lift for the players who opted in, plus Campaign Mission 3+ where storms are already part of the design.

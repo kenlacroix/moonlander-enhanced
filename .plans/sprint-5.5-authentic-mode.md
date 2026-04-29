@@ -1,6 +1,9 @@
 # Sprint 5.5 — Authentic Mode (plan)
 
-Status: CEO + Eng reviewed 2026-04-16 (CEO: SELECTIVE EXPANSION, 6 cherry-picks accepted, 8 Codex tensions resolved; Eng: 11 issues surfaced and resolved, 3 CRITICAL regression tests mandated). Ready to implement on branch `sprint-5.5/authentic-mode` (off main post-v0.5.8.0).
+**Status: ✅ COMPLETE — shipped v0.5.9.0 + v0.5.9.1 polish.**
+- Part A foundations + signature moments → v0.5.9.0 (PR #32, 2026-04-17).
+- Part B polish + 4 test coverage gaps + ERA_COLORS extraction → v0.5.9.1 (PR #34, alongside Sprint 5 Part B).
+- Deferred (standalone hazard ribbon, Authentic variants for future historic missions, leaderboard hot-path hoist) tracked in `TODOS.md`.
 
 ## Context
 Historic missions today (Sprint 5 Part A, v0.5.7.0) use the same physics as Free Play with different fuel budgets and terrain flavor. Apollo 11 and Artemis III feel mechanically identical even though 1969 and 2028 lunar tech are wildly different: Apollo had a 2KB flight computer, no GPS, analog instruments, discrete RCS thrusters, no hazard avoidance; Artemis has orbital LRO maps, GPS, autonomous hazard detection, digital continuous throttle. Briefing text says "Armstrong had 22 seconds of fuel" but the player can't *feel* that tech-era gap.

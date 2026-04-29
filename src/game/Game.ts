@@ -7,6 +7,7 @@ import {
 import type { RecordedEpisode } from "../ai/EpisodeRecorder";
 import type { TrainingStats } from "../ai/RLAgent";
 import { TrainingLoop } from "../ai/TrainingLoop";
+import { CampaignChatter } from "../api/CampaignChatter";
 import { type LLMConfig, loadLLMConfig } from "../api/LLMProvider";
 import { MissionChatter } from "../api/MissionChatter";
 import { RetroVectorSkin } from "../graphics/skins/RetroVector";
@@ -64,7 +65,12 @@ import { isHistoricMission } from "./HistoricMission";
 import { createLander, type LanderState } from "./Lander";
 import { getLanderType } from "./LanderTypes";
 import { LLMIntegration } from "./LLMIntegration";
-import { loadCampaignProgress, MISSIONS, type Mission } from "./Missions";
+import {
+	loadCampaignProgress,
+	loadCleanClears,
+	MISSIONS,
+	type Mission,
+} from "./Missions";
 import { ParticleSystem } from "./Particles";
 import { PhysicsManager } from "./PhysicsManager";
 import type { RelayState } from "./RelayMode";
@@ -141,6 +147,13 @@ export class Game {
 	} | null = null;
 	activeMission: Mission | null = null;
 	campaignCompleted = loadCampaignProgress();
+	/**
+	 * Sprint 7.4 — clean-clear progress (mission completed with
+	 * `FlightOutcome.result === "clean"`). Parallel to campaignCompleted
+	 * so the existing save schema is untouched. Mission menu renders a
+	 * star next to the [DONE] checkmark for missions in this Set.
+	 */
+	cleanClears = loadCleanClears();
 	titleSelection = 0;
 	trainingLoop: TrainingLoop | null = null;
 	latestTrainingStats: TrainingStats | null = null;
@@ -162,6 +175,27 @@ export class Game {
 	telemetry = new TelemetryRecorder();
 	autopilot = new Autopilot();
 	missionChatter = new MissionChatter();
+	/** Sprint 7.4 — Campaign-only narrative chatter (Hoshi briefing +
+	 * Chen in-flight + Hoshi post-landing). Activated in selectMission
+	 * when `gameMode === "campaign"` AND `mission.narrative?.enabled`.
+	 * MissionChatter handles Historic missions; the two systems never
+	 * fire simultaneously (gameMode is exclusive). */
+	campaignChatter = new CampaignChatter();
+	/** Sprint 7.4 — track which hazards fired during the current flight
+	 * so post-landing dialogue can branch on hazardsFired. Reset on
+	 * each reset(). The `*Active` and `*Started` semantics are different
+	 * from the live alien/storm states: these latch to true the first
+	 * frame the hazard's effect started, regardless of whether it's
+	 * still active at touchdown. */
+	flightHazardsFired = { alien: false, storm: false, fuelLeak: false };
+	/** Sprint 7.4 — track previous storm phase so we can detect the
+	 * normal→high transition for the storm-start chatter trigger.
+	 * Updated in onFixedUpdate after physics.step(). */
+	private prevStormPhase: "normal" | "high" | "low" = "normal";
+	/** Sprint 7.4 — peak angular rate seen during the current flight
+	 * (v3 only). Tracked frame-by-frame in onFixedUpdate. Used by
+	 * FlightOutcome to populate bestAngularRate. v2 missions stay 0. */
+	flightPeakAngularRate = 0;
 	wind: WindState | null = null;
 	alien: ReturnType<typeof createAlien> | null = null;
 	gravityStorm: ReturnType<typeof createGravityStorm> | null = null;
@@ -230,6 +264,19 @@ export class Game {
 	get missionChatterText(): string {
 		return this.missionChatter.latestText;
 	}
+	/** Sprint 7.4 — campaign chatter line (with speaker) for prefix-aware
+	 * rendering. Null when no campaign chatter is active. */
+	get campaignChatterLine(): {
+		speaker: "hoshi" | "chen";
+		text: string;
+	} | null {
+		return this.campaignChatter.latest;
+	}
+	/** Sprint 7.4 — true when a multi-line post-landing sequence has
+	 * more lines queued. UI shows the [SPACE] SKIP hint. */
+	get campaignHasQueuedLines(): boolean {
+		return this.campaignChatter.hasQueuedLines;
+	}
 	get isEmbed(): boolean {
 		return this.embedMode;
 	}
@@ -290,6 +337,10 @@ export class Game {
 		this.llm = new LLMIntegration(() => this.llmConfig);
 		this.audio = new Audio();
 		this.input = new Input();
+		// Sprint 7.5 Tier 1 — give Input the UI canvas so touchend can
+		// translate viewport CSS-pixel coords into canvas-internal
+		// coordinates for menu hit-testing.
+		this.input.setCanvas(this.canvasRenderer.canvas);
 		this.camera_ = new Camera();
 		this.particles_ = new ParticleSystem();
 		// Sprint 7.1 PR 1.5 — a `?cfg=` payload carries its own seed;
@@ -424,6 +475,16 @@ export class Game {
 				: undefined,
 			this.currentFlight?.authenticMode ?? false,
 		);
+		// Sprint 7.5 Tier 3 — same touch accessibility relaxation as
+		// Game.reset(). Relay lander #2/#3 inherits the eased gate.
+		if (
+			this.input.isTouchDevice &&
+			this.lander.physicsVersion === 3 &&
+			!diff?.maxLandingAngularRate &&
+			!(this.activeMission && isHistoricMission(this.activeMission))
+		) {
+			this.lander.maxLandingAngularRate = 16;
+		}
 		this.status = "playing";
 		this.particles_.clear();
 		this.gameLoop.resetAccumulator();
@@ -564,6 +625,22 @@ export class Game {
 				: undefined,
 			this.currentFlight?.authenticMode ?? false,
 		);
+		// Sprint 7.5 Tier 3 — touch accessibility: relax the angular-rate
+		// landing gate on touch devices when the mission didn't already
+		// override it. Touch is binary (no analog rotation), so a 1-frame
+		// thumb release can leave the lander rotating well past the 8°/s
+		// default gate. Doubling to 16°/s makes touch landings achievable
+		// without dumbing down the physics for keyboard players or
+		// disrespecting per-mission tightened gates (Apollo 11 = 6°/s
+		// stays tight, because that's a different value than the default).
+		if (
+			this.input.isTouchDevice &&
+			this.lander.physicsVersion === 3 &&
+			!diff?.maxLandingAngularRate &&
+			!(this.activeMission && isHistoricMission(this.activeMission))
+		) {
+			this.lander.maxLandingAngularRate = 16;
+		}
 		this.status = "playing";
 		this.score = 0;
 		this.crashAnalysis = "";
@@ -589,6 +666,10 @@ export class Game {
 			flightPolicy.storms && shouldSpawnGravityStorm(this.seed_, diff)
 				? createGravityStorm(this.seed_)
 				: null;
+		// Sprint 7.4 — reset per-flight narrative state.
+		this.flightHazardsFired = { alien: false, storm: false, fuelLeak: false };
+		this.prevStormPhase = this.gravityStorm?.phase ?? "normal";
+		this.flightPeakAngularRate = 0;
 		this.artifacts = placeArtifacts(this.seed_, this.terrain.points);
 		// Sprint 7.1 PR 1.5 — hand the archetype to the soundtrack before
 		// start(), so the next flight's drone / shimmer / tension profile
@@ -602,16 +683,20 @@ export class Game {
 
 	private onBeforeFrame(): void {
 		this.currentInput = this.input.getState();
-		if (
-			!this.audioInitialized &&
-			(this.currentInput.thrustUp ||
-				this.currentInput.rotateLeft ||
-				this.currentInput.rotateRight ||
-				this.currentInput.restart ||
-				this.currentInput.menuSelect)
-		) {
+		const userActed =
+			this.currentInput.thrustUp ||
+			this.currentInput.rotateLeft ||
+			this.currentInput.rotateRight ||
+			this.currentInput.restart ||
+			this.currentInput.menuSelect;
+		if (!this.audioInitialized && userActed) {
 			this.audio.init();
 			this.audioInitialized = true;
+		} else if (this.audioInitialized && userActed) {
+			// Mobile browsers suspend the AudioContext when the tab is
+			// backgrounded (lock screen, app switch). Resume on the next
+			// user gesture — no-op when the context is already running.
+			this.audio.resumeIfSuspended();
 		}
 	}
 
@@ -675,6 +760,34 @@ export class Game {
 			this.seed_,
 			(input) => this.ghostRecorder.record(input),
 		);
+		// Sprint 7.4 — narrative trigger detection. Runs every frame, but
+		// CampaignChatter.fire is one-shot per trigger so re-firing is a
+		// no-op. Hazard flags latch to true the first frame the effect
+		// activates and stay true through the rest of the flight.
+		if (this.alien?.effectJustStarted) {
+			this.flightHazardsFired.alien = true;
+			this.campaignChatter.onAlienSpawn();
+		}
+		if (
+			this.gravityStorm &&
+			this.prevStormPhase === "normal" &&
+			this.gravityStorm.phase === "high"
+		) {
+			this.flightHazardsFired.storm = true;
+			this.campaignChatter.onStormStart();
+		}
+		if (this.gravityStorm) {
+			this.prevStormPhase = this.gravityStorm.phase;
+		}
+		if (this.fuelLeakActive) {
+			this.flightHazardsFired.fuelLeak = true;
+		}
+		if (this.lander.physicsVersion === 3) {
+			const rate = Math.abs(this.lander.angularVel);
+			if (rate > this.flightPeakAngularRate) {
+				this.flightPeakAngularRate = rate;
+			}
+		}
 		if (!result) {
 			// Sprint 7.1 PR 1.5 — hidden-pad reveal latch. Fires a one-shot
 			// dust plume on the frame the lander first crosses the reveal

@@ -94,6 +94,15 @@ export interface GameRenderState {
 	readonly lastRank: number | null;
 	readonly llmText: string;
 	readonly missionChatterText: string;
+	/** Sprint 7.4 — campaign chatter line with speaker tag for prefix
+	 * rendering. Null when no campaign chatter is active. */
+	readonly campaignChatterLine: {
+		speaker: "hoshi" | "chen";
+		text: string;
+	} | null;
+	/** Sprint 7.4 — true when a multi-line post-landing sequence has
+	 * more lines queued. Renderer shows the [SPACE] SKIP hint. */
+	readonly campaignHasQueuedLines: boolean;
 	readonly artifactText: string;
 	readonly crashAnalysis: string;
 	readonly flightElapsed: number;
@@ -101,6 +110,10 @@ export interface GameRenderState {
 	readonly selectedMission: number;
 	readonly gameMode: "freeplay" | "campaign" | "ai-theater" | "historic";
 	readonly campaignCompleted: Set<number>;
+	/** Sprint 7.4 — clean-clears save state. Mission menu renders a
+	 * star on missions in this Set (in addition to the [DONE] checkmark
+	 * for missions in campaignCompleted). */
+	readonly cleanClears: Set<number>;
 	readonly input: Input;
 	readonly latestTrainingStats: TrainingStats | null;
 	readonly trainingLoop: TrainingLoop | null;
@@ -255,17 +268,21 @@ export class GameRenderer {
 		ctx.restore();
 	}
 
-	private drawChatterCaption(text: string): void {
+	private drawChatterCaption(text: string, isTouch = false): void {
 		const ctx = this.renderer.ctx;
 		ctx.save();
-		ctx.font = "13px 'Courier New', monospace";
+		// Sprint 7.5 Tier 5 — bump chatter font on touch. The caption is
+		// the only narrative beat during flight; at 13 px on phone scale
+		// (~7 CSS px) it was unreadable.
+		const fontPx = isTouch ? 20 : 13;
+		ctx.font = `${fontPx}px 'Courier New', monospace`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "top";
-		const padX = 14;
-		const padY = 6;
+		const padX = isTouch ? 18 : 14;
+		const padY = isTouch ? 9 : 6;
 		const metrics = ctx.measureText(text);
 		const w = metrics.width + padX * 2;
-		const h = 22;
+		const h = isTouch ? 32 : 22;
 		const x = 1280 / 2 - w / 2;
 		const y = 80;
 		ctx.fillStyle = "rgba(0,0,0,0.65)";
@@ -277,6 +294,68 @@ export class GameRenderer {
 		ctx.stroke();
 		ctx.fillStyle = "#ffd9c2";
 		ctx.fillText(text, 1280 / 2, y + padY - 1);
+		ctx.restore();
+	}
+
+	/**
+	 * Sprint 7.4 — Campaign chatter caption with speaker prefix. Hoshi
+	 * lines render in a different tint than Chen lines so the player
+	 * reads "who's talking" at a glance. Position offset 28 px below
+	 * MissionChatter's slot so a Historic mission and Campaign mission
+	 * never overlap (they can't run simultaneously per gameMode but
+	 * defensive layout still helps).
+	 *
+	 * Color scheme:
+	 *   FLIGHT: (Hoshi) — pale green-cyan, normal weight, standard font
+	 *   CAPCOM: (Chen) — desaturated amber, monospace (already monospace,
+	 *           so the speaker tag is the visual distinction)
+	 *
+	 * `showSkipHint` is true when a multi-line queue is active. Renders
+	 * a small "[SPACE] SKIP" hint so the player learns the binding.
+	 */
+	private drawCampaignChatter(
+		line: { speaker: "hoshi" | "chen"; text: string },
+		showSkipHint: boolean,
+		isTouch = false,
+	): void {
+		const ctx = this.renderer.ctx;
+		ctx.save();
+		const fontPx = isTouch ? 20 : 13;
+		ctx.font = `${fontPx}px 'Courier New', monospace`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "top";
+		const prefix = line.speaker === "hoshi" ? "FLIGHT: " : "CAPCOM: ";
+		const fullText = prefix + line.text;
+		const padX = isTouch ? 18 : 14;
+		const padY = isTouch ? 9 : 6;
+		const metrics = ctx.measureText(fullText);
+		const w = metrics.width + padX * 2;
+		const h = isTouch ? 32 : 22;
+		const x = 1280 / 2 - w / 2;
+		// Position 32 px below MissionChatter slot when touch (taller box),
+		// 30 px below on desktop. So the two systems can't visually fuse.
+		const y = isTouch ? 122 : 110;
+		const borderColor = line.speaker === "hoshi" ? "#7fc8b8" : "#d8a868";
+		const textColor = line.speaker === "hoshi" ? "#c8f0e8" : "#f0d8a8";
+		ctx.fillStyle = "rgba(0,0,0,0.7)";
+		ctx.strokeStyle = borderColor;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.fill();
+		ctx.stroke();
+		ctx.fillStyle = textColor;
+		ctx.fillText(fullText, 1280 / 2, y + padY - 1);
+		if (showSkipHint) {
+			const hintPx = isTouch ? 14 : 10;
+			ctx.font = `${hintPx}px 'Courier New', monospace`;
+			ctx.fillStyle = "rgba(255,255,255,0.4)";
+			ctx.fillText(
+				isTouch ? "TAP TO SKIP" : "[SPACE] SKIP",
+				1280 / 2,
+				y + h + 4,
+			);
+		}
 		ctx.restore();
 	}
 
@@ -396,11 +475,20 @@ export class GameRenderer {
 			state.terrain ?? null,
 			state.status === "playing",
 			state.rcsTutorialFramesRemaining,
+			// Sprint 7.5 Tier 3 — bigger HUD readouts on touch devices
+			// so altitude/speed/fuel are legible at phone-landscape scale.
+			state.input.isTouchDevice,
 		);
 
-		// Touch controls overlay
+		// Sprint 7.5 Tier 2 — visible virtual joystick + thrust button.
+		// Renderer reads the live stick knob position and thrust-held flag
+		// directly from the Input instance so the visible affordance
+		// always matches the actual physical-input state.
 		if (state.input.isTouchDevice) {
-			this.renderer.drawTouchControls();
+			this.renderer.drawTouchControls(
+				state.input.stickKnob,
+				state.input.thrustHeld,
+			);
 		}
 
 		if (state.forkReplay) {
@@ -408,7 +496,17 @@ export class GameRenderer {
 		}
 
 		if (state.missionChatterText) {
-			this.drawChatterCaption(state.missionChatterText);
+			this.drawChatterCaption(
+				state.missionChatterText,
+				state.input.isTouchDevice,
+			);
+		}
+		if (state.campaignChatterLine) {
+			this.drawCampaignChatter(
+				state.campaignChatterLine,
+				state.campaignHasQueuedLines,
+				state.input.isTouchDevice,
+			);
 		}
 
 		// Post-flight telemetry chart
@@ -556,6 +654,8 @@ export class GameRenderer {
 			CAMPAIGN.length,
 			getDailyDateLabel(),
 			getBestScore(getDailySeed()),
+			// Sprint 7.5 — touch devices get larger, more spaced rows.
+			state.input.isTouchDevice,
 		);
 	}
 
@@ -600,6 +700,11 @@ export class GameRenderer {
 			state.gameMode === "campaign" ? state.campaignCompleted : undefined,
 			authenticInfo,
 			authenticBestScores,
+			// Sprint 7.4 — pass cleanClears only for campaign mode so the
+			// star renders alongside [DONE] for missions cleared cleanly.
+			state.gameMode === "campaign" ? state.cleanClears : undefined,
+			// Sprint 7.5 — touch devices get larger rows for 44px hit targets.
+			state.input.isTouchDevice,
 		);
 		// Show relay mode indicator on free-play menu
 		if (state.gameMode === "freeplay") {

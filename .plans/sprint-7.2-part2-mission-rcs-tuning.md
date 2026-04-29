@@ -1,6 +1,6 @@
 # Sprint 7.2 Part 2 — Per-Mission Data-Driven RCS Tuning (plan)
 
-Status: **Eng-reviewed 2026-04-23. 7 decisions locked in (see GSTACK REVIEW REPORT at bottom). Ready to implement.**
+**Status: ✅ COMPLETE — shipped v0.6.2.0 (PR #43, commit `2070f97`).** Per-mission `maxLandingAngularRate` + `startingRCS` overrides on `DifficultyConfig`; `applyAuthenticPhysics` helper; Apollo 11 Authentic tightened to 3°/s.
 
 Part 1 shipped in commit `a473f2a` (PR #42, v0.6.1.0) with rigid-body rotation, a separate RCS propellant tank, and an 8°/s angular-rate landing check. Every knob was a global constant. This sprint moves the **landing-rate tolerance** into per-mission `DifficultyConfig` so Apollo 11 can land with historical-reference precision while freeplay stays forgiving, and closes the feedback loop so players understand WHY they crash when they do.
 

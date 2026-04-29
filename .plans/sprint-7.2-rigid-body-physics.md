@@ -1,6 +1,6 @@
 # Sprint 7.2 — Rigid-Body Physics (plan)
 
-Status: **CEO + Eng reviewed 2026-04-20.** 4 scope expansions accepted, 2 deferred. Claude subagent adversarial review caught 3 structural issues + 2 blockers, all resolved. Eng review locked 3 architecture decisions (physicsVersion on LanderState, copy-and-rename v2 integrator, replay sets version at start), 1 code-quality decision (autopilot full rewrite in PR 1), and 3 test gaps (PhysicsManager dispatch, AgentEnv state vector non-zero, leaderboard v2/v3 partition). Ready to implement.
+**Status: ✅ COMPLETE — Part 1 shipped v0.6.1.0 (PR #42, commit `a473f2a`).** Rigid-body rotation + RCS propellant tank + 8°/s angular-rate landing gate + autopilot PID rewrite across altitude zones + per-flight `physicsVersion: 2 | 3`. Part 2 (per-mission tuning) shipped v0.6.2.0 — see `sprint-7.2-part2-mission-rcs-tuning.md`. Free Play opt-out + Campaign physics ramp shipped Sprint 7.3 (v0.6.3.0). Gravity-storm torque shipped v0.6.3.1.
 
 CEO plan at `~/.gstack/projects/kenlacroix-moonlander-enhanced/ceo-plans/2026-04-20-sprint-7.2-rigid-body-physics.md`.
 Test plan artifact at `~/.gstack/projects/kenlacroix-moonlander-enhanced/root-main-eng-review-test-plan-20260420-221648.md`.

@@ -1,6 +1,9 @@
 # Sprint 5 — Historic Missions (plan)
 
-Status: CEO-reviewed 2026-04-15 (SCOPE EXPANSION mode, Approach C + 4 expansions accepted)
+**Status: ✅ COMPLETE — Parts A + B both shipped.**
+- Part A — Apollo 11/15/17 + Artemis III + chatter + share card → v0.5.7.0 (PR #22, merged 2026-04-15).
+- Part B — Apollo 13 Survive + Luna 9 auto-landing → v0.5.9.1 (PR #34, alongside Sprint 5.5 polish).
+- Deferred missions (Apollo 12/14/16, Luna 16, Chang'e 3/4/5, SLIM 2024, Chandrayaan-3) tracked in `TODOS.md`.
 
 ## Goal
 Ship a playable museum of lunar exploration — Apollo + Artemis + Luna 9 + Apollo 13 survive — with authentic moment-markers that answer the sprint exit question ("would a space nerd share this?") through distinctive, comparable, share-worthy mechanics rather than just authentic flavor text.

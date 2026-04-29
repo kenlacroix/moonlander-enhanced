@@ -40,6 +40,7 @@ import {
 import { getTerrainHeightAt } from "./Physics";
 import { generateRandomMission } from "./RandomMission";
 import { createRelayState } from "./RelayMode";
+import { getMissionListGeometry, getTitleGeometry } from "../utils/menuLayout";
 
 const TITLE_OPTION_COUNT = 8;
 
@@ -62,6 +63,27 @@ export function updateTitle(game: Game, input: InputState): void {
 			(game.titleSelection - 1 + TITLE_OPTION_COUNT) % TITLE_OPTION_COUNT;
 	if (input.menuDown)
 		game.titleSelection = (game.titleSelection + 1) % TITLE_OPTION_COUNT;
+	// Sprint 7.5 Tier 1 — tap-on-title-row direct select. Geometry from
+	// shared getTitleGeometry helper, in lockstep with CanvasRenderer.
+	if (input.tapCanvas) {
+		const tapX = input.tapCanvas.x;
+		const tapY = input.tapCanvas.y;
+		const optionCount = TITLE_OPTION_COUNT;
+		const geo = getTitleGeometry(game.input.isTouchDevice);
+		const firstRowY = geo.firstRowY(720, optionCount);
+		if (tapX >= geo.xMin && tapX <= geo.xMax) {
+			for (let i = 0; i < optionCount; i++) {
+				const y = firstRowY + i * geo.rowSpacing;
+				const rowTop = y - 14;
+				const rowBot = y + (geo.rowHeight - 14);
+				if (tapY >= rowTop && tapY <= rowBot) {
+					game.titleSelection = i;
+					(input as { menuSelect: boolean }).menuSelect = true;
+					break;
+				}
+			}
+		}
+	}
 	if (input.menuSelect) {
 		if (game.titleSelection === 2) {
 			game.startTraining();
@@ -160,6 +182,28 @@ export function updateMenu(game: Game, input: InputState): void {
 			(game.selectedMission - 1 + missions.length) % missions.length;
 	if (input.menuDown)
 		game.selectedMission = (game.selectedMission + 1) % missions.length;
+	// Sprint 7.5 Tier 1 — tap-on-mission-row direct select. Replaces the
+	// undiscoverable Y-zone gesture. Hit-test against the rendered
+	// geometry from CanvasRenderer.drawMissionSelect via shared
+	// getMissionListGeometry helper. Tapping a row sets selectedMission
+	// AND promotes the tap to a menuSelect so the rest of the handler
+	// launches that mission this frame.
+	if (input.tapCanvas) {
+		const tapY = input.tapCanvas.y;
+		const { startY, lineHeight, visibleCount: max } = getMissionListGeometry(
+			game.input.isTouchDevice,
+		);
+		const visibleCount = Math.min(missions.length, max);
+		for (let i = 0; i < visibleCount; i++) {
+			const rowTop = startY + i * lineHeight - 16;
+			const rowBot = rowTop + lineHeight;
+			if (tapY >= rowTop && tapY <= rowBot) {
+				game.selectedMission = i;
+				(input as { menuSelect: boolean }).menuSelect = true;
+				break;
+			}
+		}
+	}
 	if (input.menuSelect) {
 		const mission = missions[game.selectedMission];
 		if (
@@ -260,6 +304,20 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.status = "menu";
 		return;
 	}
+	// AI Theater is the only post-flight surface where menuBack should
+	// also fire on non-playing state — the user lands or crashes, the
+	// panel keeps training, and they need a way out without restarting
+	// first. The synthetic Escape from the panel's EXIT button takes
+	// this path on touch (no real Esc key).
+	if (input.menuBack && game.aiTheater.isActive) {
+		game.audio.setThruster(false);
+		game.audio.soundtrack.stop();
+		game.aiTheater.stop();
+		game.aiTheaterComparison = null;
+		game.currentFlight = null;
+		game.status = "menu";
+		return;
+	}
 	// Auto-landing missions (Luna 9) default the autopilot ON for
 	// spectator-mode descent. But the PID doesn't always converge on
 	// Luna 9's craft profile (low thrust 0.85x + low mass 0.7x) and
@@ -274,6 +332,13 @@ export function handlePostFlightInput(game: Game, input: InputState): void {
 		game.autopilot.toggleAnnotations();
 	if (input.toggleRetroSkin) {
 		game.toggleRetroSkin();
+	}
+	// Sprint 7.4 — Space (or click via menuSelect) skips to the next
+	// queued campaign chatter line. Only meaningful when a multi-line
+	// briefing or post-landing sequence is mid-display. Replaying
+	// players don't want to re-read the same Hoshi analysis.
+	if (input.menuSelect && game.campaignHasQueuedLines) {
+		game.campaignChatter.skip();
 	}
 }
 
@@ -301,8 +366,22 @@ export function updateFlightVisuals(game: Game, dt: number): void {
 					game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL,
 			});
 		}
+		// Sprint 7.4 — Campaign chatter update fires the same altitude/fuel/
+		// drift triggers MissionChatter does, but for Campaign missions only.
+		if (
+			game.gameMode === "campaign" &&
+			game.activeMission?.narrative?.enabled
+		) {
+			game.campaignChatter.update({
+				lander: game.lander,
+				altitude,
+				startingFuel:
+					game.activeMission.difficulty?.startingFuel ?? STARTING_FUEL,
+			});
+		}
 	}
 	game.missionChatter.tick(dt);
+	game.campaignChatter.tick(dt);
 	game.particles.update(dt);
 	game.audio.setThruster(game.lander.thrusting && game.status === "playing");
 	if (
@@ -408,6 +487,16 @@ export function selectMission(game: Game, mission: Mission): void {
 	updateURL(mission.seed);
 	if (isHistoricMission(mission) && mission.kind === "landing") {
 		game.missionChatter.start(mission.facts, game.getLLMConfig());
+	}
+	// Sprint 7.4 — Campaign narrative dialogue. Activates only when the
+	// player launched in Campaign mode AND the mission opted into the
+	// narrative field. Free Play, Historic, and AI Theater never reach
+	// this branch (gameMode is exclusive). The two chatter systems
+	// (MissionChatter for Historic, CampaignChatter for Campaign) never
+	// fire simultaneously — gameMode === "historic" vs "campaign" is
+	// the discriminator.
+	if (game.gameMode === "campaign" && mission.narrative?.enabled) {
+		game.campaignChatter.start(mission.id, game.getLLMConfig());
 	}
 	if (game.gameMode === "ai-theater") {
 		game.aiTheater.start(
