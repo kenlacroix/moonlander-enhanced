@@ -76,13 +76,6 @@ Browser Gamepad API works in Chrome/Firefox/Safari with zero user-side install. 
 - **Priority:** P3 (polish, not blocking)
 - **Depends on:** Nothing.
 
-### Animated character portraits for narrative dialogue (Sprint 7.5 candidate)
-**What:** Single SVG-or-pixel-art bust per character (Hoshi + Chen + future instructors), with 2-3 frame mouth animation driven by the same chatter-event timing already used by `MissionChatter`. Renders next to the dialogue line during briefing, in-flight chatter, and post-landing analysis.
-- **Why:** Player observation: "can we have a likeness of the character talking display on screen and be animated while talking?" — Tier 3 design doc explicitly rejected portraits as scope-creep for one focused sprint. This is the natural Sprint 7.5 successor once Tier 3's voice is validated by playtest.
-- **Effort:** M (CC: ~2-3 hr code; **art is the gate** — needs commissioned art, AI-gen art, or pixel-art pass before code can ship)
-- **Priority:** P2 after Sprint 7.4 ships and Hoshi/Chen voice is validated
-- **Depends on:** Sprint 7.4 shipped + playtest confirming voice works + art assets sourced
-
 ### LLM-rewritten dialogue per-run (Sprint 7.4 enhancement)
 **What:** Tier 3 design doc has Hoshi as offline-first (rule-based templates) with LLM enhancement as optional polish. This item flags the LLM polish path explicitly: keep the rule-based templates as a "skeleton" (consistent arc, fixed beats per mission), let the LLM rewrite each line per-run using the player's actual flight numbers as context (RCS burn ms, fuel margin, AGL at first thrust, hazard-fired y/n).
 - **Why:** Player observation: "for the story, can we use AI to make it unique but still mostly the same using LLM?" — gives uniqueness without arc drift, since the skeleton constrains tone and beats.
@@ -391,6 +384,9 @@ Remaining items after cherry-picks ship:
 ---
 
 ## Completed
+
+### Sprint 7.6 — Animated character portraits for narrative dialogue
+**Completed:** v0.6.5.0 (2026-06-07). Hand-authored SVG/pixel-art busts for Dr. Liam Hoshi and CapCom Maya Chen (`src/render/CharacterPortraits.ts`), each with a 3-frame talking mouth (closed → half → open → half at ~7 fps) driven by the existing chatter visibility window. Rendered next to the dialogue line in briefings, in-flight callouts, and post-landing analysis. Color-blind safe (distinct silhouettes), `prefers-reduced-motion` falls back to a static portrait, the FLIGHT:/CAPCOM: text prefix stays, and the portrait scales up on touch (64 → 96 px) then shrinks-and-drops before clipping long lines. 9 new tests (500 total).
 
 ### v0.6.0.0 milestone + backlog polish
 **Completed:** v0.6.0.0 (2026-04-19). MINOR bump marking Sprint 6 complete (Parts A+B+C shipped this session). Removed dead Part B scaffolding (`EllipseState`, `hazardMask`, `ELLIPSE_UPDATE_FRAMES`) that was populated but never consumed. Noted that the "hoist leaderboard reads out of renderMenu hot path" TODO was based on outdated info — Sprint 5.5's in-memory cache already makes repeated `getBestScore` calls O(1), not O(localStorage).

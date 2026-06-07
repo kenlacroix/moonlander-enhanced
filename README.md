@@ -4,7 +4,7 @@ A browser-based, AI-enhanced reimagining of the 1979 Atari Moon Lander. Runs ent
 
 **Play at [canyou.land](https://canyou.land/)** — or clone and `npm run dev` locally.
 
-Current version: **v0.6.2.3** (see [`CHANGELOG.md`](./CHANGELOG.md)).
+Current version: **v0.6.5.0** (see [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ![Title screen](./docs/screenshots/title.png)
 
@@ -17,6 +17,7 @@ Current version: **v0.6.2.3** (see [`CHANGELOG.md`](./CHANGELOG.md)).
 - **AI Theater.** Watch a DQN learn to land in real time at 50x speed, compare DQN vs policy gradient vs random, then fork any episode and try to beat the AI from that exact frame.
 - **Smarter DQN.** Prioritized experience replay, 11-dim state vector with vertical acceleration and ground proximity, quality-scaled terminal reward. Agent learns to land in ~15 episodes instead of 40-60.
 - **Hazards.** Alien UFOs that siphon fuel or reverse controls. Gravity storms. Fuel leaks. Lunar archaeology objects with Apollo-era trivia.
+- **Campaign with a story.** The 5-mission Campaign has two voices with faces: Dr. Liam Hoshi (briefings, post-landing analysis) and CapCom Maya Chen (in-flight callouts). Animated SVG/pixel-art portraits with a talking mouth appear next to each line; silhouettes stay distinct for color-blind players, and the text prefix never goes away.
 - **Ghost replays, leaderboards, shareable flight reports.** All client-side via localStorage + IndexedDB.
 
 ## Missions
@@ -52,13 +53,13 @@ Under the v3 physics model, rotation carries momentum. Release a rotate key and 
 
 - **Code lives under `src/`** organized by concern: `game/`, `render/`, `ai/`, `systems/`, `api/`, `utils/`.
 - **Full architecture + roadmap:** [`CLAUDE.md`](./CLAUDE.md) — the source of truth for project identity, tech stack, sprint plan, and gotchas.
-- **Tests:** `npx vitest run` (431 tests). Types: `npx tsc --noEmit`. Lint: `npx biome check src/ tests/`.
+- **Tests:** `npx vitest run` (500 tests). Types: `npx tsc --noEmit`. Lint: `npx biome check src/ tests/`.
 - **Active plans:** [`.plans/`](./.plans/) — per-sprint plan files with CEO + Eng review reports.
 - **Deferred work:** [`TODOS.md`](./TODOS.md).
 
 ## Status
 
-Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint. Sprint 5 Part A (Historic Missions foundations + Apollo landings + Artemis) shipped at v0.5.7.0. Sprint 2.7 (Smarter DQN) at v0.5.8.0. Sprint 2.6 (AI Theater Explain Mode) Parts A+B+C at v0.5.8.1–v0.5.8.3. Sprint 5.5 Part A (Authentic Mode) at v0.5.9.0. Sprint 5 Part B (Apollo 13 Survive + Luna 9 auto-landing) plus Sprint 5.5 polish at v0.5.9.1. Sprint 6 Part A (WebGL rendering pipeline + Canvas fallback) at v0.5.9.2. Sprint 6 Part B (scene-wide bloom, opt-in via `?renderer=webgl`) at v0.5.9.3. Sprint 6 Part C (per-mission sun in the skybox, bigger crash shake, impact flash) at v0.5.9.4. **v0.6.0.0 milestone** marks Sprint 6 complete (Parts A+B+C) plus a polish pass that removed dead scaffolding. Sprint 7.1 PR 1 (terrain palettes + archetypes + mission variety) at v0.6.0.1. Sprint 7.2 Part 1 (rigid-body physics + separate RCS tank + autopilot rewrite) at v0.6.1.0. Sprint 7.2 Part 2 (per-mission RCS + landing-rate tuning + HUD angular-rate readout) at v0.6.2.0. Luna 9 autopilot mitigation (unlock `[P]` + default OFF on auto-landing) at v0.6.2.1-v0.6.2.2. Next up: Sprint 7.3 (engine gimbal + center-of-mass shift) or WebRTC peer-to-peer multiplayer.
+Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater First" long-term roadmap is mid-sprint. Sprint 5 Part A (Historic Missions foundations + Apollo landings + Artemis) shipped at v0.5.7.0. Sprint 2.7 (Smarter DQN) at v0.5.8.0. Sprint 2.6 (AI Theater Explain Mode) Parts A+B+C at v0.5.8.1–v0.5.8.3. Sprint 5.5 Part A (Authentic Mode) at v0.5.9.0. Sprint 5 Part B (Apollo 13 Survive + Luna 9 auto-landing) plus Sprint 5.5 polish at v0.5.9.1. Sprint 6 Part A (WebGL rendering pipeline + Canvas fallback) at v0.5.9.2. Sprint 6 Part B (scene-wide bloom, opt-in via `?renderer=webgl`) at v0.5.9.3. Sprint 6 Part C (per-mission sun in the skybox, bigger crash shake, impact flash) at v0.5.9.4. **v0.6.0.0 milestone** marks Sprint 6 complete (Parts A+B+C) plus a polish pass that removed dead scaffolding. Sprint 7.1 PR 1 (terrain palettes + archetypes + mission variety) at v0.6.0.1. Sprint 7.2 Part 1 (rigid-body physics + separate RCS tank + autopilot rewrite) at v0.6.1.0. Sprint 7.2 Part 2 (per-mission RCS + landing-rate tuning + HUD angular-rate readout) at v0.6.2.0. Luna 9 autopilot mitigation (unlock `[P]` + default OFF on auto-landing) at v0.6.2.1-v0.6.2.2. Sprint 7.3 (Free Play sandbox + opt-in hazards + gravity-storm torque) at v0.6.3.x. Sprint 7.4 (Campaign narrative — Hoshi/Chen voices, 35 dialogue lines) at v0.6.4.0. Sprint 7.5 (mobile quality — canvas scaling, touch HUD, portrait overlay) shipped alongside. Sprint 7.6 (animated character portraits for Hoshi/Chen) at v0.6.5.0. Next up: Sprint 8 (Three.js 3D cockpit mode) or WebRTC peer-to-peer multiplayer.
 
 ## License
 
