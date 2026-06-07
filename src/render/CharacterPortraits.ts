@@ -43,9 +43,161 @@ export function mouthFrameAt(nowMs: number): MouthFrame {
 	return MOUTH_SEQUENCE[idx] ?? 0;
 }
 
+/** Monospace advance width in em. Courier is 0.6; the extra 0.01 is
+ * margin so fallback monospace fonts with slightly wider metrics never
+ * overflow the caption box. Tests import this so the budget math stays
+ * linked to the value actually applied. */
+export const MONO_CHAR_EM = 0.61;
+
+/**
+ * Greedy word-wrap for the monospace caption font. A fixed advance width
+ * (MONO_CHAR_EM) makes a character budget a pixel budget — no
+ * ctx.measureText needed, which keeps this pure and testable. Words
+ * longer than the column hard-break (defensive; no dialogue line has one).
+ */
+export function wrapMonospace(text: string, maxChars: number): string[] {
+	// Degenerate column guard: a non-positive budget would never consume
+	// `rest` below and loop forever. One char per line is the floor.
+	const budget = Math.max(1, Math.floor(maxChars));
+	const lines: string[] = [];
+	let cur = "";
+	for (const word of text.split(" ")) {
+		const candidate = cur ? `${cur} ${word}` : word;
+		if (candidate.length <= budget) {
+			cur = candidate;
+			continue;
+		}
+		if (cur) lines.push(cur);
+		let rest = word;
+		while (rest.length > budget) {
+			lines.push(rest.slice(0, budget));
+			rest = rest.slice(budget);
+		}
+		cur = rest;
+	}
+	if (cur) lines.push(cur);
+	return lines;
+}
+
+/**
+ * Chatter panel anchor (canvas px, fixed 1280x720). The panel is
+ * right-anchored in the upper-right sky — the one band that is clear of
+ * everything that can be on screen during campaign flight:
+ *
+ *   RIGHT 1260 — same right margin as the SCORE/TIME column above it.
+ *   TOP   156  — below Earth's glow (bottom y=135, Background.ts) and the
+ *                touch SCORE/TIME/BEST rows (bottom ~146 at fontMul 2.0;
+ *                the 10px slack survives taller fallback monospace fonts).
+ *   LEFT_MIN 700 — clear of the camera-centered lander descent path
+ *                (screen x~640) and, for every campaign mission (none set
+ *                sunAngle, so all default to 30°), the sun at (390,120)
+ *                halo x 334-446. Touch thrust button starts at y=490;
+ *                the tallest wrapped briefing bottoms out near y~400.
+ */
+export const CHATTER_PANEL = {
+	RIGHT: 1260,
+	TOP: 156,
+	LEFT_MIN: 700,
+} as const;
+
+/** Caption box width floor in chars. Degenerate short lines (possible
+ * mid-stream from the LLM path) would otherwise shrink boxW until the
+ * portrait — which rides the box's left edge — drifts right and up
+ * under the SCORE/TIME HUD column. 24 chars keeps the bust left of
+ * x~1022 (touch TIME column) in the worst case. */
+export const MIN_CAPTION_CHARS = 24;
+
+export interface ChatterPanelLayout {
+	lines: string[];
+	fontPx: number;
+	lineHeight: number;
+	boxX: number;
+	boxY: number;
+	boxW: number;
+	boxH: number;
+	textX: number;
+	textY: number;
+	portraitPx: number;
+	portraitX: number;
+	portraitY: number;
+	hintPx: number;
+	hintX: number;
+	hintY: number;
+}
+
+/**
+ * Pure layout for the campaign chatter panel: bust on the left, wrapped
+ * caption box on the right, the pair right-anchored at CHATTER_PANEL.
+ * Box width shrinks to the longest wrapped line so short callouts stay
+ * compact. Result is stable for a given (fullText, isTouch) — callers
+ * in the rAF loop should memoize per line instead of recomputing.
+ *
+ * Input is NOT always dialogue-from-constants: with an LLM config set,
+ * CampaignChatter streams arbitrary model output into the line. So the
+ * layout defends itself — whitespace is normalized (newlines/tabs would
+ * defeat split(" ") wrapping and render as tofu in fillText) and the
+ * line count is clamped with an ellipsis so the panel bottom can never
+ * grow past PANEL_BOTTOM_MAX into the touch thrust zone (y=490).
+ */
+const PANEL_BOTTOM_MAX = 480;
+
+export function layoutChatterPanel(
+	fullText: string,
+	isTouch: boolean,
+): ChatterPanelLayout {
+	const fontPx = isTouch ? 20 : 13;
+	const charW = fontPx * MONO_CHAR_EM;
+	const lineHeight = Math.round(fontPx * 1.3);
+	const padX = isTouch ? 18 : 14;
+	const padY = isTouch ? 9 : 6;
+	const portraitPx = isTouch ? 96 : 64;
+	const gap = isTouch ? 12 : 10;
+	const maxTextW =
+		CHATTER_PANEL.RIGHT - CHATTER_PANEL.LEFT_MIN - portraitPx - gap - padX * 2;
+	const text = fullText.replace(/\s+/g, " ").trim();
+	let lines = wrapMonospace(text, Math.floor(maxTextW / charW));
+	// Empty text still gets one (blank) line so boxH math stays sane.
+	if (lines.length === 0) lines = [""];
+	const maxLines = Math.max(
+		1,
+		Math.floor(
+			(PANEL_BOTTOM_MAX - CHATTER_PANEL.TOP - padY * 2 - fontPx) / lineHeight,
+		) + 1,
+	);
+	if (lines.length > maxLines) {
+		lines = lines.slice(0, maxLines);
+		lines[maxLines - 1] = `${(lines[maxLines - 1] ?? "").slice(0, -1)}…`;
+	}
+	const longest = lines.reduce(
+		(n, l) => Math.max(n, l.length),
+		MIN_CAPTION_CHARS,
+	);
+	const boxW = Math.ceil(longest * charW) + padX * 2;
+	const boxH = (lines.length - 1) * lineHeight + fontPx + padY * 2;
+	const boxX = CHATTER_PANEL.RIGHT - boxW;
+	const boxY = CHATTER_PANEL.TOP;
+	return {
+		lines,
+		fontPx,
+		lineHeight,
+		boxX,
+		boxY,
+		boxW,
+		boxH,
+		textX: boxX + padX,
+		textY: boxY + padY,
+		portraitPx,
+		portraitX: boxX - gap - portraitPx,
+		portraitY: Math.round(boxY + boxH / 2 - portraitPx / 2),
+		hintPx: isTouch ? 14 : 10,
+		hintX: boxX + boxW / 2,
+		hintY: boxY + boxH + 4,
+	};
+}
+
 /** Dr. Liam Hoshi (FLIGHT) — NASA mission-patch flat illustration on a
  * roundel, mint palette anchored to his #7fc8b8 caption color. */
-const HOSHI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+const HOSHI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
 <circle cx="60" cy="60" r="58" fill="#0d2230"/>
 <circle cx="60" cy="60" r="58" fill="none" stroke="#7fc8b8" stroke-width="3"/>
 <circle cx="60" cy="60" r="51" fill="none" stroke="#c8f0e8" stroke-width="1"/>
@@ -89,7 +241,7 @@ const HOSHI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"
 /** CapCom Maya Chen — 16-bit pixel-art bust (SNES portrait box), amber
  * palette anchored to her #d8a868 caption color. Headset + boom mic is
  * her diagnostic comms-operator silhouette. */
-const CHEN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" shape-rendering="crispEdges">
+const CHEN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" shape-rendering="crispEdges">
 <rect width="120" height="120" fill="#1a1410"/>
 <rect x="6" y="14" width="20" height="14" fill="#3a2c18"/>
 <rect x="94" y="14" width="20" height="14" fill="#3a2c18"/>
