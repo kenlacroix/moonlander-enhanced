@@ -2,6 +2,16 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.5.0] - 2026-06-07 (Sprint 7.6 — Animated Character Portraits)
+
+The Campaign's two voices now have faces. Dr. Liam Hoshi (mint mission-patch roundel: rectangular glasses, side-parted hair, lanyard badge) and CapCom Maya Chen (amber 16-bit pixel-art bust: blunt bob, headset, boom mic) appear next to their dialogue lines with a 3-frame talking mouth — during briefings, in-flight callouts, and post-landing analysis. Characters stay distinguishable by silhouette alone, so the portraits work for color-blind players, and the FLIGHT:/CAPCOM: text prefix stays untouched.
+
+### Added
+- **`src/render/CharacterPortraits.ts`** — hand-authored SVG busts with three mouth groups (closed/half/open) toggled by visibility. Rasterized once to 6 images via data-URL; `get()` returns null until decoded so captions never wait on art. Decode failure logs a warning and degrades to text-only. `SPEAKER_COLORS` is now the single source for per-speaker caption/portrait accent colors.
+- **Mouth animation** — closed → half → open → half at ~7 fps while a chatter line is on screen, driven by the line's existing 4s/6s visibility window. `prefers-reduced-motion` renders a static closed-mouth portrait.
+- **Portrait layout in campaign captions** — bust + caption box centered as one unit; portrait scales up on touch (64 → 96 px, Sprint 7.5 pattern) and shrinks-then-drops below 32 px before ever clipping long dialogue lines.
+- **9 new tests** in `tests/character-portraits.test.ts`: mouth-group invariants in both SVGs, frame-visibility toggles, the 140 ms talk cycle, headless degradation, and Image-readiness gating. 500 tests total (was 491).
+
 ## [0.6.4.0] - 2026-04-24 (Sprint 7.4 — Campaign Narrative)
 
 The 5-mission Campaign now has a story arc instead of just five difficulty steps. Two characters speak: Dr. Liam Hoshi (NASA Descent Systems engineer) handles pre-mission briefings and post-landing analysis; CapCom Maya Chen reads in-flight radio callouts. Hoshi's posture warms across the arc — polite Mission 1, "first nice one" Mission 2, mom-name-drop Mission 3 (Hadley Rille), self-aware Mission 4 ("this one's my fault"), payoff Mission 5 ("I wasn't sure anybody could do that"). Voice-only — no portraits this sprint (those are Sprint 7.6, blocked on art).
