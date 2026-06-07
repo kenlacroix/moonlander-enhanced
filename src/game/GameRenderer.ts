@@ -10,12 +10,18 @@ import type { TrainingLoop } from "../ai/TrainingLoop";
 import { APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
+import {
+	CharacterPortraits,
+	mouthFrameAt,
+	SPEAKER_COLORS,
+} from "../render/CharacterPortraits";
 import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import { resolvePalette } from "../render/palette";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
 import { getBestScore, getBestTime } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
+import { prefersReducedMotion } from "../utils/a11y";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
 import type { Artifact } from "./Artifacts";
 import { type FlightConfig, loadAuthenticPreference } from "./AuthenticMode";
@@ -152,7 +158,9 @@ export class GameRenderer {
 	constructor(
 		private renderer: CanvasRenderer,
 		private gameplay: IGameplayRenderer,
-	) {}
+	) {
+		this.portraits.preload();
+	}
 
 	setRetroSkin(skin: Parameters<CanvasRenderer["setRetroSkin"]>[0]): void {
 		this.renderer.setRetroSkin(skin);
@@ -164,6 +172,10 @@ export class GameRenderer {
 	 * after which the canvas stays black and no texture uploads
 	 * happen until the next gameplay frame. */
 	private lastFrameDrewGameplay = false;
+	/** Sprint 7.6 — animated speaker busts for campaign chatter. Lazily
+	 * rasterized on first draw; get() returns null until decoded so the
+	 * caption never waits on art. */
+	private readonly portraits = new CharacterPortraits();
 	/** Frame counter used to throttle the training screen's redraw.
 	 * Training runs the RL agent on the main thread; every rAF spent
 	 * redrawing the reward chart is time the agent doesn't spend
@@ -331,12 +343,37 @@ export class GameRenderer {
 		const metrics = ctx.measureText(fullText);
 		const w = metrics.width + padX * 2;
 		const h = isTouch ? 32 : 22;
-		const x = 1280 / 2 - w / 2;
+		// Sprint 7.6 — animated speaker bust left of the caption, the pair
+		// centered as one unit. The line is "speaking" for its whole
+		// visibility window (4s callouts / 6s briefing), so the mouth
+		// cycles while the box is on screen and is simply absent otherwise.
+		// Scales UP on touch like the rest of the HUD (Sprint 7.5 pattern:
+		// the canvas is fixed 1280x720 and letterboxed, so nothing hides).
+		// While the SVG is still decoding the layout falls back to the
+		// pre-7.6 centered text-only box.
+		const mouthFrame = prefersReducedMotion() ? 0 : mouthFrameAt(Date.now());
+		// Below this the bust is unreadable mush — drop it instead.
+		const MIN_PORTRAIT_PX = 32;
+		let portraitPx = isTouch ? 96 : 64;
+		const portraitGap = isTouch ? 12 : 10;
+		// Overflow guard: shrink the portrait before ever clipping text;
+		// below readable size, omit it (text-only, never clipped).
+		const maxTotal = 1280 - 32;
+		if (w + portraitGap + portraitPx > maxTotal) {
+			portraitPx = maxTotal - w - portraitGap;
+		}
+		const portrait =
+			portraitPx >= MIN_PORTRAIT_PX
+				? this.portraits.get(line.speaker, mouthFrame)
+				: null;
+		const left = 1280 / 2 - (portrait ? portraitPx + portraitGap + w : w) / 2;
+		const x = portrait ? left + portraitPx + portraitGap : left;
+		const boxCx = x + w / 2;
 		// Position 32 px below MissionChatter slot when touch (taller box),
 		// 30 px below on desktop. So the two systems can't visually fuse.
 		const y = isTouch ? 122 : 110;
-		const borderColor = line.speaker === "hoshi" ? "#7fc8b8" : "#d8a868";
-		const textColor = line.speaker === "hoshi" ? "#c8f0e8" : "#f0d8a8";
+		const { border: borderColor, text: textColor } =
+			SPEAKER_COLORS[line.speaker];
 		ctx.fillStyle = "rgba(0,0,0,0.7)";
 		ctx.strokeStyle = borderColor;
 		ctx.lineWidth = 1;
@@ -345,16 +382,20 @@ export class GameRenderer {
 		ctx.fill();
 		ctx.stroke();
 		ctx.fillStyle = textColor;
-		ctx.fillText(fullText, 1280 / 2, y + padY - 1);
+		ctx.fillText(fullText, boxCx, y + padY - 1);
+		if (portrait) {
+			const py = y + h / 2 - portraitPx / 2;
+			ctx.fillStyle = "rgba(0,0,0,0.7)";
+			ctx.fillRect(left, py, portraitPx, portraitPx);
+			ctx.drawImage(portrait, left, py, portraitPx, portraitPx);
+			ctx.strokeStyle = borderColor;
+			ctx.strokeRect(left, py, portraitPx, portraitPx);
+		}
 		if (showSkipHint) {
 			const hintPx = isTouch ? 14 : 10;
 			ctx.font = `${hintPx}px 'Courier New', monospace`;
 			ctx.fillStyle = "rgba(255,255,255,0.4)";
-			ctx.fillText(
-				isTouch ? "TAP TO SKIP" : "[SPACE] SKIP",
-				1280 / 2,
-				y + h + 4,
-			);
+			ctx.fillText(isTouch ? "TAP TO SKIP" : "[SPACE] SKIP", boxCx, y + h + 4);
 		}
 		ctx.restore();
 	}
