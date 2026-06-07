@@ -53,7 +53,7 @@ Under the v3 physics model, rotation carries momentum. Release a rotate key and 
 
 - **Code lives under `src/`** organized by concern: `game/`, `render/`, `ai/`, `systems/`, `api/`, `utils/`.
 - **Full architecture + roadmap:** [`CLAUDE.md`](./CLAUDE.md) — the source of truth for project identity, tech stack, sprint plan, and gotchas.
-- **Tests:** `npx vitest run` (500 tests). Types: `npx tsc --noEmit`. Lint: `npx biome check src/ tests/`.
+- **Tests:** `npx vitest run` (554 tests). Types: `npx tsc --noEmit`. Lint: `npx biome check src/ tests/`.
 - **Active plans:** [`.plans/`](./.plans/) — per-sprint plan files with CEO + Eng review reports.
 - **Deferred work:** [`TODOS.md`](./TODOS.md).
 
