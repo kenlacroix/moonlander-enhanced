@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.12.0",
+		date: "2026-06-15",
+		summary:
+			"In 3D mode (?renderer=3d), replays now get a cinematic camera — AI Theater episodes and ghost-fork playbacks slowly orbit the lander and pull back into a beauty shot on touchdown or crash.",
+	},
+	{
 		version: "0.6.11.0",
 		date: "2026-06-14",
 		summary:

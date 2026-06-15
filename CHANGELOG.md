@@ -2,6 +2,20 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.12.0] - 2026-06-15 (3D cinematic replays)
+
+3D mode is at its best where you watch rather than fly — so replays now get a dedicated cinematic camera. When a session is in `?renderer=3d`, AI Theater episode playback and ghost-archaeology fork replays (before the player takes over) slowly orbit the lander so the terrain's depth reads, then widen into an orbital beauty shot on touchdown or crash. Live flight keeps its chase camera; precision landing stays on the readable side-on framing it wants.
+
+### Added
+- **`IGameplayRenderer.setReplayMode?(active)`** — an optional, camera-only signal. The 3D renderer swings to a slow orbital sweep when a replay is on screen; Canvas and WebGL omit it (no camera concept).
+- **Cinematic sweep in `ThreejsGameplayRenderer`** — time-based orbit around the playback lander (radius/height widen on `landed`/`crashed`), framing the depth the side-on 2-D view can't show. Zero control cost, since the player is watching.
+
+### Changed
+- **`Game.onAfterFrame`** flags replay playback (`status === "agent-replay"`, or a `forkReplay` before takeover) and calls `setReplayMode`. Ghost racing is excluded — the player is live there, so the chase camera stays.
+
+### Why
+- 3D adds perspective foreshortening, which makes precision *live* landing harder to read (the 2-D side view is the better instrument for that). Replays have no control cost, so the cinematic 3D camera is pure upside — the strongest use of the renderer.
+
 ## [0.6.11.0] - 2026-06-14 (Sprint 8 — 3D mode, first cut)
 
 The headline Phase 4 feature: an opt-in **cinematic third-person 3D renderer** (Three.js), launched with `?renderer=3d`. The game stays 2.5-D — physics, HUD, and menus are untouched — but the flight is now projected into a real 3D scene: an extruded lunar landscape, a low-poly LM, Earth and a low key-light sun casting long shadows, and a chase camera. Press `C` to cycle chase / orbital / low-cinematic angles; the camera auto-pulls to an orbital beauty shot on touchdown or crash.

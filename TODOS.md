@@ -448,8 +448,9 @@ Remaining items after cherry-picks ship:
 
 The cinematic third-person 3D renderer (`?renderer=3d`, `ThreejsGameplayRenderer`) shipped as a first cut in v0.6.11.0. Deferred from that cut:
 
-- [ ] **In-browser verification of `?renderer=3d`** on the deploy preview — confirm the scene renders, chase/orbital/low cams (C key) behave, plume + shadows read well, and perf holds (desktop + mid-tier mobile). The renderer needs a live WebGL context so it isn't unit-testable.
-- [ ] **First-person cockpit view** — the scoped-out 4th camera mode (instrument framing, look-out parallax). The mockup stubs a COCKPIT view; the real renderer only ships chase/orbital/low.
+- [x] **Desktop verification of `?renderer=3d`** — Ken eyeballed the preview (2026-06-15): "feels and looks better" than 2D. Still open: mid-tier **mobile perf** check (the renderer needs a live WebGL context so it isn't unit-testable).
+- [x] **3D cinematic replays** (v0.6.12.0) — replay surfaces (AI Theater episodes, ghost-fork before takeover) orbital-sweep + beauty-shot pull on land/crash when in `?renderer=3d`, via `IGameplayRenderer.setReplayMode`. Where 3D is genuinely best (watch, don't control).
+- [ ] **First-person cockpit view** — the scoped-out 4th camera mode. Per the v0.6.12.0 analysis, ship as an opt-in challenge/replay camera with an attitude + landing-point reticle, NOT the default live-landing view (3D foreshortening makes precision landing harder).
 - [ ] **3D models for artifacts + aliens** — currently `drawArtifacts`/`drawAlien` are no-ops in 3D; lunar archaeology + UFO hazards have no 3D presence.
 - [ ] **GLB asset pipeline** — v1 uses code-built low-poly meshes (no hosted assets). A proper LM/Earth/artifact model set would lift fidelity (loader + caching + bundle budget).
 - [ ] **Volumetric plume polish** — current plume is the shared particle cloud + an additive engine-glow cone; a dedicated volumetric/instanced plume would sell thrust better.

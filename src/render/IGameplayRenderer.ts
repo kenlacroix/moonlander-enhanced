@@ -72,4 +72,11 @@ export interface IGameplayRenderer {
 
 	/** Release GPU resources. Called on page unload or backend swap. */
 	destroy(): void;
+
+	/** Sprint 8 follow-up — opt-in cinematic replay camera. When true, a
+	 * playback (ghost-archaeology fork before takeover, or an AI Theater
+	 * episode) is on screen, so the renderer may swing to a cinematic
+	 * orbital sweep instead of the live chase framing. Optional: only the
+	 * 3D renderer acts on it; Canvas / WebGL omit it (no camera concept). */
+	setReplayMode?(active: boolean): void;
 }

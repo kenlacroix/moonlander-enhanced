@@ -81,6 +81,7 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 	private lastLander: LanderState | null = null;
 	private shakeAmount = 0;
 	private camMode = 0; // 0 chase, 1 orbital, 2 low cinematic
+	private replayMode = false;
 	private readonly onKey: (e: KeyboardEvent) => void;
 
 	private constructor(canvas: HTMLCanvasElement) {
@@ -237,7 +238,10 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 			metalness: 0.4,
 		});
 		// Descent stage (octagonal) — ~28 wide.
-		const desc = new THREE.Mesh(new THREE.CylinderGeometry(13, 14, 11, 8), gold);
+		const desc = new THREE.Mesh(
+			new THREE.CylinderGeometry(13, 14, 11, 8),
+			gold,
+		);
 		desc.position.y = -2;
 		desc.castShadow = true;
 		g.add(desc);
@@ -360,10 +364,9 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		this.sunDisc.position.copy(sunPos);
 		if (palette?.sky) {
 			const c = new THREE.Color(palette.sky);
-			(this.scene.fog as THREE.FogExp2).color.copy(c).lerp(
-				new THREE.Color(0x05070c),
-				0.5,
-			);
+			(this.scene.fog as THREE.FogExp2).color
+				.copy(c)
+				.lerp(new THREE.Color(0x05070c), 0.5);
 		}
 	}
 
@@ -510,6 +513,24 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		const tx = l ? l.x : WORLD_WIDTH * 0.5;
 		const ty = l ? sy(l.y) : 400;
 		const landed = l?.status === "landed" || l?.status === "crashed";
+
+		// Cinematic replay sweep — slowly orbit the playback lander so the
+		// terrain's depth reads, widening into a beauty shot on touchdown /
+		// crash. No control cost here (the player is watching, not flying),
+		// which is exactly where the 3rd-person 3D view is strongest.
+		if (this.replayMode) {
+			const ang = this.frameId * 0.005; // ~0.3 rad/s at 60 Hz
+			const radius = landed ? 480 : 340;
+			const height = landed ? 300 : 190;
+			this.camera.position.set(
+				tx + Math.cos(ang) * radius,
+				ty + height,
+				Math.sin(ang) * radius,
+			);
+			this.camera.lookAt(tx, ty + 10, 0);
+			return;
+		}
+
 		// Auto-pull to an orbital beauty shot on the end-of-flight beat.
 		const mode = landed ? 1 : this.camMode;
 		let px: number;
@@ -536,6 +557,10 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		// Smooth follow.
 		this.camera.position.lerp(new THREE.Vector3(px, py, pz), 0.12);
 		this.camera.lookAt(tx, ty + 10, 0);
+	}
+
+	setReplayMode(active: boolean): void {
+		this.replayMode = active;
 	}
 
 	resize(_width: number, _height: number): void {

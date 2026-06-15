@@ -887,6 +887,14 @@ export class Game {
 			this.gamepadToastTimer -= dt;
 			if (this.gamepadToastTimer <= 0) this.gamepadToast = null;
 		}
+		// Sprint 8 follow-up — flag replay playback for the cinematic 3D
+		// camera. AI Theater episodes (agent-replay) and fork replays before
+		// the player takes over are "watch, don't control" — orbital sweep.
+		// Ghost racing is excluded (the player is live). No-op on Canvas/WebGL.
+		const isReplay =
+			this.status === "agent-replay" ||
+			(this.forkReplay !== null && !this.forkReplay.forked);
+		this.gameplayRenderer.setReplayMode?.(isReplay);
 		switch (this.status) {
 			case "title":
 				updateTitle(this, input);
