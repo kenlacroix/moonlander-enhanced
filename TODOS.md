@@ -94,7 +94,9 @@ one at a time (each invalidates that mission's old ghosts, so do it deliberately
 - **Priority:** P2 (low effort, real signal; pair with `/document-release` so changelog updates stay disciplined)
 - **Depends on:** Nothing.
 
-### Pause-screen ambient music layer (extend Soundtrack.ts)
+### Pause-screen ambient music layer (extend Soundtrack.ts) — DONE 2026-06-14 (v0.6.9.0)
+**Shipped:** 4th "menu" mode in `Soundtrack.ts` (`startMenu`/`stopMenu`) — calm C2+G2 sine pad + sparse C-pentatonic triangle arpeggio (self-scheduling note timer), flight-only tension/shimmer layers silenced. Edge-triggered from `Game.onAfterFrame` on the `title` + `menu` screens, gated on audio init. (Note: actual layers are drone/tension/shimmer, not the bass/melody/drums this item assumed — adapted accordingly.)
+
 **What:** `src/systems/Soundtrack.ts` already does 3-layer Web Audio synthesis (bass, melody, drums) with adaptive intensity. Add a 4th "menu/pause" mode: slow the bass ~50%, add a sparse arpeggio voice, drop drums entirely. Triggered on pause + menu states.
 - **Why:** Player observation: "AI synth music on the pause screen?" — the existing soundtrack subsystem covers this without ML. True neural synth (Magenta.js MusicVAE) stays in Sprint 9 territory; this is the right scope match for "ambient menu music" without 10-30MB model downloads.
 - **Effort:** S (CC: ~45-60 min — new oscillator config + state hook into Game state machine for paused/title)

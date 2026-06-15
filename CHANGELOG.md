@@ -2,6 +2,17 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.9.0] - 2026-06-14 (Menu / pause ambient music)
+
+The title and mission-select screens used to be silent until you launched a flight. They now have their own calm ambient track — a soft consonant low pad with a sparse, gently-plucked arpeggio — so the pre-flight screens feel alive without competing with the in-flight soundtrack.
+
+### Added
+- **Menu mode in `src/systems/Soundtrack.ts`** — `startMenu()` / `stopMenu()` add a 4th layer (a monophonic triangle arpeggio over C-major pentatonic, re-enveloped per note by a self-scheduling timer) on top of a quiet C2+G2 sine pad, with the flight-only tension and shimmer layers silenced. Both are idempotent; `stopMenu()` yields the shared drone to flight audio without clipping a track that just started, so menu→flight transitions stay clean. Honors mute.
+- **2 menu-mode smoke tests** in `tests/soundtrack.test.ts` (592 total, was 591): the new methods no-op safely without an AudioContext and survive any start/stop ordering.
+
+### Changed
+- **`Game.onAfterFrame`** edge-triggers the menu track on the `title` and `menu` screens (gated on audio init, so nothing plays before the first user gesture) and stops it on any other screen — flight audio continues to be driven by the existing `start()` path.
+
 ## [0.6.8.0] - 2026-06-14 ("What's new" toast)
 
 Players now get a heads-up when the game has been updated. The title screen shows a small corner card — "Updated to vX.Y.Z" — that expands to a one-line summary of what changed and can be dismissed. It only appears after an actual update (never on a first-ever visit), shows once per release, and is suppressed in embed mode.

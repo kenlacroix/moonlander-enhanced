@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.9.0",
+		date: "2026-06-14",
+		summary:
+			"The title and mission-select screens now have their own calm ambient music — a soft pad with a sparse arpeggio — instead of silence before you fly.",
+	},
+	{
 		version: "0.6.8.0",
 		date: "2026-06-14",
 		summary:
