@@ -80,11 +80,50 @@ export class Input {
 	private canvas: HTMLCanvasElement | null = null;
 	readonly isTouchDevice: boolean;
 
+	// P3 Gamepad — pressed-state of each button on the active pad from the
+	// previous poll, for rising-edge detection of one-shot actions (restart,
+	// menu nav/select/back). Reset to [] when no pad is connected.
+	private _gpPrevButtons: boolean[] = [];
+	// True while the left stick is held past the menu-nav threshold, so a
+	// single push fires one menuUp/menuDown instead of one per frame.
+	private _gpStickMenuLatch = false;
+	// One-shot: id of the most recently connected pad, consumed by the game
+	// to show a "GAMEPAD CONNECTED" toast once per connection.
+	private _gpConnectedToast: string | null = null;
+	private _lastInputSource: "keyboard" | "touch" | "gamepad" = "keyboard";
+
 	get stickKnob(): { dx: number; dy: number } {
 		return this._stickKnob;
 	}
 	get thrustHeld(): boolean {
 		return this._thrustHeld;
+	}
+	get lastInputSource(): "keyboard" | "touch" | "gamepad" {
+		return this._lastInputSource;
+	}
+
+	/** P3 Gamepad — returns the connected pad's name once after each
+	 * connection, then clears. Game polls this to raise a connection toast. */
+	consumeGamepadConnected(): string | null {
+		const v = this._gpConnectedToast;
+		this._gpConnectedToast = null;
+		return v;
+	}
+
+	/** P3 Gamepad — fire a rumble effect on the active pad if supported.
+	 * No-op when no pad, no haptics, or the browser lacks `playEffect`. */
+	rumble(durationMs: number, weak: number, strong: number): void {
+		const act = this.activeGamepad()?.vibrationActuator;
+		if (!act?.playEffect) return;
+		try {
+			void act.playEffect("dual-rumble", {
+				duration: durationMs,
+				weakMagnitude: weak,
+				strongMagnitude: strong,
+			});
+		} catch {
+			// Older/partial haptics implementations — ignore.
+		}
 	}
 
 	/** Sprint 7.5 Tier 1 — register the canvas element so touchend can
@@ -101,6 +140,7 @@ export class Input {
 
 		window.addEventListener("keydown", (e) => {
 			this.keys.add(e.code);
+			this._lastInputSource = "keyboard";
 			if (e.code === "KeyR") {
 				this._restartPressed = true;
 			}
@@ -172,6 +212,7 @@ export class Input {
 			"touchstart",
 			(e) => {
 				if (!isInteractiveTarget(e.target)) e.preventDefault();
+				this._lastInputSource = "touch";
 				for (let i = 0; i < e.changedTouches.length; i++) {
 					const t = e.changedTouches[i];
 					const zone = this.classifyTouch(t.clientX, t.clientY);
@@ -271,6 +312,12 @@ export class Input {
 				this.touchActive.delete(e.changedTouches[i].identifier);
 			}
 		});
+
+		// P3 Gamepad — announce the controller on connect. The id is often
+		// suffixed with " (STANDARD GAMEPAD Vendor: ...)"; trim to the name.
+		window.addEventListener("gamepadconnected", (e) => {
+			this._gpConnectedToast = e.gamepad.id.split(" (")[0];
+		});
 	}
 
 	/**
@@ -357,6 +404,87 @@ export class Input {
 		return false;
 	}
 
+	/** P3 Gamepad — first connected pad, or null. */
+	private activeGamepad(): Gamepad | null {
+		const pads = navigator.getGamepads?.() ?? [];
+		for (const p of pads) {
+			if (p) return p;
+		}
+		return null;
+	}
+
+	/**
+	 * P3 Gamepad — poll the active pad and map it to game actions. Called
+	 * once per frame from getState(). Standard mapping:
+	 *   left stick X / D-pad L-R → rotate (0.15 deadzone)
+	 *   right trigger / A (south) → thrust
+	 *   left stick Y / D-pad U-D  → menu up/down (edge-detected)
+	 *   A or Start → menuSelect, Back/Share → menuBack, B → restart
+	 * One-shot actions fire on the button's rising edge.
+	 */
+	private pollGamepad(): {
+		thrust: boolean;
+		left: boolean;
+		right: boolean;
+		restart: boolean;
+		menuUp: boolean;
+		menuDown: boolean;
+		menuSelect: boolean;
+		menuBack: boolean;
+	} {
+		const none = {
+			thrust: false,
+			left: false,
+			right: false,
+			restart: false,
+			menuUp: false,
+			menuDown: false,
+			menuSelect: false,
+			menuBack: false,
+		};
+		const pad = this.activeGamepad();
+		if (!pad) {
+			this._gpPrevButtons = [];
+			this._gpStickMenuLatch = false;
+			return none;
+		}
+		const b = pad.buttons.map((btn) => btn.pressed);
+		const prev = this._gpPrevButtons;
+		const rising = (i: number): boolean => !!b[i] && !prev[i];
+		const axisX = pad.axes[0] ?? 0;
+		const axisY = pad.axes[1] ?? 0;
+		const trigger = pad.buttons[7]?.value ?? 0;
+		const DEAD = 0.15;
+
+		// Stick-driven menu nav: one event per push past the threshold.
+		const stickUp = axisY < -0.5;
+		const stickDown = axisY > 0.5;
+		let menuUp = rising(12);
+		let menuDown = rising(13);
+		if ((stickUp || stickDown) && !this._gpStickMenuLatch) {
+			if (stickUp) menuUp = true;
+			else menuDown = true;
+			this._gpStickMenuLatch = true;
+		} else if (!stickUp && !stickDown) {
+			this._gpStickMenuLatch = false;
+		}
+
+		if (b.some(Boolean) || Math.abs(axisX) > DEAD || Math.abs(axisY) > DEAD) {
+			this._lastInputSource = "gamepad";
+		}
+		this._gpPrevButtons = b;
+		return {
+			thrust: !!b[0] || trigger > 0.3,
+			left: axisX < -DEAD || !!b[14],
+			right: axisX > DEAD || !!b[15],
+			restart: rising(1),
+			menuUp,
+			menuDown,
+			menuSelect: rising(0) || rising(9),
+			menuBack: rising(8),
+		};
+	}
+
 	getState(): InputState {
 		// Sprint 7.5 Tier 2 — virtual stick X-offset drives rotation.
 		// Past STICK_DEADZONE (25 px) the rotate input fires; below it,
@@ -364,27 +492,32 @@ export class Input {
 		// finger jitter when the player intends to hold the stick centered.
 		const stickRotateLeft = this._stickKnob.dx < -STICK_DEADZONE;
 		const stickRotateRight = this._stickKnob.dx > STICK_DEADZONE;
+		const gp = this.pollGamepad();
 		const state: InputState = {
 			thrustUp:
 				this.keys.has("ArrowUp") ||
 				this.keys.has("KeyW") ||
 				this._thrustHeld ||
-				this.hasTouchZone("thrust"),
+				this.hasTouchZone("thrust") ||
+				gp.thrust,
 			rotateLeft:
 				this.keys.has("ArrowLeft") ||
 				this.keys.has("KeyA") ||
 				stickRotateLeft ||
-				this.hasTouchZone("left"),
+				this.hasTouchZone("left") ||
+				gp.left,
 			rotateRight:
 				this.keys.has("ArrowRight") ||
 				this.keys.has("KeyD") ||
 				stickRotateRight ||
-				this.hasTouchZone("right"),
-			restart: this._restartPressed || this._touchRestart,
-			menuUp: this._menuUpPressed,
-			menuDown: this._menuDownPressed,
-			menuSelect: this._menuSelectPressed || this._touchMenuSelect,
-			menuBack: this._menuBackPressed,
+				this.hasTouchZone("right") ||
+				gp.right,
+			restart: this._restartPressed || this._touchRestart || gp.restart,
+			menuUp: this._menuUpPressed || gp.menuUp,
+			menuDown: this._menuDownPressed || gp.menuDown,
+			menuSelect:
+				this._menuSelectPressed || this._touchMenuSelect || gp.menuSelect,
+			menuBack: this._menuBackPressed || gp.menuBack,
 			toggleAutopilot: this._autopilotToggled,
 			openSettings: this._settingsPressed,
 			toggleRetroSkin: this._retroToggled,
