@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.10.0",
+		date: "2026-06-14",
+		summary:
+			"Free Play and Campaign levels are reworked — each now has its own dramatic terrain (cratered fields, spires, mesas) and a real difficulty curve, from gentle flats to narrow single-pad expert runs. Note: old leaderboard ghosts on these levels are retired.",
+	},
+	{
 		version: "0.6.9.0",
 		date: "2026-06-14",
 		summary:
