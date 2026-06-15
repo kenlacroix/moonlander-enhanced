@@ -85,7 +85,9 @@ one at a time (each invalidates that mission's old ghosts, so do it deliberately
 - **Priority:** P2 (real product gap, but post-Sprint 7.4)
 - **Depends on:** Nothing structurally. Cleanest after Sprint 7.4 lands so Campaign archetype-wiring isn't fighting the new generator.
 
-### Dismissible "what's new" banner on title screen
+### Dismissible "what's new" banner on title screen — DONE 2026-06-14 (v0.6.8.0)
+**Shipped:** `src/data/whatsNew.ts` (curated per-release summaries; newest entry = source of truth for current version) + `src/ui/WhatsNewToast.ts` (title-screen DOM corner card, click to expand, × to dismiss, seen-version persisted to `localStorage["moonlander-last-seen-version"]`). Shows only after a real update, once per release, suppressed in embed mode. Driven from `Game.onAfterFrame`. Add a `whatsNew.ts` entry on every release — fold into `/document-release`.
+
 **What:** When the build's `VERSION` is newer than `localStorage["moonlander-last-seen-version"]`, show a small corner toast on title screen with the latest changelog entry. Click-X dismisses; sets the seen-version to current. Pulls from a new `src/data/whatsNew.ts` keyed by version (1-2 sentence summary per release).
 - **Why:** Player observation: "I would like a change log that the user can dismiss but just a heads up something has changed." Solo dev shipping aggressively (28 versions since Sprint 5) — players currently have no signal that anything changed between sessions.
 - **Effort:** S (CC: ~30-45 min including the data file + dismiss persistence + first-time-ever case where last-seen is undefined)

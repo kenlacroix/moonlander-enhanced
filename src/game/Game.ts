@@ -27,6 +27,7 @@ import {
 import { Input, type InputState } from "../systems/Input";
 import { TelemetryRecorder } from "../systems/Telemetry";
 import { SettingsOverlay } from "../ui/SettingsOverlay";
+import { WhatsNewToast } from "../ui/WhatsNewToast";
 import {
 	buildTerrainFromEditor,
 	deserializeEditor,
@@ -168,6 +169,7 @@ export class Game {
 	artifactText = "";
 	crashAnalysis = "";
 	private settingsOverlay = new SettingsOverlay();
+	private whatsNewToast = new WhatsNewToast();
 	private fuelWarningCooldown = 0;
 	private audioInitialized = false;
 	ghostRecorder = new GhostRecorder();
@@ -863,6 +865,7 @@ export class Game {
 
 	private onAfterFrame(dt: number): void {
 		const input = this.currentInput;
+		this.whatsNewToast.update(this.status === "title");
 		if (this.gamepadToastTimer > 0) {
 			this.gamepadToastTimer -= dt;
 			if (this.gamepadToastTimer <= 0) this.gamepadToast = null;
