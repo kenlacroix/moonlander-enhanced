@@ -41,19 +41,51 @@ export interface Mission {
 	narrative?: { enabled: boolean };
 }
 
-/** Free-play missions — all use default difficulty */
+/**
+ * Free-play missions — each carries a tuned `DifficultyConfig` so the
+ * terrain and landing challenge actually match the mission's promise (the
+ * descriptions used to over-sell flat, default terrain). All opt into
+ * `terrainVersion: 2` (per-archetype base-shape generators) for dramatic
+ * geometry, with an escalating curve from mission 1 (genuinely flat,
+ * generous) to mission 10 (single narrow pad, crevices, low fuel, wind).
+ *
+ * Free Play physics + hazards come from player preferences, NOT mission
+ * flags (see resolveFlightPolicy), so these configs only set the levers
+ * that bite in Free Play: archetype/terrainVersion, pad size/count,
+ * crevices, fuel, wind, and spawn altitude.
+ *
+ * Opting a seed into terrainVersion 2 changes its terrain, which retires
+ * any old ghost/leaderboard recorded for that seed on the v1 terrain —
+ * accepted, since the v1 terrain didn't match the mission's billing.
+ */
 export const MISSIONS: Mission[] = [
 	{
 		id: 1,
 		name: "TRANQUILITY BASE",
 		seed: 1969,
 		description: "Flat terrain, wide pads. Learn the controls.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "flats",
+			padMinWidth: 130,
+			padMaxWidth: 160,
+			padCount: 3,
+			startingFuel: 1300,
+		},
 	},
 	{
 		id: 2,
 		name: "SEA OF STORMS",
 		seed: 4217,
 		description: "Moderate terrain. Watch your speed.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "rolling",
+			padMinWidth: 100,
+			padMaxWidth: 130,
+			startingFuel: 1100,
+			windStrength: 12,
+		},
 	},
 	{
 		id: 3,
@@ -61,7 +93,11 @@ export const MISSIONS: Mission[] = [
 		seed: 7331,
 		description: "Rough terrain. Narrow pads.",
 		difficulty: {
+			terrainVersion: 2,
 			archetype: "crater-field",
+			padMinWidth: 70,
+			padMaxWidth: 95,
+			startingFuel: 1000,
 		},
 	},
 	{
@@ -69,42 +105,105 @@ export const MISSIONS: Mission[] = [
 		name: "TYCHO HIGHLANDS",
 		seed: 1138,
 		description: "High altitude start. Conserve fuel.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "mesa",
+			padMinWidth: 80,
+			padMaxWidth: 110,
+			startingFuel: 750,
+			spawnY: 40,
+		},
 	},
 	{
 		id: 5,
 		name: "MARE IMBRIUM",
 		seed: 2001,
 		description: "Deep valleys. Precision required.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "crater-field",
+			crevices: 2,
+			padMinWidth: 65,
+			padMaxWidth: 90,
+			startingFuel: 950,
+		},
 	},
 	{
 		id: 6,
 		name: "ARISTARCHUS RIDGE",
 		seed: 9973,
 		description: "Jagged peaks. Thread the needle.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "spires",
+			padMinWidth: 55,
+			padMaxWidth: 80,
+			startingFuel: 900,
+		},
 	},
 	{
 		id: 7,
 		name: "OCEANUS PROCELLARUM",
 		seed: 3141,
 		description: "Wide open. Speed is the enemy.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "flats",
+			padMinWidth: 90,
+			padMaxWidth: 120,
+			startingFuel: 900,
+			windStrength: 28,
+		},
 	},
 	{
 		id: 8,
 		name: "SOUTH POLE BASIN",
 		seed: 6502,
 		description: "Extreme terrain. Expert only.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "spires",
+			crevices: 3,
+			padMinWidth: 45,
+			padMaxWidth: 65,
+			padCount: 1,
+			startingFuel: 800,
+			windStrength: 20,
+			spawnY: 50,
+		},
 	},
 	{
 		id: 9,
 		name: "FAR SIDE",
 		seed: 8086,
 		description: "No easy landing zones.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "mesa",
+			crevices: 2,
+			padMinWidth: 45,
+			padMaxWidth: 60,
+			padCount: 1,
+			startingFuel: 750,
+			windStrength: 25,
+		},
 	},
 	{
 		id: 10,
 		name: "THE FINAL DESCENT",
 		seed: 42,
 		description: "Everything you've learned. Good luck.",
+		difficulty: {
+			terrainVersion: 2,
+			archetype: "spires",
+			crevices: 4,
+			padMinWidth: 38,
+			padMaxWidth: 55,
+			padCount: 1,
+			startingFuel: 650,
+			windStrength: 35,
+			spawnY: 40,
+		},
 	},
 ];
 
@@ -137,6 +236,7 @@ export const CAMPAIGN: Mission[] = [
 		},
 		narrative: { enabled: true },
 		difficulty: {
+			terrainVersion: 2,
 			roughness: 0.3,
 			padMinWidth: 100,
 			padMaxWidth: 140,
@@ -161,6 +261,7 @@ export const CAMPAIGN: Mission[] = [
 		},
 		narrative: { enabled: true },
 		difficulty: {
+			terrainVersion: 2,
 			roughness: 0.5,
 			padMinWidth: 70,
 			padMaxWidth: 110,
@@ -187,6 +288,7 @@ export const CAMPAIGN: Mission[] = [
 		},
 		narrative: { enabled: true },
 		difficulty: {
+			terrainVersion: 2,
 			roughness: 0.5,
 			padMinWidth: 60,
 			padMaxWidth: 100,
@@ -211,6 +313,7 @@ export const CAMPAIGN: Mission[] = [
 		},
 		narrative: { enabled: true },
 		difficulty: {
+			terrainVersion: 2,
 			roughness: 0.8,
 			padMinWidth: 40,
 			padMaxWidth: 70,
@@ -238,6 +341,7 @@ export const CAMPAIGN: Mission[] = [
 		},
 		narrative: { enabled: true },
 		difficulty: {
+			terrainVersion: 2,
 			roughness: 0.9,
 			padMinWidth: 35,
 			padMaxWidth: 50,

@@ -75,8 +75,9 @@ gentle rolling, low-amp flats) gated behind a `terrainVersion: 2` field on
 `DifficultyConfig`. Applied to **Random Mission only** this pass (live roll +
 share-decode); historic, curated free-play, and campaign stay v1 byte-identical,
 so all existing ghosts/leaderboards and the seed 1969/4217/7001 pins are untouched.
-Next step to extend the win: opt curated free-play / campaign missions into v2
-one at a time (each invalidates that mission's old ghosts, so do it deliberately).
+Extended in v0.6.10.0: all 10 curated Free Play + all 5 Campaign missions opted
+into v2 with tuned difficulty curves (old ghosts on those seeds retired, as
+expected). Historic stays v1 for accuracy.
 
 **What:** Levels still feel samey across Free Play / Campaign / Historic because all 5 archetypes (`rolling`, `crater-field`, `spires`, `mesa`, `flats`) run on the same midpoint-displacement core with cosmetic biasing. Add a *second* generator (Voronoi craters for `crater-field`, ridged-noise for `spires`, domain-warped fBm for `mesa`) and dispatch by archetype.
 - **Reconciling with "accuracy":** Historic missions and Authentic Mode keep their curated deterministic path (`specialFeature: "rille" | "valley"` + Apollo-site-faithful seeds stay byte-identical). Procedural variety lands in Free Play + Random Mission only — historic seeds remain pinned by the existing regression test (`tests/terrain.test.ts` seed 1969 / 4217 / 7001 byte-identical pin).

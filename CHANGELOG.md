@@ -2,6 +2,21 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.10.0] - 2026-06-14 (Free Play + Campaign level rework)
+
+The terrain engine shipped in v0.6.7.0 (terrainVersion 2) was only wired into Random Mission. This release opts the curated Free Play and Campaign missions into it and tunes their difficulty, so the levels finally match their descriptions — "flat terrain" is genuinely flat, "jagged peaks" are spires, "deep valleys" have crevices — and there's a real curve instead of ten near-identical default maps.
+
+### Changed
+- **Free Play missions (all 10)** now carry a tuned `DifficultyConfig` on `terrainVersion: 2`, with an escalating curve: mission 1 is genuinely flat with wide triple pads and generous fuel; later missions move through rolling, crater-field, mesa, and spires terrain with narrower/fewer pads, crevices, less fuel, wind, and higher spawn altitudes — ending on a single narrow pad over creviced spires at 650 fuel in a crosswind. Only the levers that bite in Free Play are set (terrain, pads, crevices, fuel, wind, spawn altitude), since physics and hazards there come from player preferences.
+- **Campaign missions (all 5)** opt into `terrainVersion: 2`, so the existing difficulty/palette/archetype ramp now renders as dramatic per-archetype geometry (rolling → crater-field → spires → mesa → spires) on top of the established pad/fuel/hazard/physics curve.
+- **Historic missions stay on v1** (no `terrainVersion`) — site-faithful Apollo/Artemis/Luna terrain and the byte-identical regression pins are untouched, since historical accuracy is the point there.
+
+### Added
+- **`tests/mission-difficulty.test.ts`** (602 total, was 592): asserts every curated mission opts into v2, that each one's terrain still generates flat, landable pads at its tuned width/count (the load-bearing guarantee for dramatic terrain), that heights stay in the valid band, and a coarse Free Play difficulty curve (mission 1 most forgiving, mission 10 least).
+
+### Note
+- Opting a seed into terrainVersion 2 changes its terrain, which **retires any old ghost / leaderboard entry** recorded on the previous (v1) terrain for the curated Free Play and Campaign seeds. This is the intended, accepted trade — the old terrain didn't match the mission's billing. Random Mission and Historic are unaffected.
+
 ## [0.6.9.0] - 2026-06-14 (Menu / pause ambient music)
 
 The title and mission-select screens used to be silent until you launched a flight. They now have their own calm ambient track — a soft consonant low pad with a sparse, gently-plucked arpeggio — so the pre-flight screens feel alive without competing with the in-flight soundtrack.
