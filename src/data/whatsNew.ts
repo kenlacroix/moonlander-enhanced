@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.14.0",
+		date: "2026-06-15",
+		summary:
+			"3D mode has a cockpit view — press C to cycle camera angles to first-person. Flying blind to your own tilt is hard, so a landing-point reticle shows where you'll touch down: steer it onto the pad (green = on a pad). A real challenge mode.",
+	},
+	{
 		version: "0.6.13.0",
 		date: "2026-06-15",
 		summary:

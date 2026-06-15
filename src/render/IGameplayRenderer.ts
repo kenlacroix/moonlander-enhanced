@@ -79,4 +79,9 @@ export interface IGameplayRenderer {
 	 * orbital sweep instead of the live chase framing. Optional: only the
 	 * 3D renderer acts on it; Canvas / WebGL omit it (no camera concept). */
 	setReplayMode?(active: boolean): void;
+
+	/** Sprint 8 follow-up — current effective gravity (game units/s²) for the
+	 * 3D cockpit camera's landing-point reticle, so its ballistic prediction
+	 * is correct on alt-gravity worlds. Optional: only the 3D renderer uses it. */
+	setEffectiveGravity?(g: number): void;
 }
