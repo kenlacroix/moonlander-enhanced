@@ -30,6 +30,28 @@ const FILTER_MAX = 2000;
 // Transition speed (seconds)
 const SMOOTH_TAU = 1.0;
 
+// v0.6.9.0 — menu / pause ambient mode. A calm consonant low pad plus a
+// sparse arpeggio, with the flight-only tension + shimmer layers silenced.
+// "Slow the bass" is expressed as a quiet, steady low fifth; the unhurried
+// feel comes from the sparse, gently-plucked arpeggio rather than a beat.
+const MENU_DRONE1 = 65.41; // C2
+const MENU_DRONE2 = 98.0; // G2 (perfect fifth — consonant, restful)
+const MENU_DRONE_GAIN = 0.035; // quieter than flight drone (0.06)
+// C-major pentatonic arpeggio, up then back — no semitone clashes, so any
+// order sounds pleasant. Sparse and soft; this is background, not melody.
+const MENU_ARP_NOTES = [
+	261.63, // C4
+	329.63, // E4
+	392.0, // G4
+	440.0, // A4
+	523.25, // C5
+	440.0, // A4
+	392.0, // G4
+	329.63, // E4
+];
+const MENU_ARP_PEAK = 0.045; // soft pluck, sits just above the pad
+const MENU_ARP_BASE_GAP_MS = 1150; // ~0.9 Hz — unhurried, "slowed" feel
+
 /** Per-archetype sonic profile. Every value is optional so profiles
  * can override just the knobs that matter for their mood while
  * inheriting the rest from `DEFAULT_PROFILE`. */
@@ -154,7 +176,14 @@ export class Soundtrack {
 	private shimmerLfoGain: GainNode | null = null;
 	private shimmerGain: GainNode | null = null;
 
+	// Layer 4: Menu arpeggio (monophonic — one osc retriggered per note)
+	private arpOsc: OscillatorNode | null = null;
+	private arpGain: GainNode | null = null;
+	private arpTimer: ReturnType<typeof setTimeout> | null = null;
+	private arpIndex = 0;
+
 	private active = false;
+	private menuActive = false;
 	private muted = false;
 	/** Current archetype profile. Swappable between flights via
 	 * `setArchetype`. Defaults to the legacy rolling/tritone mix. */
@@ -214,6 +243,18 @@ export class Soundtrack {
 		this.shimmerGain.connect(this.masterGain);
 		this.shimmerOsc.start();
 		this.shimmerLfo.start();
+
+		// Layer 4: Menu arpeggio. A single triangle oscillator whose gain is
+		// re-enveloped per note by the scheduler (see scheduleArpNote). Silent
+		// until startMenu().
+		this.arpOsc = ctx.createOscillator();
+		this.arpGain = ctx.createGain();
+		this.arpOsc.type = "triangle";
+		this.arpOsc.frequency.value = MENU_ARP_NOTES[0];
+		this.arpGain.gain.value = 0;
+		this.arpOsc.connect(this.arpGain);
+		this.arpGain.connect(this.masterGain);
+		this.arpOsc.start();
 	}
 
 	start(): void {
@@ -266,9 +307,74 @@ export class Soundtrack {
 		this.masterGain?.gain.setTargetAtTime(0, now, 0.3);
 	}
 
+	/** v0.6.9.0 — start the menu / pause ambient mode: calm low pad +
+	 * sparse arpeggio, flight-only layers silenced. Idempotent. Safe to call
+	 * while flight audio is active (it takes over the shared drone), though
+	 * Game only requests it on the title / mission-select screens. */
+	startMenu(): void {
+		if (!this.ctx || this.menuActive) return;
+		this.menuActive = true;
+		const now = this.ctx.currentTime;
+
+		// Calm consonant low pad — sine, steady, quiet.
+		this.droneOsc1?.frequency.setTargetAtTime(MENU_DRONE1, now, 0.3);
+		this.droneOsc2?.frequency.setTargetAtTime(MENU_DRONE2, now, 0.3);
+		if (this.droneOsc1) this.droneOsc1.type = "sine";
+		if (this.droneOsc2) this.droneOsc2.type = "sine";
+		this.droneGain?.gain.setTargetAtTime(MENU_DRONE_GAIN, now, 1.0);
+
+		// Silence the flight-only layers.
+		this.tensionGain?.gain.setTargetAtTime(0, now, 0.3);
+		this.shimmerGain?.gain.setTargetAtTime(0, now, 0.3);
+		this.shimmerLfoGain?.gain.setTargetAtTime(0, now, 0.3);
+
+		this.masterGain?.gain.setTargetAtTime(this.muted ? 0 : 1, now, 0.8);
+
+		this.arpIndex = 0;
+		this.scheduleArpNote();
+	}
+
+	/** v0.6.9.0 — stop the menu ambient mode. Fades the arpeggio; only pulls
+	 * the master/drone down when flight audio isn't taking over (so a
+	 * menu→flight transition doesn't clip the flight track that just started). */
+	stopMenu(): void {
+		if (!this.ctx || !this.menuActive) return;
+		this.menuActive = false;
+		const now = this.ctx.currentTime;
+		if (this.arpTimer) {
+			clearTimeout(this.arpTimer);
+			this.arpTimer = null;
+		}
+		this.arpGain?.gain.cancelScheduledValues(now);
+		this.arpGain?.gain.setTargetAtTime(0, now, 0.2);
+		if (!this.active) {
+			this.droneGain?.gain.setTargetAtTime(0, now, 0.4);
+			this.masterGain?.gain.setTargetAtTime(0, now, 0.4);
+		}
+	}
+
+	/** Play one arpeggio note with a soft pluck envelope, then schedule the
+	 * next. Self-terminates when the menu mode is stopped (timer cleared). */
+	private scheduleArpNote(): void {
+		if (!this.ctx || !this.menuActive || !this.arpGain || !this.arpOsc) return;
+		const now = this.ctx.currentTime;
+		const freq = MENU_ARP_NOTES[this.arpIndex % MENU_ARP_NOTES.length];
+		this.arpIndex++;
+		this.arpOsc.frequency.setValueAtTime(freq, now);
+		const peak = this.muted ? 0.0001 : MENU_ARP_PEAK;
+		const g = this.arpGain.gain;
+		g.cancelScheduledValues(now);
+		g.setValueAtTime(0.0001, now);
+		g.exponentialRampToValueAtTime(peak, now + 0.04);
+		g.exponentialRampToValueAtTime(0.0001, now + 1.3);
+		// Vary the gap slightly by step so it never feels metronomic.
+		const gap = MENU_ARP_BASE_GAP_MS + (this.arpIndex % 3) * 180;
+		this.arpTimer = setTimeout(() => this.scheduleArpNote(), gap);
+	}
+
 	setMuted(muted: boolean): void {
 		this.muted = muted;
-		if (!this.ctx || !this.active) return;
+		if (!this.ctx || !(this.active || this.menuActive)) return;
 		const now = this.ctx.currentTime;
 		this.masterGain?.gain.setTargetAtTime(muted ? 0 : 1, now, 0.2);
 	}
