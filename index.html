@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>MoonLander</title>
+  <meta name="description" content="MoonLander Enhanced — a browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game. Real lunar physics, historic Apollo missions, in-browser AI agents that learn to land, procedural terrain, and a 3D mode. No install." />
+  <meta name="author" content="Kenneth LaCroix" />
+  <link rel="author" href="https://kennethlacroix.me" />
+  <meta property="og:title" content="MoonLander Enhanced" />
+  <meta property="og:description" content="A browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://canyou.land" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#00ff88" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -57,6 +64,41 @@
                     #game-canvas {
                       position: relative;
                       z-index: 1;
+                    }
+                    /* v0.6.13.0 — site credit + founder's-story opener.
+                       A real crawlable reciprocal link to the author's
+                       site (SEO), plus a button into the in-game story
+                       overlay. Sits in the letterbox below the game;
+                       suppressed in embed mode. */
+                    #site-credit {
+                      position: fixed;
+                      bottom: 6px;
+                      left: 0;
+                      right: 0;
+                      z-index: 5;
+                      text-align: center;
+                      font-family: "Courier New", monospace;
+                      font-size: 11px;
+                      color: #5a7a8a;
+                      letter-spacing: 0.04em;
+                      pointer-events: none;
+                    }
+                    #site-credit a,
+                    #site-credit button {
+                      color: #8fd6ff;
+                      text-decoration: none;
+                      background: none;
+                      border: none;
+                      font: inherit;
+                      cursor: pointer;
+                      pointer-events: auto;
+                    }
+                    #site-credit a:hover,
+                    #site-credit button:hover {
+                      text-decoration: underline;
+                    }
+                    body.embed #site-credit {
+                      display: none;
                     }
                     /* v0.6.2.3 — portrait-phone nag overlay.
                        The game is 1280x720 fixed-aspect; rendered into
@@ -140,6 +182,10 @@
     <h1>ROTATE YOUR PHONE</h1>
     <p>MoonLander uses a landscape cockpit view. Turn your phone sideways to fly.</p>
   </div>
+  <footer id="site-credit">
+    Built by <a href="https://kennethlacroix.me/blog/moonlander-enhanced" target="_blank" rel="author">Kenneth&nbsp;LaCroix</a>
+    &nbsp;·&nbsp; <button id="open-story" type="button">The&nbsp;Story</button>
+  </footer>
   <script type="module" src="/src/main.ts"></script>
   <script>
     if ("serviceWorker" in navigator) {
