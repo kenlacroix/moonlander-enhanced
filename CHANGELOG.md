@@ -2,6 +2,26 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.7.0] - 2026-06-14 (Procedural terrain variety — Random Mission)
+
+Random Missions no longer feel like the same hills with different labels. A second terrain-generation algorithm gives each archetype a structurally distinct base shape: crater-fields are pocked with overlapping bowls, spires are thin sharp ridgelines over deep troughs, mesas are terraced flat-topped tablelands, rolling is gentle warped hills, and flats is a near-level plain. The change is gated so it touches Random Missions only — historic, curated free-play, and campaign terrain are byte-identical to before, and every existing ghost, leaderboard, and regression pin is untouched.
+
+### Added
+- **`src/game/terrain/generators.ts`** — seeded value-noise / fBm helpers and five per-archetype base-shape generators that REPLACE the midpoint-displacement base (vs the Sprint 7.1 archetype post-passes, which only decorated a shared base). `genCraterField` (Voronoi-style cratered mare), `genSpires` (ridged multifractal), `genMesa` (domain-warped fBm terraced into plateaus), `genRolling` (gentle warped hills), `genFlats` (low-amplitude plain). Every generator is deterministic in the provided RNG and returns a heights array the same length as the v1 output, so pad placement and world-step math are unchanged.
+- **`terrainVersion?: 1 | 2`** on `DifficultyConfig`. v2 selects the new generators; undefined/1 keeps the v0.6.0.0 midpoint base. Embedded in ghosts (via the existing difficulty payload) so replays and share URLs reconstruct the matching terrain.
+- **27 new terrain tests** (581 total, was 554): v1-byte-identical pin under explicit `terrainVersion: 1`, v2-differs-from-v1 per archetype, v2 determinism, cross-seed variance, point-count parity, height-band clamping, and flat/landable pads on the non-monotone v2 surfaces.
+
+### Changed
+- **Random Mission uses `terrainVersion: 2`.** Both the live roll (`generateRandomMission`) and the share-URL decode (`buildRandomMissionFromShare`) now emit `difficulty: { archetype, terrainVersion: 2 }`, so rolled and shared random missions get the new geometry.
+- **Archetype post-pass is skipped under v2** in `generateTerrain` — the base generator already produces the archetype's character, so the old post-pass would double-apply it.
+
+### Not changed
+- **Historic, curated free-play, and campaign terrain.** None set `terrainVersion`, so they stay on the v1 midpoint path — byte-identical to v0.6.6.0. The seed 1969 / 4217 / 7001 regression pins and the Apollo/Artemis/Luna seeds are untouched.
+- **Existing ghosts and leaderboards.** v1 ghosts carry no `terrainVersion` (default 1) and replay on the original terrain. Only freshly rolled random missions are v2.
+
+### Deferred
+- **Opting curated free-play / campaign missions into v2** — done deliberately one at a time, since each invalidates that mission's existing ghosts. Tracked in TODOS.md.
+
 ## [0.6.6.0] - 2026-06-14 (Gamepad support)
 
 Plug in any USB or Bluetooth controller — Xbox, PlayStation, 8BitDo — and fly. The browser Gamepad API joins keyboard and touch as a third input source with zero install: the left stick steers, the right trigger (or A) fires the descent engine, and the D-pad/face buttons drive the menus. Connecting a pad pops a brief on-screen toast, and supported controllers rumble on RCS thruster fire, on impact, and through a gravity storm's peak.
