@@ -147,7 +147,7 @@ export function generateRandomMission(explicitSeed?: number): RandomMission {
 		name,
 		seed,
 		description,
-		difficulty: { archetype },
+		difficulty: { archetype, terrainVersion: 2 },
 		offlineBriefing,
 	};
 }
@@ -188,7 +188,7 @@ export function buildRandomMissionFromShare(
 		name,
 		seed,
 		description,
-		difficulty: { archetype },
+		difficulty: { archetype, terrainVersion: 2 },
 		offlineBriefing,
 	};
 }
