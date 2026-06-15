@@ -2,6 +2,16 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.5.0] - 2026-06-07 (Sprint 7.6 — Animated Character Portraits)
+
+The Campaign's two voices now have faces. Dr. Liam Hoshi (mint mission-patch roundel: rectangular glasses, side-parted hair, lanyard badge) and CapCom Maya Chen (amber 16-bit pixel-art bust: blunt bob, headset, boom mic) appear next to their dialogue lines with a 3-frame talking mouth — during briefings, in-flight callouts, and post-landing analysis. Characters stay distinguishable by silhouette alone, so the portraits work for color-blind players, and the FLIGHT:/CAPCOM: text prefix stays untouched.
+
+### Added
+- **`src/render/CharacterPortraits.ts`** — hand-authored SVG busts with three mouth groups (closed/half/open) toggled by visibility. Rasterized once to 6 images via data-URL; `get()` returns null until decoded so captions never wait on art. Decode failure logs a warning and degrades to text-only. `SPEAKER_COLORS` is now the single source for per-speaker caption/portrait accent colors.
+- **Mouth animation** — closed → half → open → half at ~7 fps while a chatter line is on screen, driven by the line's existing 4s/6s visibility window. `prefers-reduced-motion` renders a static closed-mouth portrait.
+- **Portrait layout in campaign captions** — bust + word-wrapped caption box as a right-anchored comms panel (`CHATTER_PANEL`: right edge x=1260 under the score column, top y=156). The anchor provably clears the sun (fixed at canvas 390,120 for every campaign mission), Earth, the HUD readouts, the camera-centered lander descent path, and the touch joystick/thrust circles. Long dialogue wraps via `wrapMonospace` (pure, monospace-budget based) instead of overflowing the canvas; the portrait stays fixed at 64 px (96 px on touch, Sprint 7.5 pattern). Layout is memoized per line, so wrap + geometry run once per chatter line, not per frame.
+- **63 tests** in `tests/character-portraits.test.ts`: mouth-group invariants in both SVGs, frame-visibility toggles, the 140 ms talk cycle, headless degradation, Image-readiness gating, monospace word-wrap (boundaries, hard-break, degenerate-column guard), the panel collision invariants (right-anchor, sun/descent-path clearance, touch thrust-zone clearance), and hostile-input hardening (LLM-streamed text: length clamp with ellipsis, whitespace normalization, blank-line degradation). 554 tests total (was 491).
+
 ## [0.6.4.0] - 2026-04-24 (Sprint 7.4 — Campaign Narrative)
 
 The 5-mission Campaign now has a story arc instead of just five difficulty steps. Two characters speak: Dr. Liam Hoshi (NASA Descent Systems engineer) handles pre-mission briefings and post-landing analysis; CapCom Maya Chen reads in-flight radio callouts. Hoshi's posture warms across the arc — polite Mission 1, "first nice one" Mission 2, mom-name-drop Mission 3 (Hadley Rille), self-aware Mission 4 ("this one's my fault"), payoff Mission 5 ("I wasn't sure anybody could do that"). Voice-only — no portraits this sprint (those are Sprint 7.6, blocked on art).

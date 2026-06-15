@@ -10,12 +10,20 @@ import type { TrainingLoop } from "../ai/TrainingLoop";
 import { APOLLO_MISSIONS } from "../data/apolloMissions";
 import { ARTEMIS_MISSIONS } from "../data/artemisMissions";
 import type { CanvasRenderer } from "../render/CanvasRenderer";
+import {
+	CharacterPortraits,
+	type ChatterPanelLayout,
+	layoutChatterPanel,
+	mouthFrameAt,
+	SPEAKER_COLORS,
+} from "../render/CharacterPortraits";
 import type { IGameplayRenderer } from "../render/IGameplayRenderer";
 import { resolvePalette } from "../render/palette";
 import type { GhostPlayer } from "../systems/GhostReplay";
 import type { Input } from "../systems/Input";
 import { getBestScore, getBestTime } from "../systems/Leaderboard";
 import type { TelemetryRecorder } from "../systems/Telemetry";
+import { prefersReducedMotion } from "../utils/a11y";
 import { type AlienState, getAlienEffectLabel } from "./Alien";
 import type { Artifact } from "./Artifacts";
 import { type FlightConfig, loadAuthenticPreference } from "./AuthenticMode";
@@ -152,7 +160,9 @@ export class GameRenderer {
 	constructor(
 		private renderer: CanvasRenderer,
 		private gameplay: IGameplayRenderer,
-	) {}
+	) {
+		this.portraits.preload();
+	}
 
 	setRetroSkin(skin: Parameters<CanvasRenderer["setRetroSkin"]>[0]): void {
 		this.renderer.setRetroSkin(skin);
@@ -164,6 +174,10 @@ export class GameRenderer {
 	 * after which the canvas stays black and no texture uploads
 	 * happen until the next gameplay frame. */
 	private lastFrameDrewGameplay = false;
+	/** Sprint 7.6 — animated speaker busts for campaign chatter. Lazily
+	 * rasterized on first draw; get() returns null until decoded so the
+	 * caption never waits on art. */
+	private readonly portraits = new CharacterPortraits();
 	/** Frame counter used to throttle the training screen's redraw.
 	 * Training runs the RL agent on the main thread; every rAF spent
 	 * redrawing the reward chart is time the agent doesn't spend
@@ -300,19 +314,30 @@ export class GameRenderer {
 	/**
 	 * Sprint 7.4 — Campaign chatter caption with speaker prefix. Hoshi
 	 * lines render in a different tint than Chen lines so the player
-	 * reads "who's talking" at a glance. Position offset 28 px below
-	 * MissionChatter's slot so a Historic mission and Campaign mission
-	 * never overlap (they can't run simultaneously per gameMode but
-	 * defensive layout still helps).
+	 * reads "who's talking" at a glance.
 	 *
 	 * Color scheme:
 	 *   FLIGHT: (Hoshi) — pale green-cyan, normal weight, standard font
 	 *   CAPCOM: (Chen) — desaturated amber, monospace (already monospace,
 	 *           so the speaker tag is the visual distinction)
 	 *
+	 * Sprint 7.6 follow-up — bust + wrapped caption as a right-anchored
+	 * comms panel (see CHATTER_PANEL for the collision rationale; the old
+	 * centered single-line box covered the sun and, on long briefings,
+	 * overflowed the canvas onto the HUD). The line is "speaking" for its
+	 * whole visibility window (4s callouts / 6s briefing), so the mouth
+	 * cycles while the panel is on screen. While the SVG is still decoding
+	 * the panel renders text-only in the same spot (pre-7.6 behavior).
+	 *
 	 * `showSkipHint` is true when a multi-line queue is active. Renders
 	 * a small "[SPACE] SKIP" hint so the player learns the binding.
 	 */
+	/** Memoized chatter layout — inputs are constant for a line's whole
+	 * 4-6s visibility window, so wrap + layout run once per line instead
+	 * of every rAF frame. */
+	private chatterLayoutKey = "";
+	private chatterLayout: ChatterPanelLayout | null = null;
+
 	private drawCampaignChatter(
 		line: { speaker: "hoshi" | "chen"; text: string },
 		showSkipHint: boolean,
@@ -320,40 +345,63 @@ export class GameRenderer {
 	): void {
 		const ctx = this.renderer.ctx;
 		ctx.save();
-		const fontPx = isTouch ? 20 : 13;
-		ctx.font = `${fontPx}px 'Courier New', monospace`;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "top";
 		const prefix = line.speaker === "hoshi" ? "FLIGHT: " : "CAPCOM: ";
 		const fullText = prefix + line.text;
-		const padX = isTouch ? 18 : 14;
-		const padY = isTouch ? 9 : 6;
-		const metrics = ctx.measureText(fullText);
-		const w = metrics.width + padX * 2;
-		const h = isTouch ? 32 : 22;
-		const x = 1280 / 2 - w / 2;
-		// Position 32 px below MissionChatter slot when touch (taller box),
-		// 30 px below on desktop. So the two systems can't visually fuse.
-		const y = isTouch ? 122 : 110;
-		const borderColor = line.speaker === "hoshi" ? "#7fc8b8" : "#d8a868";
-		const textColor = line.speaker === "hoshi" ? "#c8f0e8" : "#f0d8a8";
+		const layoutKey = `${isTouch}:${fullText}`;
+		if (!this.chatterLayout || this.chatterLayoutKey !== layoutKey) {
+			this.chatterLayoutKey = layoutKey;
+			this.chatterLayout = layoutChatterPanel(fullText, isTouch);
+		}
+		const layout = this.chatterLayout;
+		ctx.font = `${layout.fontPx}px 'Courier New', monospace`;
+		ctx.textAlign = "left";
+		ctx.textBaseline = "top";
+		const { border: borderColor, text: textColor } =
+			SPEAKER_COLORS[line.speaker];
 		ctx.fillStyle = "rgba(0,0,0,0.7)";
 		ctx.strokeStyle = borderColor;
 		ctx.lineWidth = 1;
 		ctx.beginPath();
-		ctx.rect(x, y, w, h);
+		ctx.rect(layout.boxX, layout.boxY, layout.boxW, layout.boxH);
 		ctx.fill();
 		ctx.stroke();
 		ctx.fillStyle = textColor;
-		ctx.fillText(fullText, 1280 / 2, y + padY - 1);
+		layout.lines.forEach((text, i) => {
+			ctx.fillText(text, layout.textX, layout.textY + i * layout.lineHeight);
+		});
+		const mouthFrame = prefersReducedMotion() ? 0 : mouthFrameAt(Date.now());
+		const portrait = this.portraits.get(line.speaker, mouthFrame);
+		if (portrait) {
+			ctx.fillStyle = "rgba(0,0,0,0.7)";
+			ctx.fillRect(
+				layout.portraitX,
+				layout.portraitY,
+				layout.portraitPx,
+				layout.portraitPx,
+			);
+			ctx.drawImage(
+				portrait,
+				layout.portraitX,
+				layout.portraitY,
+				layout.portraitPx,
+				layout.portraitPx,
+			);
+			ctx.strokeStyle = borderColor;
+			ctx.strokeRect(
+				layout.portraitX,
+				layout.portraitY,
+				layout.portraitPx,
+				layout.portraitPx,
+			);
+		}
 		if (showSkipHint) {
-			const hintPx = isTouch ? 14 : 10;
-			ctx.font = `${hintPx}px 'Courier New', monospace`;
+			ctx.font = `${layout.hintPx}px 'Courier New', monospace`;
+			ctx.textAlign = "center";
 			ctx.fillStyle = "rgba(255,255,255,0.4)";
 			ctx.fillText(
 				isTouch ? "TAP TO SKIP" : "[SPACE] SKIP",
-				1280 / 2,
-				y + h + 4,
+				layout.hintX,
+				layout.hintY,
 			);
 		}
 		ctx.restore();
