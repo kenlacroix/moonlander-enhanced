@@ -41,6 +41,13 @@ connection toast (`drawGamepadToast`, shown across title/menu/gameplay), rumble
 `lastInputSource` getter. All in `Input.ts` plus thin wiring in `Game.ts`,
 `GameRenderer.ts`, `CollisionHandler.ts`, `CanvasRenderer.ts`.
 
+- [ ] **Hardware test on a real controller (PR #52 follow-up).** Logic uses the
+  standard Gamepad mapping but was not tested with a physical pad. Verify on at
+  least one Xbox + one PS/8BitDo pad: button indices (A=0, B=1, Back=8, Start=9,
+  D-pad=12-15, right-trigger=7), stick deadzone feel, menu-nav edge detection,
+  and `vibrationActuator` rumble actually fires. Some 8BitDo/PS pads report
+  non-standard mappings — confirm or add a fallback.
+
 Captured 2026-04-24 from user observation about physical controllers.
 
 Browser Gamepad API works in Chrome/Firefox/Safari with zero user-side install. Plug in any USB or Bluetooth gamepad (Xbox/PS4/8BitDo/SNES-style USB) and the browser exposes `navigator.getGamepads()`. MoonLander adds it as a third input source alongside keyboard + touch.
