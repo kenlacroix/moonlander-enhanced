@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.15.0",
+		date: "2026-06-15",
+		summary:
+			"The 3D cockpit view is easier to fly now — a porthole vignette frames the window, and a new artificial-horizon gauge at the bottom shows your roll directly (it tilts with the craft and turns red when you bank past the safe landing angle).",
+	},
+	{
 		version: "0.6.14.0",
 		date: "2026-06-15",
 		summary:

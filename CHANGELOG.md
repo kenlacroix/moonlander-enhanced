@@ -2,6 +2,17 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.15.0] - 2026-06-15 (Cockpit window vignette + attitude indicator)
+
+Polish on the v0.6.14.0 cockpit camera. The first-person view was hard to read for two reasons: it didn't feel "inside" anything, and roll was only conveyed by the world tilting (so small banks were easy to miss). Both are now addressed.
+
+### Added
+- **Window-frame vignette** — a camera-fixed porthole that darkens the periphery and faintly frames the edge, so the cockpit view reads as looking *out* of the lander rather than a free camera. Built once into a `CanvasTexture` mapped onto a camera-child plane (`makeVignetteTexture`), drawn over the scene with depth test off.
+- **Synthetic attitude indicator (artificial horizon)** — a small gauge at bottom-center showing bank directly: a horizon bar counter-rotates against a fixed craft reference (wings + hub) as the lander rolls. The reference goes red once `|angle|` exceeds `MAX_LANDING_ANGLE` (10°), so "too steep to land" reads at a glance instead of having to infer it from the tilting world.
+
+### Note
+- Both elements are cockpit-only (camera mode 3) and need a live WebGL context, so they aren't jsdom-testable. Verified in-browser on `?renderer=3d`: vignette + gauge render, the horizon bar tilts with roll, and the reference reddens past the 10° gate. Static checks (types, build, 602 tests) pass.
+
 ## [0.6.14.0] - 2026-06-15 (3D cockpit challenge camera)
 
 3D mode gets a first-person cockpit view — the 4th camera angle in the `C` cycle (chase → orbital → low → cockpit). It's deliberately a *challenge* camera, not the default: from inside the lander you can't see your own attitude, and 3D foreshortening already makes precision landing harder. So it ships with a **landing-point designator (LPD)** — a ground reticle showing where you'll touch down if you cut thrust now. Steer it onto a pad (the ring turns green over a pad, amber off it) and you land. Live flight defaults to chase; the land/crash beat still pulls to the orbital shot.
