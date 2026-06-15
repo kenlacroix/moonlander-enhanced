@@ -91,6 +91,8 @@ export function handleCollisionResult(
 		// picks up the same treatment a few lines below for consistency.
 		game.camera.shake(40);
 		game.camera.flash(0.6);
+		// P3 Gamepad — heavy thump on impact.
+		game.input.rumble(300, 1, 1);
 		game.audio.setThruster(false);
 		game.audio.playCrash();
 		game.audio.soundtrack.onCrashed();

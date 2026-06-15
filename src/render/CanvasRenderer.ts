@@ -1614,6 +1614,32 @@ export class CanvasRenderer implements IGameplayRenderer {
 		ctx.restore();
 	}
 
+	/** P3 Gamepad — draw the controller-connected toast. */
+	drawGamepadToast(name: string, timer: number): void {
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.globalAlpha = Math.min(1, timer);
+		const w = 320;
+		const h = 40;
+		const x = CANVAS_WIDTH / 2 - w / 2;
+		const y = 80;
+		ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeStyle = "#33ccff";
+		ctx.lineWidth = 2;
+		ctx.strokeRect(x, y, w, h);
+		ctx.fillStyle = "#33ccff";
+		ctx.font = '18px "Courier New", monospace';
+		ctx.textAlign = "left";
+		ctx.fillText("\u{1F3AE}", x + 12, y + 27);
+		ctx.font = 'bold 12px "Courier New", monospace';
+		ctx.fillText("GAMEPAD CONNECTED", x + 44, y + 18);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+		ctx.font = '11px "Courier New", monospace';
+		ctx.fillText(name.slice(0, 32), x + 44, y + 33);
+		ctx.restore();
+	}
+
 	/** Draw semi-transparent touch control zones for mobile */
 	/**
 	 * Sprint 7.5 Tier 2 — visible virtual joystick (left) + thrust button

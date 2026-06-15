@@ -32,7 +32,14 @@ Live mobile testing on canyou.land branch preview 2026-04-24 surfaced two founda
 
 ---
 
-## P3 — Gamepad API support (in-game)
+## P3 — Gamepad API support (in-game) — DONE 2026-06-14
+
+Shipped: stick/D-pad rotation (0.15 deadzone), right-trigger + A thrust, A/Start
+select, Back menu-back, B restart, stick/D-pad menu nav (edge-detected),
+connection toast (`drawGamepadToast`, shown across title/menu/gameplay), rumble
+(light on RCS firing, heavy on crash, sustained on storm peak), and a
+`lastInputSource` getter. All in `Input.ts` plus thin wiring in `Game.ts`,
+`GameRenderer.ts`, `CollisionHandler.ts`, `CanvasRenderer.ts`.
 
 Captured 2026-04-24 from user observation about physical controllers.
 

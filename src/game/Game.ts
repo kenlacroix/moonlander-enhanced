@@ -215,6 +215,12 @@ export class Game {
 	achievementToast: Achievement | null = null;
 	gravityPreset: GravityPreset = getDefaultPreset();
 	achievementToastTimer = 0;
+	/** P3 Gamepad — controller name to announce, set on connect; cleared
+	 * when gamepadToastTimer expires. */
+	gamepadToast: string | null = null;
+	gamepadToastTimer = 0;
+	/** P3 Gamepad — previous-frame RCS-firing flag for rising-edge rumble. */
+	private prevRcsFiring = false;
 	/** Sprint 7.1 PR 1.5 — hidden pad reveal latch. Starts false on every
 	 * flight, flips true the frame the lander first crosses the reveal
 	 * AGL. A one-shot dust-plume burst fires on that transition; the
@@ -683,6 +689,11 @@ export class Game {
 
 	private onBeforeFrame(): void {
 		this.currentInput = this.input.getState();
+		const connected = this.input.consumeGamepadConnected();
+		if (connected) {
+			this.gamepadToast = connected;
+			this.gamepadToastTimer = 3;
+		}
 		const userActed =
 			this.currentInput.thrustUp ||
 			this.currentInput.rotateLeft ||
@@ -775,6 +786,8 @@ export class Game {
 		) {
 			this.flightHazardsFired.storm = true;
 			this.campaignChatter.onStormStart();
+			// P3 Gamepad — sustained low rumble as the storm peaks.
+			this.input.rumble(1200, 0.5, 0.2);
 		}
 		if (this.gravityStorm) {
 			this.prevStormPhase = this.gravityStorm.phase;
@@ -788,6 +801,11 @@ export class Game {
 				this.flightPeakAngularRate = rate;
 			}
 		}
+		// P3 Gamepad — light buzz on the frame RCS thrusters start firing.
+		if (this.lander.rcsFiring && !this.prevRcsFiring) {
+			this.input.rumble(90, 0.25, 0);
+		}
+		this.prevRcsFiring = this.lander.rcsFiring;
 		if (!result) {
 			// Sprint 7.1 PR 1.5 — hidden-pad reveal latch. Fires a one-shot
 			// dust plume on the frame the lander first crosses the reveal
@@ -845,6 +863,10 @@ export class Game {
 
 	private onAfterFrame(dt: number): void {
 		const input = this.currentInput;
+		if (this.gamepadToastTimer > 0) {
+			this.gamepadToastTimer -= dt;
+			if (this.gamepadToastTimer <= 0) this.gamepadToast = null;
+		}
 		switch (this.status) {
 			case "title":
 				updateTitle(this, input);

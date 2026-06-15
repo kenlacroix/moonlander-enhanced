@@ -129,6 +129,8 @@ export interface GameRenderState {
 	readonly activeMission: Mission | null;
 	readonly achievementToast: { name: string; description: string } | null;
 	readonly achievementToastTimer: number;
+	readonly gamepadToast: string | null;
+	readonly gamepadToastTimer: number;
 	readonly gravityPreset: { name: string; gravity: number; color: string };
 	readonly aiTheaterComparison: {
 		playerScore: number;
@@ -677,6 +679,7 @@ export class GameRenderer {
 				state.achievementToastTimer,
 			);
 		}
+		this.drawGamepadToast(state);
 
 		// Sprint 6 Part C — crash flash. Drawn on the UI canvas so it
 		// covers both the gameplay (WebGL or Canvas) and UI layers.
@@ -705,6 +708,17 @@ export class GameRenderer {
 			// Sprint 7.5 — touch devices get larger, more spaced rows.
 			state.input.isTouchDevice,
 		);
+		this.drawGamepadToast(state);
+	}
+
+	/** P3 Gamepad — connection toast, shown across title/menu/gameplay. */
+	private drawGamepadToast(state: GameRenderState): void {
+		if (state.gamepadToast && state.gamepadToastTimer > 0) {
+			this.renderer.drawGamepadToast(
+				state.gamepadToast,
+				state.gamepadToastTimer,
+			);
+		}
 	}
 
 	renderMenu(state: GameRenderState): void {
@@ -764,6 +778,7 @@ export class GameRenderer {
 				state.tutorialOverlay.framesRemaining,
 			);
 		}
+		this.drawGamepadToast(state);
 	}
 
 	renderTraining(state: GameRenderState): void {
