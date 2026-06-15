@@ -10,6 +10,7 @@ import {
 	CANVAS_WIDTH,
 	COLOR_TERRAIN,
 	GRAVITY,
+	MAX_LANDING_ANGLE,
 	WORLD_WIDTH,
 } from "../utils/constants";
 import { degToRad } from "../utils/math";
@@ -55,6 +56,36 @@ function depthRidge(x: number, z: number, seed: number): number {
 	);
 }
 
+/** Radial cockpit-window vignette: clear center fading to a dark, faintly
+ * framed border. Built once into a CanvasTexture and mapped onto a
+ * camera-fixed plane so the first-person view reads as a porthole. */
+function makeVignetteTexture(): THREE.CanvasTexture {
+	const size = 256;
+	const cv = document.createElement("canvas");
+	cv.width = size;
+	cv.height = size;
+	const ctx = cv.getContext("2d");
+	if (!ctx) return new THREE.CanvasTexture(cv);
+	const g = ctx.createRadialGradient(
+		size / 2,
+		size / 2,
+		size * 0.32,
+		size / 2,
+		size / 2,
+		size * 0.62,
+	);
+	g.addColorStop(0, "rgba(0,0,0,0)");
+	g.addColorStop(1, "rgba(0,0,0,0.92)");
+	ctx.fillStyle = g;
+	ctx.fillRect(0, 0, size, size);
+	// Faint window frame near the edge.
+	ctx.strokeStyle = "rgba(120,160,180,0.18)";
+	ctx.lineWidth = size * 0.02;
+	const m = size * 0.085;
+	ctx.strokeRect(m, m, size - 2 * m, size - 2 * m);
+	return new THREE.CanvasTexture(cv);
+}
+
 export class ThreejsGameplayRenderer implements IGameplayRenderer {
 	readonly canvas: HTMLCanvasElement;
 	private renderer: THREE.WebGLRenderer;
@@ -87,6 +118,10 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 	private cockpitGroup: THREE.Group;
 	private lpdRing: THREE.Mesh;
 	private lpdMat: THREE.MeshBasicMaterial;
+	private vignette: THREE.Mesh;
+	private attitudeGroup: THREE.Group;
+	private horizonBar: THREE.Mesh;
+	private attitudeMat: THREE.MeshBasicMaterial;
 	private effectiveGravity = GRAVITY;
 	private readonly onKey: (e: KeyboardEvent) => void;
 
@@ -241,6 +276,83 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		this.lpdRing.rotation.x = -Math.PI / 2;
 		this.lpdRing.visible = false;
 		this.scene.add(this.lpdRing);
+
+		// Window-frame vignette — darkens the periphery into a porthole so the
+		// first-person view reads as "inside the lander", not a free camera.
+		// Camera-fixed, drawn over the scene (depthTest off).
+		this.vignette = new THREE.Mesh(
+			new THREE.PlaneGeometry(2.2, 1.25),
+			new THREE.MeshBasicMaterial({
+				map: makeVignetteTexture(),
+				transparent: true,
+				depthTest: false,
+				depthWrite: false,
+				fog: false,
+			}),
+		);
+		this.vignette.position.set(0, 0, -1);
+		this.vignette.renderOrder = 10;
+		this.vignette.visible = false;
+		this.camera.add(this.vignette);
+
+		// Synthetic attitude indicator (artificial horizon). From inside you
+		// can't see your own bank except by the world tilting; this gauge
+		// shows roll directly. A fixed craft reference (wings + hub) sits
+		// against a horizon bar that counter-rotates with the craft. The wings
+		// go red past the landing-angle gate so "too steep" reads at a glance.
+		this.attitudeGroup = new THREE.Group();
+		this.attitudeGroup.position.set(0, -0.3, -1);
+		const adiHud = <T extends THREE.Object3D>(m: T): T => {
+			m.renderOrder = 11;
+			return m;
+		};
+		const ringOutline = new THREE.Mesh(
+			new THREE.RingGeometry(0.075, 0.083, 40),
+			new THREE.MeshBasicMaterial({
+				color: 0x2a4a55,
+				transparent: true,
+				opacity: 0.8,
+				depthTest: false,
+				fog: false,
+			}),
+		);
+		this.attitudeGroup.add(adiHud(ringOutline));
+
+		this.horizonBar = new THREE.Mesh(
+			new THREE.BoxGeometry(0.14, 0.008, 0.001),
+			new THREE.MeshBasicMaterial({
+				color: 0x55ccff,
+				transparent: true,
+				opacity: 0.9,
+				depthTest: false,
+				fog: false,
+			}),
+		);
+		this.attitudeGroup.add(adiHud(this.horizonBar));
+
+		this.attitudeMat = new THREE.MeshBasicMaterial({
+			color: 0x33ff88,
+			transparent: true,
+			opacity: 0.95,
+			depthTest: false,
+			fog: false,
+		});
+		for (const wx of [-0.05, 0.05]) {
+			const wing = new THREE.Mesh(
+				new THREE.BoxGeometry(0.045, 0.009, 0.001),
+				this.attitudeMat,
+			);
+			wing.position.set(wx, 0, 0.001);
+			this.attitudeGroup.add(adiHud(wing));
+		}
+		const hub = new THREE.Mesh(
+			new THREE.CircleGeometry(0.01, 16),
+			this.attitudeMat,
+		);
+		hub.position.z = 0.001;
+		this.attitudeGroup.add(adiHud(hub));
+		this.attitudeGroup.visible = false;
+		this.camera.add(this.attitudeGroup);
 
 		this.onKey = (e: KeyboardEvent) => {
 			if (e.code === "KeyC") this.camMode = (this.camMode + 1) % 4;
@@ -576,6 +688,8 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		const cockpit = !this.replayMode && !landed && this.camMode === 3;
 		this.cockpitGroup.visible = cockpit;
 		this.lpdRing.visible = cockpit;
+		this.vignette.visible = cockpit;
+		this.attitudeGroup.visible = cockpit;
 		if (cockpit && l) {
 			this.lm.visible = false;
 			const roll = degToRad(l.angle);
@@ -593,6 +707,12 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 				this.lpdRing.scale.setScalar(pulse);
 				this.lpdMat.color.setHex(lpd.onPad ? 0x33ff88 : 0xffaa33);
 			}
+			// Artificial horizon: counter-rotate the bar against the fixed
+			// craft reference so bank reads directly; redden past the gate.
+			this.horizonBar.rotation.z = -roll;
+			this.attitudeMat.color.setHex(
+				Math.abs(l.angle) > MAX_LANDING_ANGLE ? 0xff5544 : 0x33ff88,
+			);
 			return;
 		}
 
