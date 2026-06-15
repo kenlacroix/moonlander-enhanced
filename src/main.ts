@@ -44,7 +44,7 @@ const shareConfig = readShareConfigFromUrl();
 	// prevents the two layers drifting out of alignment.
 	const fitAll = () => {
 		fitCanvasToWindow(uiCanvas);
-		if (backend === "webgl") fitCanvasToWindow(glCanvas);
+		if (backend !== "canvas") fitCanvasToWindow(glCanvas);
 	};
 	fitAll();
 	window.addEventListener("resize", fitAll);

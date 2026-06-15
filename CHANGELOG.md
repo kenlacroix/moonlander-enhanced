@@ -2,6 +2,24 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.11.0] - 2026-06-14 (Sprint 8 — 3D mode, first cut)
+
+The headline Phase 4 feature: an opt-in **cinematic third-person 3D renderer** (Three.js), launched with `?renderer=3d`. The game stays 2.5-D — physics, HUD, and menus are untouched — but the flight is now projected into a real 3D scene: an extruded lunar landscape, a low-poly LM, Earth and a low key-light sun casting long shadows, and a chase camera. Press `C` to cycle chase / orbital / low-cinematic angles; the camera auto-pulls to an orbital beauty shot on touchdown or crash.
+
+### Added
+- **`src/render/ThreejsGameplayRenderer.ts`** — a third `IGameplayRenderer` implementation alongside Canvas and WebGL. The 1-D terrain heightline is extruded into depth so the surface reads 3D, while the `z=0` flight-plane slice stays byte-faithful to where the lander actually flies. Retained-mode bridge: the terrain mesh rebuilds only when the `TerrainData` reference changes (a new flight), and per-frame work is just transform updates + one `render()`.
+- **`?renderer=3d`** wired into `createGameplayRenderer` with a WebGL pre-probe, **dynamic import** of the Three.js renderer (so `three` ships as a lazy ~120 KB-gz chunk, never in the default bundle), and Canvas fallback on any init failure or WebGL context loss (same self-healing reload as the WebGL path).
+- **Mockup** (`mockups/sprint8-3d.html`) — a standalone Three.js prototype used to scope the look and answer the sprint's "different game or gimmick?" exit question before committing.
+
+### Changed
+- `Game` and `main.ts` treat the new `"3d"` backend like the WebGL overlay path (gameplay on the GL canvas, HUD on a transparent Canvas 2D overlay on top). Default Canvas and `?renderer=webgl` paths are unchanged.
+
+### Deferred (Sprint 8 follow-ups)
+- First-person cockpit view (this cut is cinematic third-person, per scope), 3D models for artifacts/aliens (currently no-ops in 3D), GLB asset pipeline (v1 uses code-built low-poly meshes), and AI-generated terrain textures (Sprint 9). Tracked in TODOS.md.
+
+### Note
+- The 3D renderer requires a live WebGL context, so it can't be unit-tested in jsdom (same as the existing WebGL renderer). Static checks (types, build, 602 tests) pass; in-browser 3D output should be confirmed on the deploy preview with `?renderer=3d`.
+
 ## [0.6.10.0] - 2026-06-14 (Free Play + Campaign level rework)
 
 The terrain engine shipped in v0.6.7.0 (terrainVersion 2) was only wired into Random Mission. This release opts the curated Free Play and Campaign missions into it and tunes their difficulty, so the levels finally match their descriptions — "flat terrain" is genuinely flat, "jagged peaks" are spires, "deep valleys" have crevices — and there's a real curve instead of ten near-identical default maps.

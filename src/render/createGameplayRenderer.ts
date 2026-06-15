@@ -10,7 +10,7 @@ import { WebGLGameplayRenderer } from "./WebGLGameplayRenderer";
  */
 export interface RendererSelection {
 	gameplay: IGameplayRenderer;
-	backend: "webgl" | "canvas";
+	backend: "webgl" | "canvas" | "3d";
 }
 
 /**
@@ -40,7 +40,42 @@ export async function createGameplayRenderer(
 	canvasFallback: HTMLCanvasElement,
 ): Promise<RendererSelection> {
 	const params = new URLSearchParams(window.location.search);
-	const optInWebGL = params.get("renderer") === "webgl";
+	const requested = params.get("renderer");
+	const optInWebGL = requested === "webgl";
+
+	// Opt-in 3D (Three.js). Probe WebGL first, then dynamic-import the
+	// renderer so `three` stays out of the default bundle. Any failure
+	// falls back to Canvas so the game is always playable.
+	if (requested === "3d") {
+		const probe3d =
+			glCanvas.getContext("webgl2") ?? glCanvas.getContext("webgl");
+		if (!probe3d) {
+			console.warn(
+				"[renderer] ?renderer=3d requested but WebGL unavailable — using Canvas 2D",
+			);
+			return {
+				gameplay: new CanvasRenderer(canvasFallback),
+				backend: "canvas",
+			};
+		}
+		try {
+			const { ThreejsGameplayRenderer } = await import(
+				"./ThreejsGameplayRenderer"
+			);
+			const gameplay = await ThreejsGameplayRenderer.create(glCanvas);
+			console.info("[renderer] 3D (Three.js) enabled via ?renderer=3d");
+			return { gameplay, backend: "3d" };
+		} catch (err) {
+			console.warn(
+				"[renderer] 3D init failed, falling back to Canvas 2D:",
+				err,
+			);
+			return {
+				gameplay: new CanvasRenderer(canvasFallback),
+				backend: "canvas",
+			};
+		}
+	}
 
 	if (!optInWebGL) {
 		// Default path — ship Canvas. Everything Part A does visually

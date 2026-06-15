@@ -98,7 +98,7 @@ export class Game {
 	 * backend initialized cleanly, Canvas 2D otherwise. UI draws
 	 * (HUD, menus, briefings) always stay on canvasRenderer. */
 	readonly gameplayRenderer: IGameplayRenderer;
-	readonly rendererBackend: "webgl" | "canvas";
+	readonly rendererBackend: "webgl" | "canvas" | "3d";
 	private gameLoop: GameLoop;
 	physics = new PhysicsManager();
 	llm: LLMIntegration;
@@ -312,7 +312,7 @@ export class Game {
 	constructor(
 		canvas: HTMLCanvasElement,
 		gameplayRenderer: IGameplayRenderer,
-		rendererBackend: "webgl" | "canvas",
+		rendererBackend: "webgl" | "canvas" | "3d",
 		urlSeed?: number,
 		embedMode = false,
 		customTerrain?: string,
@@ -336,7 +336,7 @@ export class Game {
 		// Canvas fallback: gameplayRenderer IS the CanvasRenderer bound to
 		// the same 2D canvas. Reuse it as both gameplay and UI renderer
 		// instead of double-constructing.
-		if (rendererBackend === "webgl") {
+		if (rendererBackend === "webgl" || rendererBackend === "3d") {
 			this.canvasRenderer = new CanvasRenderer(canvas);
 			this.canvasRenderer.setTransparentClear(true);
 		} else {

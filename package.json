@@ -1,6 +1,6 @@
 {
 	"name": "moonlander-enhanced",
-	"version": "0.6.10.0",
+	"version": "0.6.11.0",
 	"description": "A browser-based, AI-enhanced reimagining of the 1979 Moon Lander arcade game",
 	"type": "module",
 	"scripts": {
@@ -23,6 +23,7 @@
 	"homepage": "https://github.com/kenlacroix/moonlander-enhanced#readme",
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.11",
+		"@types/three": "^0.160.0",
 		"knip": "^6.4.1",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.8",
@@ -31,6 +32,7 @@
 	"dependencies": {
 		"@tensorflow/tfjs": "^4.22.0",
 		"pixi-filters": "^6.1.5",
-		"pixi.js": "^8.18.1"
+		"pixi.js": "^8.18.1",
+		"three": "^0.160.1"
 	}
 }
