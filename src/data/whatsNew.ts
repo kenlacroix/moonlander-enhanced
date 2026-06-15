@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.13.0",
+		date: "2026-06-15",
+		summary:
+			"There's a story now — a small 'The Story' panel (and a credit link in the corner) on why a 1979 arcade game got a 2026 rebuild, linking to the full write-up.",
+	},
+	{
 		version: "0.6.12.0",
 		date: "2026-06-15",
 		summary:

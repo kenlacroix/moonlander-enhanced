@@ -1,6 +1,7 @@
 import { Game } from "./game/Game";
 import { createGameplayRenderer } from "./render/createGameplayRenderer";
 import { fitCanvasToWindow } from "./render/fitCanvasToWindow";
+import { FounderStoryOverlay } from "./ui/FounderStoryOverlay";
 import { readShareConfigFromUrl } from "./utils/shareUrl";
 
 const uiCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -20,6 +21,9 @@ const customTerrain = params.get("custom");
 if (embedMode) {
 	document.body.classList.add("embed");
 }
+// v0.6.13.0 — wire the site-credit footer's "The Story" button to the
+// in-game founder's-story overlay. Self-wires to #open-story in index.html.
+new FounderStoryOverlay();
 // Sprint 7.1 PR 1.5 — `?cfg=<base64url>` carries a full ShareConfig
 // (seed + archetype + optional palette). Takes precedence over
 // `?seed=` when both are present — the payload is the richer signal.

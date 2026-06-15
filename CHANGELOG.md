@@ -2,6 +2,18 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.13.0] - 2026-06-15 (Founder's story + reciprocal link)
+
+A small "The Story" panel and a corner credit link tell the game's origin and link out to the full write-up on the author's site — a reciprocal link between canyou.land and kennethlacroix.me. Also fills in the page's missing SEO metadata.
+
+### Added
+- **`src/ui/FounderStoryOverlay.ts`** — a DOM overlay (mirrors the Settings/what's-new pattern) with a short "why I built this" blurb and a real outbound link to the full story. Opened from the `#open-story` button; dismissed with CLOSE, Escape, or a backdrop click.
+- **Site-credit footer** in `index.html` — a crawlable reciprocal `<a>` ("Built by Kenneth LaCroix" → `kennethlacroix.me/blog/moonlander-enhanced`, `rel="author"`, dofollow) plus the "The Story" opener. Sits in the letterbox below the game; hidden in embed mode. Being in the static HTML (not canvas-drawn or overlay-only) is what makes the reciprocal link actually crawlable.
+- **SEO metadata** — `description`, `author`, `rel="author"`, and Open Graph `og:title`/`og:description`/`og:type`/`og:url` tags (the page previously had none).
+
+### Note
+- The story link targets `kennethlacroix.me/blog/moonlander-enhanced`, which is scheduled to go live later — it will 404 until the post is published.
+
 ## [0.6.12.0] - 2026-06-15 (3D cinematic replays)
 
 3D mode is at its best where you watch rather than fly — so replays now get a dedicated cinematic camera. When a session is in `?renderer=3d`, AI Theater episode playback and ghost-archaeology fork replays (before the player takes over) slowly orbit the lander so the terrain's depth reads, then widen into an orbital beauty shot on touchdown or crash. Live flight keeps its chase camera; precision landing stays on the readable side-on framing it wants.
