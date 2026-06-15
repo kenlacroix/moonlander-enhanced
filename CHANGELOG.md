@@ -2,6 +2,18 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.8.0] - 2026-06-14 ("What's new" toast)
+
+Players now get a heads-up when the game has been updated. The title screen shows a small corner card — "Updated to vX.Y.Z" — that expands to a one-line summary of what changed and can be dismissed. It only appears after an actual update (never on a first-ever visit), shows once per release, and is suppressed in embed mode.
+
+### Added
+- **`src/data/whatsNew.ts`** — curated, player-facing one-or-two-sentence summary per release, newest first. Decoupled from the dev-facing CHANGELOG; the newest entry's `version` is the single source of truth for "current version" (no separate VERSION import in-app). `isUpdatePending(seen, latest)` is the pure gate: false for brand-new players (no seen version) and when already current, true after an update.
+- **`src/ui/WhatsNewToast.ts`** — DOM corner toast (Canvas can't host clickable text, and the title is keyboard-driven on desktop). Collapsed by default; click to expand the summary, × to dismiss. Persists the seen version to `localStorage["moonlander-last-seen-version"]` on dismiss or when the player leaves the title, so it never nags twice for the same release. localStorage access is wrapped (degrades silently in private mode).
+- **10 tests** in `tests/whats-new.test.ts` (591 total, was 581): data integrity (newest-first ordering, unique versions, non-empty summaries), `LATEST_VERSION` wiring, and the `isUpdatePending` truth table (new player, current, post-update, no-latest, default arg).
+
+### Changed
+- **`Game.onAfterFrame`** drives the toast with `update(status === "title")` — shown only on the title screen (Sprint placement decision), hidden everywhere else.
+
 ## [0.6.7.0] - 2026-06-14 (Procedural terrain variety — Random Mission)
 
 Random Missions no longer feel like the same hills with different labels. A second terrain-generation algorithm gives each archetype a structurally distinct base shape: crater-fields are pocked with overlapping bowls, spires are thin sharp ridgelines over deep troughs, mesas are terraced flat-topped tablelands, rolling is gentle warped hills, and flats is a near-level plain. The change is gated so it touches Random Missions only — historic, curated free-play, and campaign terrain are byte-identical to before, and every existing ghost, leaderboard, and regression pin is untouched.
