@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MoonLander — Sprint 8 3D Cockpit Mockup</title>
+<style>
+	html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+	#hud {
+		position: fixed; top: 12px; left: 12px; z-index: 10;
+		font-family: "Courier New", monospace; color: #8fd6ff; font-size: 13px;
+		line-height: 1.6; text-shadow: 0 0 4px rgba(0,0,0,0.9); user-select: none;
+		background: rgba(4,8,16,0.55); border: 1px solid #2a5a7a; border-radius: 6px;
+		padding: 10px 14px; max-width: 320px;
+	}
+	#hud b { color: #33ccff; }
+	#hud .key { color: #ffd84a; }
+	#view { color: #fff; font-weight: bold; }
+	#note { position: fixed; bottom: 12px; left: 12px; z-index: 10;
+		font-family: "Courier New", monospace; color: #6a8aa0; font-size: 11px;
+		text-shadow: 0 0 4px #000; }
+</style>
+<script type="importmap">
+{
+	"imports": {
+		"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+		"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+	}
+}
+</script>
+</head>
+<body>
+<div id="hud">
+	<div><b>MoonLander — 3D mockup</b></div>
+	<div>view: <span id="view">CHASE</span></div>
+	<div style="margin-top:6px;">
+		<span class="key">1</span> chase &nbsp; <span class="key">2</span> orbital
+		&nbsp; <span class="key">3</span> low cinematic &nbsp; <span class="key">4</span> cockpit
+	</div>
+	<div><span class="key">drag</span> orbit &nbsp; <span class="key">P</span> plume
+		&nbsp; <span class="key">R</span> new terrain &nbsp; <span class="key">space</span> pause</div>
+</div>
+<div id="note">Scoping mockup only — scripted descent, placeholder LM. Not the game build.</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ---- deterministic PRNG (mulberry32), mirrors the game's seeded approach ----
+function mulberry32(seed) {
+	let a = seed >>> 0;
+	return () => {
+		a |= 0; a = (a + 0x6d2b79f5) | 0;
+		let t = Math.imul(a ^ (a >>> 15), 1 | a);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05070c, 0.0016);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 12, 0);
+
+// ---- lighting: low sun + soft fill, the lunar key-light look ----
+const sun = new THREE.DirectionalLight(0xfff4e0, 3.2);
+sun.position.set(-180, 90, 60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 600;
+sun.shadow.camera.left = -250; sun.shadow.camera.right = 250;
+sun.shadow.camera.top = 250; sun.shadow.camera.bottom = -250;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x223344, 0x080808, 0.35));
+
+// sun disc
+const sunDisc = new THREE.Mesh(
+	new THREE.SphereGeometry(14, 24, 24),
+	new THREE.MeshBasicMaterial({ color: 0xfff6e0 })
+);
+sunDisc.position.copy(sun.position).multiplyScalar(2.2);
+scene.add(sunDisc);
+
+// ---- starfield ----
+(() => {
+	const N = 1800, pos = new Float32Array(N * 3), rng = mulberry32(7);
+	for (let i = 0; i < N; i++) {
+		const r = 2000, u = rng() * 2 - 1, th = rng() * Math.PI * 2;
+		const s = Math.sqrt(1 - u * u);
+		pos[i*3] = r * s * Math.cos(th);
+		pos[i*3+1] = Math.abs(r * u) * 0.8 + 50;
+		pos[i*3+2] = r * s * Math.sin(th);
+	}
+	const g = new THREE.BufferGeometry();
+	g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+	scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false })));
+})();
+
+// ---- Earth in the sky ----
+const earth = new THREE.Mesh(
+	new THREE.SphereGeometry(60, 48, 48),
+	new THREE.MeshStandardMaterial({ color: 0x2a5fa8, emissive: 0x0a1830, emissiveIntensity: 0.6, roughness: 0.9 })
+);
+earth.position.set(260, 220, -420);
+scene.add(earth);
+const earthGlow = new THREE.Mesh(
+	new THREE.SphereGeometry(66, 48, 48),
+	new THREE.MeshBasicMaterial({ color: 0x4a90d0, transparent: true, opacity: 0.15, side: THREE.BackSide })
+);
+earthGlow.position.copy(earth.position);
+scene.add(earthGlow);
+
+// ---- terrain: heightmap -> displaced plane (the core Sprint 8 technique) ----
+const WORLD = 700, SEG = 200;
+let terrain, padMesh;
+function heightAt(rng, noise, x, z) {
+	// multi-octave value-ish noise + a few carved craters → cratered mare feel
+	let h = 0, amp = 22, f = 0.012;
+	for (let o = 0; o < 5; o++) {
+		h += amp * (Math.sin(x*f + noise[o]) * Math.cos(z*f*1.3 + noise[o]*2));
+		amp *= 0.55; f *= 2.1;
+	}
+	return h;
+}
+function buildTerrain(seed) {
+	if (terrain) { terrain.geometry.dispose(); scene.remove(terrain); }
+	if (padMesh) { scene.remove(padMesh); }
+	const rng = mulberry32(seed);
+	const noise = Array.from({ length: 5 }, () => rng() * 100);
+	const craters = Array.from({ length: 16 }, () => ({
+		x: (rng()*2-1)*WORLD*0.45, z: (rng()*2-1)*WORLD*0.45,
+		r: 18 + rng()*55, d: 10 + rng()*26
+	}));
+	const geo = new THREE.PlaneGeometry(WORLD, WORLD, SEG, SEG);
+	geo.rotateX(-Math.PI / 2);
+	const pos = geo.attributes.position;
+	const colors = [];
+	const base = new THREE.Color(0x6b6b6b), dark = new THREE.Color(0x3a3a3a);
+	for (let i = 0; i < pos.count; i++) {
+		const x = pos.getX(i), z = pos.getZ(i);
+		let y = heightAt(rng, noise, x, z);
+		for (const c of craters) {
+			const dx = x - c.x, dz = z - c.z, dist = Math.hypot(dx, dz);
+			if (dist < c.r) { const t = 1 - dist / c.r; y += c.d * t * t; }      // bowl
+			else if (dist < c.r * 1.18) y -= (1 - (dist - c.r)/(c.r*0.18)) * 4; // rim
+		}
+		// flat landing pad zone near origin
+		const padDist = Math.hypot(x, z);
+		if (padDist < 34) y = -6;
+		pos.setY(i, y);
+		const shade = base.clone().lerp(dark, THREE.MathUtils.clamp((y+30)/60, 0, 1) * 0.6 + Math.random()*0.06);
+		colors.push(shade.r, shade.g, shade.b);
+	}
+	geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+	geo.computeVertexNormals();
+	terrain = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true }));
+	terrain.receiveShadow = true;
+	scene.add(terrain);
+
+	// glowing landing pad
+	padMesh = new THREE.Mesh(
+		new THREE.RingGeometry(20, 26, 32),
+		new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+	);
+	padMesh.rotation.x = -Math.PI / 2;
+	padMesh.position.y = -5.4;
+	scene.add(padMesh);
+}
+buildTerrain(1969);
+
+// ---- low-poly LM ----
+function buildLM() {
+	const g = new THREE.Group();
+	const gold = new THREE.MeshStandardMaterial({ color: 0xc8a23a, roughness: 0.4, metalness: 0.8 });
+	const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.7, metalness: 0.3 });
+	const accent = new THREE.MeshStandardMaterial({ color: 0x4488ff, roughness: 0.5, metalness: 0.4 });
+	// descent stage (octagonal-ish box)
+	const desc = new THREE.Mesh(new THREE.CylinderGeometry(9, 10, 7, 8), gold);
+	desc.position.y = 6; desc.castShadow = true; g.add(desc);
+	// ascent stage
+	const asc = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 6, 6), dark);
+	asc.position.y = 12.5; asc.castShadow = true; g.add(asc);
+	const cap = new THREE.Mesh(new THREE.SphereGeometry(5, 8, 6, 0, Math.PI*2, 0, Math.PI/2), accent);
+	cap.position.y = 15.3; g.add(cap);
+	// engine bell
+	const bell = new THREE.Mesh(new THREE.CylinderGeometry(2, 4, 4, 8), dark);
+	bell.position.y = 1; g.add(bell);
+	// 4 legs
+	for (let k = 0; k < 4; k++) {
+		const a = (k / 4) * Math.PI * 2 + Math.PI/4;
+		const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 13, 5), gold);
+		leg.position.set(Math.cos(a)*9, 1, Math.sin(a)*9);
+		leg.rotation.z = Math.cos(a)*0.5; leg.rotation.x = -Math.sin(a)*0.5;
+		leg.castShadow = true; g.add(leg);
+		const foot = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 8), gold);
+		foot.position.set(Math.cos(a)*13.5, -5, Math.sin(a)*13.5); g.add(foot);
+	}
+	return g;
+}
+const lm = buildLM();
+scene.add(lm);
+
+// ---- thruster plume (additive points) ----
+let plumeOn = true;
+const PLUME_N = 400;
+const plumePos = new Float32Array(PLUME_N * 3);
+const plumeVel = [];
+for (let i = 0; i < PLUME_N; i++) plumeVel.push({ y: 0, life: 0, r: 0, a: 0 });
+const plumeGeo = new THREE.BufferGeometry();
+plumeGeo.setAttribute("position", new THREE.BufferAttribute(plumePos, 3));
+const plume = new THREE.Points(plumeGeo, new THREE.PointsMaterial({
+	color: 0xff8a3a, size: 3.2, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false
+}));
+scene.add(plume);
+function stepPlume(originY, thrusting) {
+	for (let i = 0; i < PLUME_N; i++) {
+		const p = plumeVel[i];
+		if (p.life <= 0) {
+			if (!thrusting) { plumePos[i*3+1] = -9999; continue; }
+			p.life = 0.4 + Math.random()*0.5; p.y = originY;
+			p.a = Math.random()*Math.PI*2; p.r = 0; p.spd = 18 + Math.random()*22;
+		}
+		p.life -= 0.016; p.y -= p.spd * 0.016; p.r += 0.6;
+		plumePos[i*3] = lm.position.x + Math.cos(p.a) * p.r * 0.5;
+		plumePos[i*3+1] = p.y;
+		plumePos[i*3+2] = lm.position.z + Math.sin(p.a) * p.r * 0.5;
+	}
+	plumeGeo.attributes.position.needsUpdate = true;
+}
+
+// ---- views ----
+const VIEWS = ["CHASE", "ORBITAL", "LOW CINEMATIC", "COCKPIT"];
+let view = 0;
+const viewLabel = document.getElementById("view");
+function applyAutoCam() {
+	// non-orbit framing per view; OrbitControls drag overrides until view re-pressed
+	const t = lm.position;
+	if (view === 0) { camera.position.set(t.x - 40, t.y + 38, t.z + 70); controls.target.set(t.x, t.y, t.z); }
+	if (view === 1) { camera.position.set(t.x + 120, t.y + 140, t.z + 200); controls.target.set(0, 0, 0); }
+	if (view === 2) { camera.position.set(t.x + 55, t.y + 6, t.z + 30); controls.target.set(t.x, t.y + 8, t.z); }
+	if (view === 3) { camera.position.set(t.x, t.y + 14, t.z + 2); controls.target.set(t.x, t.y + 8, t.z - 40); }
+}
+addEventListener("keydown", (e) => {
+	if (e.key >= "1" && e.key <= "4") { view = +e.key - 1; viewLabel.textContent = VIEWS[view]; applyAutoCam(); }
+	if (e.key.toLowerCase() === "p") plumeOn = !plumeOn;
+	if (e.key.toLowerCase() === "r") buildTerrain((Math.random()*1e6)|0);
+	if (e.key === " ") { paused = !paused; e.preventDefault(); }
+});
+
+// ---- scripted descent loop (mockup — no real physics) ----
+let paused = false, tDesc = 0;
+function descent() {
+	tDesc += paused ? 0 : 0.006;
+	const cycle = tDesc % 1;
+	const startY = 150, endY = 6.5;
+	const y = THREE.MathUtils.lerp(startY, endY, Math.min(cycle * 1.15, 1));
+	lm.position.set(Math.sin(tDesc*1.7)*14, y, Math.cos(tDesc*1.3)*14);
+	lm.rotation.z = Math.sin(tDesc*2)*0.12;
+	lm.rotation.x = Math.cos(tDesc*1.5)*0.1;
+}
+
+addEventListener("resize", () => {
+	camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+	renderer.setSize(innerWidth, innerHeight);
+});
+
+applyAutoCam();
+let frame = 0;
+function loop() {
+	requestAnimationFrame(loop);
+	descent();
+	const thrusting = plumeOn && (tDesc % 1) < 0.95;
+	stepPlume(lm.position.y - 1, thrusting);
+	// keep chase/cockpit framing glued to the LM; orbital/low stay put unless dragged
+	if (view === 0 || view === 3) applyAutoCam();
+	earth.rotation.y += 0.0006;
+	controls.update();
+	renderer.render(scene, camera);
+	frame++;
+}
+loop();
+</script>
+</body>
+</html>

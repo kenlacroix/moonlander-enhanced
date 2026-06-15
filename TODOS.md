@@ -441,3 +441,16 @@ Remaining items after cherry-picks ship:
 **Completed:** v0.5.9.1 (2026-04-18). Two SHOULD-FIX items from prior /review.
 - ✅ Embed/shared-URL with historic seed now routes through `selectMission` (Luna 9 autopilot engages on `?seed=<luna9>&embed=1`)
 - ✅ `handleSurviveSuccess` honors `currentFlight.authenticMode` for leaderboard slot routing (mirrors `handleCollisionResult`)
+
+---
+
+## Sprint 8 — 3D mode follow-ups (after v0.6.11.0 first cut)
+
+The cinematic third-person 3D renderer (`?renderer=3d`, `ThreejsGameplayRenderer`) shipped as a first cut in v0.6.11.0. Deferred from that cut:
+
+- [ ] **In-browser verification of `?renderer=3d`** on the deploy preview — confirm the scene renders, chase/orbital/low cams (C key) behave, plume + shadows read well, and perf holds (desktop + mid-tier mobile). The renderer needs a live WebGL context so it isn't unit-testable.
+- [ ] **First-person cockpit view** — the scoped-out 4th camera mode (instrument framing, look-out parallax). The mockup stubs a COCKPIT view; the real renderer only ships chase/orbital/low.
+- [ ] **3D models for artifacts + aliens** — currently `drawArtifacts`/`drawAlien` are no-ops in 3D; lunar archaeology + UFO hazards have no 3D presence.
+- [ ] **GLB asset pipeline** — v1 uses code-built low-poly meshes (no hosted assets). A proper LM/Earth/artifact model set would lift fidelity (loader + caching + bundle budget).
+- [ ] **Volumetric plume polish** — current plume is the shared particle cloud + an additive engine-glow cone; a dedicated volumetric/instanced plume would sell thrust better.
+- [ ] **Settings/menu toggle** — 3D is URL-only (`?renderer=3d`); a persistent in-game setting (with renderer teardown/re-init) would make it discoverable. (AI-generated terrain textures stay in Sprint 9.)

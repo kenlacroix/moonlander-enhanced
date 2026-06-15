@@ -14,6 +14,12 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		version: "0.6.11.0",
+		date: "2026-06-14",
+		summary:
+			"Experimental 3D mode! Add ?renderer=3d to the URL to fly in a cinematic third-person view — a real lunar landscape, low-poly lander, Earth in the sky, and a chase camera (press C to switch angles). Same physics, new perspective.",
+	},
+	{
 		version: "0.6.10.0",
 		date: "2026-06-14",
 		summary:
