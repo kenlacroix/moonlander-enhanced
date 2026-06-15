@@ -2,6 +2,23 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.6.0] - 2026-06-14 (Gamepad support)
+
+Plug in any USB or Bluetooth controller — Xbox, PlayStation, 8BitDo — and fly. The browser Gamepad API joins keyboard and touch as a third input source with zero install: the left stick steers, the right trigger (or A) fires the descent engine, and the D-pad/face buttons drive the menus. Connecting a pad pops a brief on-screen toast, and supported controllers rumble on RCS thruster fire, on impact, and through a gravity storm's peak.
+
+### Added
+- **Gamepad input in `src/systems/Input.ts`** — polled once per frame inside `getState()` and merged with keyboard/touch. Standard mapping: left stick X / D-pad ←→ rotate (0.15 deadzone), right trigger or A (south) thrust, left stick Y / D-pad ↑↓ menu nav (edge-detected so one push = one move), A or Start select, Back/Share menu-back, B restart. One-shot actions fire on the button's rising edge.
+- **Connection toast** — a "GAMEPAD CONNECTED" banner with the controller name, shown for ~3 s across title, menu, and gameplay (`CanvasRenderer.drawGamepadToast`, wired through `GameRenderer` and decremented every frame in `Game.onAfterFrame`).
+- **Rumble feedback** — light buzz on the frame RCS thrusters start firing, a heavy thump on crash, and a sustained low rumble as a gravity storm peaks, via `Gamepad.vibrationActuator`. Guarded so browsers/pads without haptics no-op silently.
+- **`lastInputSource` getter** (`"keyboard" | "touch" | "gamepad"`) on `Input`, updated as each source is used — available for a future HUD indicator.
+
+### Not changed
+- **Keyboard and touch input** — gamepad state is OR-merged into the existing input, so nothing about the keyboard or virtual-joystick paths changes.
+- **Physics, scoring, and ghost determinism** — input source is invisible to the simulation; a gamepad-flown run records and replays identically to a keyboard run.
+
+### Notes
+- The standard Gamepad mapping is wired but has not been verified against a physical controller. Real-pad button indices and rumble behavior (some 8BitDo / PlayStation pads report non-standard mappings) need a live hardware pass — tracked in TODOS.md.
+
 ## [0.6.5.0] - 2026-06-07 (Sprint 7.6 — Animated Character Portraits)
 
 The Campaign's two voices now have faces. Dr. Liam Hoshi (mint mission-patch roundel: rectangular glasses, side-parted hair, lanyard badge) and CapCom Maya Chen (amber 16-bit pixel-art bust: blunt bob, headset, boom mic) appear next to their dialogue lines with a 3-frame talking mouth — during briefings, in-flight callouts, and post-landing analysis. Characters stay distinguishable by silhouette alone, so the portraits work for color-blind players, and the FLIGHT:/CAPCOM: text prefix stays untouched.
