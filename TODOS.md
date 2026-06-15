@@ -68,7 +68,16 @@ Browser Gamepad API works in Chrome/Firefox/Safari with zero user-side install. 
 
 ## P2 — Playtest observations 2026-04-24 (5 ideas captured for tracking)
 
-### Procedural terrain variety — second-algorithm pass
+### Procedural terrain variety — second-algorithm pass — DONE 2026-06-14 (Random Mission)
+**Shipped:** New `src/game/terrain/generators.ts` — seeded value-noise/fBm base-shape
+generators (Voronoi craters, ridged-noise spires, domain-warped + terraced mesa,
+gentle rolling, low-amp flats) gated behind a `terrainVersion: 2` field on
+`DifficultyConfig`. Applied to **Random Mission only** this pass (live roll +
+share-decode); historic, curated free-play, and campaign stay v1 byte-identical,
+so all existing ghosts/leaderboards and the seed 1969/4217/7001 pins are untouched.
+Next step to extend the win: opt curated free-play / campaign missions into v2
+one at a time (each invalidates that mission's old ghosts, so do it deliberately).
+
 **What:** Levels still feel samey across Free Play / Campaign / Historic because all 5 archetypes (`rolling`, `crater-field`, `spires`, `mesa`, `flats`) run on the same midpoint-displacement core with cosmetic biasing. Add a *second* generator (Voronoi craters for `crater-field`, ridged-noise for `spires`, domain-warped fBm for `mesa`) and dispatch by archetype.
 - **Reconciling with "accuracy":** Historic missions and Authentic Mode keep their curated deterministic path (`specialFeature: "rille" | "valley"` + Apollo-site-faithful seeds stay byte-identical). Procedural variety lands in Free Play + Random Mission only — historic seeds remain pinned by the existing regression test (`tests/terrain.test.ts` seed 1969 / 4217 / 7001 byte-identical pin).
 - **Why:** Sprint 7.1 added archetype labels and palettes but the geometry underneath is mostly the same shape. Player observation: "the terrain is mostly flat with a few spikes or mountains."

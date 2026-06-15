@@ -10,6 +10,7 @@ import {
 } from "../utils/constants";
 import { createRng, lerp, type Vec2, vec2 } from "../utils/math";
 import { applyArchetype } from "./terrain/archetypes";
+import { generateV2Base } from "./terrain/generators";
 
 export interface LandingPad {
 	x: number;
@@ -83,6 +84,17 @@ export interface DifficultyConfig {
 	 * specialFeature=rille) keeps both behaviors.
 	 */
 	archetype?: "rolling" | "crater-field" | "spires" | "mesa" | "flats";
+	/**
+	 * Terrain generator version. Undefined/1 = the v0.6.0.0 midpoint-
+	 * displacement base + archetype post-pass (byte-identical, used by all
+	 * historic, curated free-play, and campaign missions). 2 = per-archetype
+	 * base-shape generators in `terrain/generators.ts` (Voronoi craters,
+	 * ridged spires, domain-warped mesa/rolling). v2 is currently set only
+	 * by Random Missions, so v1 ghosts and the historic regression pins are
+	 * never affected. Embedded in ghosts (via DifficultyConfig) so replays
+	 * reconstruct the matching terrain.
+	 */
+	terrainVersion?: 1 | 2;
 }
 
 /** Generate terrain using midpoint displacement, seeded for determinism */
@@ -94,23 +106,29 @@ export function generateTerrain(
 
 	const roughness = difficulty?.roughness ?? TERRAIN_ROUGHNESS;
 
-	// Start with two endpoints
-	const baseY =
-		CANVAS_HEIGHT - lerp(TERRAIN_MIN_HEIGHT, TERRAIN_MAX_HEIGHT, 0.5);
-	let heights = [baseY - 50 + rng() * 100, baseY - 50 + rng() * 100];
+	// v2 — per-archetype base-shape generators replace midpoint displacement.
+	// Gated to opt-in missions (Random Mission); v1 stays byte-identical.
+	let heights: number[];
+	if (difficulty?.terrainVersion === 2) {
+		heights = generateV2Base(difficulty.archetype, rng);
+	} else {
+		// v1 — midpoint displacement. Start with two endpoints.
+		const baseY =
+			CANVAS_HEIGHT - lerp(TERRAIN_MIN_HEIGHT, TERRAIN_MAX_HEIGHT, 0.5);
+		heights = [baseY - 50 + rng() * 100, baseY - 50 + rng() * 100];
 
-	// Midpoint displacement iterations
-	const iterations = 8;
-	for (let iter = 0; iter < iterations; iter++) {
-		const newHeights: number[] = [];
-		const scale = roughness * 0.5 ** iter * 150;
-		for (let i = 0; i < heights.length - 1; i++) {
-			newHeights.push(heights[i]);
-			const mid = (heights[i] + heights[i + 1]) / 2 + (rng() - 0.5) * scale;
-			newHeights.push(mid);
+		const iterations = 8;
+		for (let iter = 0; iter < iterations; iter++) {
+			const newHeights: number[] = [];
+			const scale = roughness * 0.5 ** iter * 150;
+			for (let i = 0; i < heights.length - 1; i++) {
+				newHeights.push(heights[i]);
+				const mid = (heights[i] + heights[i + 1]) / 2 + (rng() - 0.5) * scale;
+				newHeights.push(mid);
+			}
+			newHeights.push(heights[heights.length - 1]);
+			heights = newHeights;
 		}
-		newHeights.push(heights[heights.length - 1]);
-		heights = newHeights;
 	}
 
 	// Carve crevices — sharp V-shaped dips for harder missions
@@ -148,8 +166,12 @@ export function generateTerrain(
 	// can avoid touching pad zones. `rolling` and `undefined` are
 	// no-ops (bypass dispatch entirely), preserving v0.6.0.0 output
 	// exactly. The regression pin for MISSIONS[] seeds + Apollo 11/15/17
-	// depends on that no-op path.
-	applyArchetype(difficulty?.archetype, points, pads, rng);
+	// depends on that no-op path. Skipped under v2 — the base generator
+	// already produces the archetype's geometry, so a post-pass would
+	// double-apply it.
+	if (difficulty?.terrainVersion !== 2) {
+		applyArchetype(difficulty?.archetype, points, pads, rng);
+	}
 
 	// Optional historic-mission flavor pass. Runs after pads AND after
 	// archetype so "rolling + rille" stays identical to v0.5.x behavior

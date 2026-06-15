@@ -106,3 +106,81 @@ describe("generateTerrain — specialFeature: valley", () => {
 		expect(a.points).toEqual(b.points);
 	});
 });
+
+describe("generateTerrain — terrainVersion 2 (procedural variety)", () => {
+	const archetypes = [
+		"rolling",
+		"crater-field",
+		"spires",
+		"mesa",
+		"flats",
+	] as const;
+	const seeds = [1969, 4217, 7001];
+
+	it("leaves v1 output byte-identical (v2 is fully opt-in)", () => {
+		for (const seed of seeds) {
+			const baseline = generateTerrain(seed);
+			const v1Explicit = generateTerrain(seed, { terrainVersion: 1 });
+			expect(v1Explicit.points).toEqual(baseline.points);
+		}
+	});
+
+	it.each(
+		archetypes,
+	)("v2 %s produces different geometry than v1 for the same seed", (archetype) => {
+		const v1 = generateTerrain(4217, { archetype });
+		const v2 = generateTerrain(4217, { archetype, terrainVersion: 2 });
+		expect(v2.points).not.toEqual(v1.points);
+	});
+
+	it.each(
+		archetypes,
+	)("v2 %s is deterministic for the same seed", (archetype) => {
+		const a = generateTerrain(4217, { archetype, terrainVersion: 2 });
+		const b = generateTerrain(4217, { archetype, terrainVersion: 2 });
+		expect(a.points).toEqual(b.points);
+	});
+
+	it("v2 differs across seeds for the same archetype", () => {
+		const a = generateTerrain(1969, { archetype: "spires", terrainVersion: 2 });
+		const b = generateTerrain(4217, { archetype: "spires", terrainVersion: 2 });
+		expect(a.points).not.toEqual(b.points);
+	});
+
+	it.each(archetypes)("v2 %s keeps the same point count as v1", (archetype) => {
+		const v1 = generateTerrain(7001, { archetype });
+		const v2 = generateTerrain(7001, { archetype, terrainVersion: 2 });
+		expect(v2.points.length).toBe(v1.points.length);
+	});
+
+	it.each(
+		archetypes,
+	)("v2 %s clamps all heights into the valid terrain band", (archetype) => {
+		const { points } = generateTerrain(1969, { archetype, terrainVersion: 2 });
+		// CANVAS_HEIGHT 720, height band [TERRAIN_MIN 100, TERRAIN_MAX 500]
+		// → screen-y in [220, 620].
+		for (const p of points) {
+			expect(p.y).toBeGreaterThanOrEqual(220);
+			expect(p.y).toBeLessThanOrEqual(620);
+		}
+	});
+
+	it.each(
+		archetypes,
+	)("v2 %s yields flat, landable pads (single y across each pad)", (archetype) => {
+		const { points, pads } = generateTerrain(4217, {
+			archetype,
+			terrainVersion: 2,
+		});
+		expect(pads.length).toBeGreaterThan(0);
+		for (const pad of pads) {
+			const onPad = points.filter(
+				(p) => p.x >= pad.x && p.x <= pad.x + pad.width,
+			);
+			expect(onPad.length).toBeGreaterThan(0);
+			for (const p of onPad) {
+				expect(p.y).toBeCloseTo(pad.y, 5);
+			}
+		}
+	});
+});
