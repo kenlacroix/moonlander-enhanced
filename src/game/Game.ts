@@ -172,6 +172,10 @@ export class Game {
 	private whatsNewToast = new WhatsNewToast();
 	private fuelWarningCooldown = 0;
 	private audioInitialized = false;
+	/** v0.6.9.0 — whether the menu/pause ambient track is currently requested,
+	 * for edge-triggered start/stop as the player moves between the title/menu
+	 * screens and flight. */
+	private menuMusicOn = false;
 	ghostRecorder = new GhostRecorder();
 	ghostPlayer: GhostPlayer | null = null;
 	telemetry = new TelemetryRecorder();
@@ -866,6 +870,19 @@ export class Game {
 	private onAfterFrame(dt: number): void {
 		const input = this.currentInput;
 		this.whatsNewToast.update(this.status === "title");
+		// v0.6.9.0 — menu/pause ambient track on the title + mission-select
+		// screens. Edge-triggered so startMenu/stopMenu fire once per
+		// transition; gated on audioInitialized (no sound before first gesture).
+		const wantMenuMusic =
+			this.audioInitialized &&
+			(this.status === "title" || this.status === "menu");
+		if (wantMenuMusic && !this.menuMusicOn) {
+			this.audio.soundtrack.startMenu();
+			this.menuMusicOn = true;
+		} else if (!wantMenuMusic && this.menuMusicOn) {
+			this.audio.soundtrack.stopMenu();
+			this.menuMusicOn = false;
+		}
 		if (this.gamepadToastTimer > 0) {
 			this.gamepadToastTimer -= dt;
 			if (this.gamepadToastTimer <= 0) this.gamepadToast = null;

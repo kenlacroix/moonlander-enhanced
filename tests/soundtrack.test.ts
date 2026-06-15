@@ -39,6 +39,18 @@ describe("Soundtrack — per-archetype setup", () => {
 		expect(() => st.setMuted(true)).not.toThrow();
 	});
 
+	it("menu mode methods no-op safely without an AudioContext", () => {
+		const st = new Soundtrack();
+		// startMenu must not schedule an arpeggio timer when there's no ctx,
+		// and stopMenu/start must stay safe in any order.
+		expect(() => st.startMenu()).not.toThrow();
+		expect(() => st.stopMenu()).not.toThrow();
+		expect(() => st.startMenu()).not.toThrow();
+		expect(() => st.start()).not.toThrow();
+		expect(() => st.stopMenu()).not.toThrow();
+		expect(() => st.setMuted(true)).not.toThrow();
+	});
+
 	it("setArchetype before init() still leaves the soundtrack safe to call", () => {
 		// Matches Game.reset()'s flow: setArchetype is called every reset,
 		// but init() only fires once on first audio interaction.
