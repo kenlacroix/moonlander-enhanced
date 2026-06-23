@@ -67,4 +67,4 @@ MIT — see `LICENSE` if present, otherwise assume MIT.
 
 ---
 
-Built by [Kenneth Lacroix](https://kennethlacroix.me)
+Built by [Kenneth LaCroix](https://kennethlacroix.me)
