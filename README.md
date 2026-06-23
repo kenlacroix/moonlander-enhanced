@@ -64,3 +64,7 @@ Phases 1-3 shipped. Phase 4 (polish + shareability) mostly done. The "AI Theater
 ## License
 
 MIT — see `LICENSE` if present, otherwise assume MIT.
+
+---
+
+Built by [Kenneth LaCroix](https://kennethlacroix.me)
