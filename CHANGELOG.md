@@ -2,6 +2,32 @@
 
 All notable changes to MoonLander Enhanced will be documented in this file.
 
+## [0.6.15.0] - 2026-06-15 (Cockpit window vignette + attitude indicator)
+
+Polish on the v0.6.14.0 cockpit camera. The first-person view was hard to read for two reasons: it didn't feel "inside" anything, and roll was only conveyed by the world tilting (so small banks were easy to miss). Both are now addressed.
+
+### Added
+- **Window-frame vignette** — a camera-fixed porthole that darkens the periphery and faintly frames the edge, so the cockpit view reads as looking *out* of the lander rather than a free camera. Built once into a `CanvasTexture` mapped onto a camera-child plane (`makeVignetteTexture`), drawn over the scene with depth test off.
+- **Synthetic attitude indicator (artificial horizon)** — a small gauge at bottom-center showing bank directly: a horizon bar counter-rotates against a fixed craft reference (wings + hub) as the lander rolls. The reference goes red once `|angle|` exceeds `MAX_LANDING_ANGLE` (10°), so "too steep to land" reads at a glance instead of having to infer it from the tilting world.
+
+### Note
+- Both elements are cockpit-only (camera mode 3) and need a live WebGL context, so they aren't jsdom-testable. Verified in-browser on `?renderer=3d`: vignette + gauge render, the horizon bar tilts with roll, and the reference reddens past the 10° gate. Static checks (types, build, 602 tests) pass.
+
+## [0.6.14.0] - 2026-06-15 (3D cockpit challenge camera)
+
+3D mode gets a first-person cockpit view — the 4th camera angle in the `C` cycle (chase → orbital → low → cockpit). It's deliberately a *challenge* camera, not the default: from inside the lander you can't see your own attitude, and 3D foreshortening already makes precision landing harder. So it ships with a **landing-point designator (LPD)** — a ground reticle showing where you'll touch down if you cut thrust now. Steer it onto a pad (the ring turns green over a pad, amber off it) and you land. Live flight defaults to chase; the land/crash beat still pulls to the orbital shot.
+
+### Added
+- **Cockpit camera in `ThreejsGameplayRenderer`** — first-person, positioned at the lander, rolling with the craft (so banking is felt) and looking down-forward into the terrain's depth; the LM mesh hides. A camera-fixed boresight reticle gives a stable aiming reference while the world tilts around it.
+- **Landing-point designator** — a world-space ground ring at the ballistic-predicted touchdown point (current position + velocity under gravity, no thrust), refined against the terrain height there, clamped to the world, and colored by whether it lands on a pad. The skill aid that makes flying blind to your own attitude landable.
+- **`IGameplayRenderer.setEffectiveGravity?(g)`** — optional signal so the LPD's prediction is correct on alt-gravity worlds (Europa/Titan/etc.); `Game` feeds it `gravityPreset.gameGravity`. Canvas/WebGL omit it.
+
+### Changed
+- The `C` camera cycle is now 4-wide (was 3); cockpit is the new mode 3.
+
+### Note
+- Camera/reticle behavior needs a live WebGL context (not jsdom-testable). Static checks (types, build, 602 tests) pass; confirm the cockpit + LPD on the deploy preview with `?renderer=3d` (press `C` to reach it). Window-frame vignette and a synthetic attitude indicator are possible polish follow-ups.
+
 ## [0.6.13.0] - 2026-06-15 (Founder's story + reciprocal link)
 
 A small "The Story" panel and a corner credit link tell the game's origin and link out to the full write-up on the author's site — a reciprocal link between canyou.land and kennethlacroix.me. Also fills in the page's missing SEO metadata.

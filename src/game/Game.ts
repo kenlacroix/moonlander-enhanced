@@ -895,6 +895,9 @@ export class Game {
 			this.status === "agent-replay" ||
 			(this.forkReplay !== null && !this.forkReplay.forked);
 		this.gameplayRenderer.setReplayMode?.(isReplay);
+		// Sprint 8 follow-up — feed effective gravity to the 3D cockpit camera
+		// so its landing-point reticle predicts correctly on alt-gravity worlds.
+		this.gameplayRenderer.setEffectiveGravity?.(this.gravityPreset.gameGravity);
 		switch (this.status) {
 			case "title":
 				updateTitle(this, input);

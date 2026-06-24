@@ -9,6 +9,8 @@ import {
 	CANVAS_HEIGHT,
 	CANVAS_WIDTH,
 	COLOR_TERRAIN,
+	GRAVITY,
+	MAX_LANDING_ANGLE,
 	WORLD_WIDTH,
 } from "../utils/constants";
 import { degToRad } from "../utils/math";
@@ -54,6 +56,36 @@ function depthRidge(x: number, z: number, seed: number): number {
 	);
 }
 
+/** Radial cockpit-window vignette: clear center fading to a dark, faintly
+ * framed border. Built once into a CanvasTexture and mapped onto a
+ * camera-fixed plane so the first-person view reads as a porthole. */
+function makeVignetteTexture(): THREE.CanvasTexture {
+	const size = 256;
+	const cv = document.createElement("canvas");
+	cv.width = size;
+	cv.height = size;
+	const ctx = cv.getContext("2d");
+	if (!ctx) return new THREE.CanvasTexture(cv);
+	const g = ctx.createRadialGradient(
+		size / 2,
+		size / 2,
+		size * 0.32,
+		size / 2,
+		size / 2,
+		size * 0.62,
+	);
+	g.addColorStop(0, "rgba(0,0,0,0)");
+	g.addColorStop(1, "rgba(0,0,0,0.92)");
+	ctx.fillStyle = g;
+	ctx.fillRect(0, 0, size, size);
+	// Faint window frame near the edge.
+	ctx.strokeStyle = "rgba(120,160,180,0.18)";
+	ctx.lineWidth = size * 0.02;
+	const m = size * 0.085;
+	ctx.strokeRect(m, m, size - 2 * m, size - 2 * m);
+	return new THREE.CanvasTexture(cv);
+}
+
 export class ThreejsGameplayRenderer implements IGameplayRenderer {
 	readonly canvas: HTMLCanvasElement;
 	private renderer: THREE.WebGLRenderer;
@@ -80,8 +112,17 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 	private ghostFrame = -1;
 	private lastLander: LanderState | null = null;
 	private shakeAmount = 0;
-	private camMode = 0; // 0 chase, 1 orbital, 2 low cinematic
+	private camMode = 0; // 0 chase, 1 orbital, 2 low cinematic, 3 cockpit
 	private replayMode = false;
+	// Cockpit challenge camera: first-person view + a landing-point reticle.
+	private cockpitGroup: THREE.Group;
+	private lpdRing: THREE.Mesh;
+	private lpdMat: THREE.MeshBasicMaterial;
+	private vignette: THREE.Mesh;
+	private attitudeGroup: THREE.Group;
+	private horizonBar: THREE.Mesh;
+	private attitudeMat: THREE.MeshBasicMaterial;
+	private effectiveGravity = GRAVITY;
 	private readonly onKey: (e: KeyboardEvent) => void;
 
 	private constructor(canvas: HTMLCanvasElement) {
@@ -189,8 +230,132 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		particles.frustumCulled = false;
 		this.scene.add(particles);
 
+		// Cockpit reticle — a center boresight fixed to the camera (the
+		// world tilts around it, giving attitude feedback). The camera is
+		// added to the scene so its child HUD objects render.
+		this.scene.add(this.camera);
+		this.cockpitGroup = new THREE.Group();
+		const reticleMat = new THREE.MeshBasicMaterial({
+			color: 0x33ff99,
+			fog: false,
+			transparent: true,
+			opacity: 0.9,
+		});
+		const ring = new THREE.Mesh(
+			new THREE.RingGeometry(0.03, 0.045, 24),
+			reticleMat,
+		);
+		this.cockpitGroup.add(ring);
+		for (let k = 0; k < 4; k++) {
+			const tick = new THREE.Mesh(
+				new THREE.BoxGeometry(0.012, 0.05, 0.001),
+				reticleMat,
+			);
+			const a = (k / 4) * Math.PI * 2;
+			tick.position.set(Math.cos(a) * 0.08, Math.sin(a) * 0.08, 0);
+			tick.rotation.z = a;
+			this.cockpitGroup.add(tick);
+		}
+		this.cockpitGroup.position.set(0, 0, -3); // fixed in front of the eye
+		this.cockpitGroup.visible = false;
+		this.camera.add(this.cockpitGroup);
+
+		// Landing-point designator — a world-space ground ring at the
+		// ballistic-predicted touchdown spot. Green over a pad, amber off it.
+		this.lpdMat = new THREE.MeshBasicMaterial({
+			color: 0xffaa33,
+			fog: false,
+			transparent: true,
+			opacity: 0.85,
+			side: THREE.DoubleSide,
+		});
+		this.lpdRing = new THREE.Mesh(
+			new THREE.RingGeometry(14, 20, 28),
+			this.lpdMat,
+		);
+		this.lpdRing.rotation.x = -Math.PI / 2;
+		this.lpdRing.visible = false;
+		this.scene.add(this.lpdRing);
+
+		// Window-frame vignette — darkens the periphery into a porthole so the
+		// first-person view reads as "inside the lander", not a free camera.
+		// Camera-fixed, drawn over the scene (depthTest off).
+		this.vignette = new THREE.Mesh(
+			new THREE.PlaneGeometry(2.2, 1.25),
+			new THREE.MeshBasicMaterial({
+				map: makeVignetteTexture(),
+				transparent: true,
+				depthTest: false,
+				depthWrite: false,
+				fog: false,
+			}),
+		);
+		this.vignette.position.set(0, 0, -1);
+		this.vignette.renderOrder = 10;
+		this.vignette.visible = false;
+		this.camera.add(this.vignette);
+
+		// Synthetic attitude indicator (artificial horizon). From inside you
+		// can't see your own bank except by the world tilting; this gauge
+		// shows roll directly. A fixed craft reference (wings + hub) sits
+		// against a horizon bar that counter-rotates with the craft. The wings
+		// go red past the landing-angle gate so "too steep" reads at a glance.
+		this.attitudeGroup = new THREE.Group();
+		this.attitudeGroup.position.set(0, -0.3, -1);
+		const adiHud = <T extends THREE.Object3D>(m: T): T => {
+			m.renderOrder = 11;
+			return m;
+		};
+		const ringOutline = new THREE.Mesh(
+			new THREE.RingGeometry(0.075, 0.083, 40),
+			new THREE.MeshBasicMaterial({
+				color: 0x2a4a55,
+				transparent: true,
+				opacity: 0.8,
+				depthTest: false,
+				fog: false,
+			}),
+		);
+		this.attitudeGroup.add(adiHud(ringOutline));
+
+		this.horizonBar = new THREE.Mesh(
+			new THREE.BoxGeometry(0.14, 0.008, 0.001),
+			new THREE.MeshBasicMaterial({
+				color: 0x55ccff,
+				transparent: true,
+				opacity: 0.9,
+				depthTest: false,
+				fog: false,
+			}),
+		);
+		this.attitudeGroup.add(adiHud(this.horizonBar));
+
+		this.attitudeMat = new THREE.MeshBasicMaterial({
+			color: 0x33ff88,
+			transparent: true,
+			opacity: 0.95,
+			depthTest: false,
+			fog: false,
+		});
+		for (const wx of [-0.05, 0.05]) {
+			const wing = new THREE.Mesh(
+				new THREE.BoxGeometry(0.045, 0.009, 0.001),
+				this.attitudeMat,
+			);
+			wing.position.set(wx, 0, 0.001);
+			this.attitudeGroup.add(adiHud(wing));
+		}
+		const hub = new THREE.Mesh(
+			new THREE.CircleGeometry(0.01, 16),
+			this.attitudeMat,
+		);
+		hub.position.z = 0.001;
+		this.attitudeGroup.add(adiHud(hub));
+		this.attitudeGroup.visible = false;
+		this.camera.add(this.attitudeGroup);
+
 		this.onKey = (e: KeyboardEvent) => {
-			if (e.code === "KeyC") this.camMode = (this.camMode + 1) % 3;
+			if (e.code === "KeyC") this.camMode = (this.camMode + 1) % 4;
 		};
 		window.addEventListener("keydown", this.onKey);
 
@@ -513,6 +678,43 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 		const tx = l ? l.x : WORLD_WIDTH * 0.5;
 		const ty = l ? sy(l.y) : 400;
 		const landed = l?.status === "landed" || l?.status === "crashed";
+		this.camera.up.set(0, 1, 0); // reset roll; cockpit overrides below
+
+		// Cockpit challenge camera — first-person, rolls with the craft, LM
+		// hidden. A landing-point reticle (where you'll touch down if you cut
+		// thrust now) is the skill aid that makes flying blind to your own
+		// attitude landable: steer the marker onto the pad. Not active on the
+		// land/crash beat (that pulls to the orbital shot like the other modes).
+		const cockpit = !this.replayMode && !landed && this.camMode === 3;
+		this.cockpitGroup.visible = cockpit;
+		this.lpdRing.visible = cockpit;
+		this.vignette.visible = cockpit;
+		this.attitudeGroup.visible = cockpit;
+		if (cockpit && l) {
+			this.lm.visible = false;
+			const roll = degToRad(l.angle);
+			const syY = sy(l.y);
+			this.camera.position.set(l.x, syY + 4, 0);
+			const groundSceneY = sy(this.terrainHeightWorldY(l.x));
+			this.camera.up.set(Math.sin(roll), Math.cos(roll), 0);
+			// Look down and forward into the terrain's depth, biased toward
+			// horizontal travel so drift reads.
+			this.camera.lookAt(l.x + l.vx * 0.25, groundSceneY + 20, 80);
+			const lpd = this.computeLPD();
+			if (lpd) {
+				this.lpdRing.position.set(lpd.x, sy(lpd.groundY) + 1, 0);
+				const pulse = 1 + Math.sin(this.frameId * 0.12) * 0.08;
+				this.lpdRing.scale.setScalar(pulse);
+				this.lpdMat.color.setHex(lpd.onPad ? 0x33ff88 : 0xffaa33);
+			}
+			// Artificial horizon: counter-rotate the bar against the fixed
+			// craft reference so bank reads directly; redden past the gate.
+			this.horizonBar.rotation.z = -roll;
+			this.attitudeMat.color.setHex(
+				Math.abs(l.angle) > MAX_LANDING_ANGLE ? 0xff5544 : 0x33ff88,
+			);
+			return;
+		}
 
 		// Cinematic replay sweep — slowly orbit the playback lander so the
 		// terrain's depth reads, widening into a beauty shot on touchdown /
@@ -561,6 +763,57 @@ export class ThreejsGameplayRenderer implements IGameplayRenderer {
 
 	setReplayMode(active: boolean): void {
 		this.replayMode = active;
+	}
+
+	setEffectiveGravity(g: number): void {
+		this.effectiveGravity = g > 0 ? g : GRAVITY;
+	}
+
+	/** World-space terrain height (y-down coords) at a world x, interpolated
+	 * from the cached heightline. */
+	private terrainHeightWorldY(x: number): number {
+		const t = this.lastTerrain;
+		if (!t || t.points.length < 2) return CANVAS_HEIGHT - 200;
+		const pts = t.points;
+		const last = pts[pts.length - 1];
+		if (x <= pts[0].x) return pts[0].y;
+		if (x >= last.x) return last.y;
+		const step = WORLD_WIDTH / (pts.length - 1);
+		const i = Math.min(pts.length - 2, Math.max(0, Math.floor(x / step)));
+		const span = pts[i + 1].x - pts[i].x || 1;
+		const f = (x - pts[i].x) / span;
+		return pts[i].y + (pts[i + 1].y - pts[i].y) * f;
+	}
+
+	/** Ballistic landing-point prediction: where the lander touches down if
+	 * it stops thrusting now (current position + velocity under gravity).
+	 * Returns world-x, world-ground-y, and whether it lands on a pad. */
+	private computeLPD(): { x: number; groundY: number; onPad: boolean } | null {
+		const l = this.lastLander;
+		const t = this.lastTerrain;
+		if (!l || !t) return null;
+		const g = this.effectiveGravity;
+		// Solve 0.5*g*tt^2 + vy*tt + (y - groundY) = 0 for the fall time.
+		const solveT = (groundY: number): number | null => {
+			const a = 0.5 * g;
+			const b = l.vy;
+			const c = l.y - groundY;
+			if (a <= 0) return b > 0 ? -c / b : null;
+			const disc = b * b - 4 * a * c;
+			if (disc < 0) return null;
+			return (-b + Math.sqrt(disc)) / (2 * a);
+		};
+		let xi = l.x;
+		let tt = solveT(this.terrainHeightWorldY(xi));
+		if (tt != null && tt >= 0) {
+			xi = l.x + l.vx * tt; // first guess
+			tt = solveT(this.terrainHeightWorldY(xi)); // refine against terrain there
+			if (tt != null && tt >= 0) xi = l.x + l.vx * tt;
+		}
+		xi = Math.max(0, Math.min(WORLD_WIDTH, xi));
+		const groundY = this.terrainHeightWorldY(xi);
+		const onPad = t.pads.some((p) => xi >= p.x && xi <= p.x + p.width);
+		return { x: xi, groundY, onPad };
 	}
 
 	resize(_width: number, _height: number): void {
